@@ -77,16 +77,16 @@ export default function HomePage() {
 
       <div className="relative z-10 flex w-full flex-col items-center gap-5 px-6">
         {/* Main Card */}
-        <div className="flex w-full max-w-[440px] flex-col gap-5 rounded-[18px] border border-[#2d2d2d] bg-[#1e1e1e] p-7">
+        <div className="flex w-full max-w-110 flex-col gap-5 rounded-[18px] border border-[#2d2d2d] bg-[#1e1e1e] p-7">
           {/* Header */}
           <div className="flex flex-col items-center gap-2.5 text-center">
             <ForgeLogo className="h-9 w-9 text-[#10a37f]" />
 
-            <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-white">
+            <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em] text-white">
               What do you want to build today?
             </h1>
 
-            <p className="max-w-[290px] text-[12px] leading-relaxed text-zinc-500">
+            <p className="max-w-72.5 text-[14px] leading-6 text-zinc-500">
               Forge helps you think, create, research, organize projects, and
               move faster.
             </p>
@@ -101,11 +101,11 @@ export default function HomePage() {
               >
                 <Icon size={17} className="text-[#10a37f]" />
 
-                <span className="text-center text-[11px] font-semibold leading-snug text-zinc-300">
+                <span className="text-center text-[13px] font-semibold leading-snug tracking-[-0.01em] text-zinc-300">
                   {title}
                 </span>
 
-                <span className="text-center text-[10px] leading-snug text-zinc-500">
+                <span className="text-center text-[12px] leading-snug text-zinc-500">
                   {description}
                 </span>
               </button>
@@ -118,7 +118,7 @@ export default function HomePage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`border-b-2 px-2.5 py-1 pb-[7px] text-[13px] transition-colors ${
+                className={`border-b-2 px-2.5 py-1 pb-1.75 text-[14px] transition-colors ${
                   activeTab === tab
                     ? "border-[#10a37f] text-[#10a37f]"
                     : "border-transparent text-zinc-500 hover:text-zinc-300"
@@ -139,7 +139,7 @@ export default function HomePage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Message Forge"
-              className="flex-1 bg-transparent text-sm text-zinc-300 outline-none placeholder:text-zinc-600"
+              className="flex-1 bg-transparent text-[15px] text-zinc-300 outline-none placeholder:text-zinc-600"
             />
 
             <div className="flex shrink-0 items-center gap-1.5">
@@ -149,7 +149,7 @@ export default function HomePage() {
 
               <button
                 onClick={handleSend}
-                className="rounded-lg bg-[#10a37f] p-[6px] text-white transition-colors duration-150 hover:bg-[#0d8f6f]"
+                className="rounded-lg bg-[#10a37f] p-1.5 text-white transition-colors duration-150 hover:bg-[#0d8f6f]"
               >
                 <ArrowRight size={14} />
               </button>

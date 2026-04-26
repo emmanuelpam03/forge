@@ -351,7 +351,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
           return (
             <p
               key={index}
-              className="whitespace-pre-wrap text-sm leading-relaxed"
+              className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]"
             >
               {block.value}
             </p>
@@ -362,7 +362,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
           return (
             <blockquote
               key={index}
-              className="rounded-xl border border-[#2f2f2f] bg-[#171717] px-3 py-2.5 text-sm italic leading-relaxed text-zinc-300"
+              className="rounded-xl border border-[#2f2f2f] bg-[#171717] px-3 py-2.5 text-[14px] italic leading-7 tracking-[-0.01em] text-zinc-300"
             >
               {block.value}
             </blockquote>
@@ -371,7 +371,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
 
         if (block.type === "checklist") {
           return (
-            <ul key={index} className="space-y-2 text-sm text-zinc-200">
+            <ul key={index} className="space-y-2 text-[14px] text-zinc-200">
               {block.items.map((item, itemIndex) => (
                 <li
                   key={`${index}-${itemIndex}`}
@@ -395,7 +395,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
 
         if (block.type === "inlineCode") {
           return (
-            <p key={index} className="text-sm leading-relaxed text-zinc-200">
+            <p key={index} className="text-[14px] leading-7 text-zinc-200">
               {block.label}{" "}
               <code className="rounded bg-[#151515] px-1.5 py-0.5 text-[12px] text-zinc-100">
                 {block.code}
@@ -436,7 +436,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
                   {block.title}
                 </p>
               )}
-              <ul className="space-y-1.5 text-sm text-zinc-200">
+              <ul className="space-y-1.5 text-[13px] text-zinc-200">
                 {block.items.map((item, itemIndex) => (
                   <li
                     key={`${index}-${itemIndex}`}

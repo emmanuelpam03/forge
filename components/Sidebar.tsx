@@ -24,7 +24,7 @@ function ProjectItem({
   return (
     <Link
       href={project.href}
-      className={`group flex items-center justify-between rounded-lg px-2 py-[7px] text-sm transition-colors duration-150 border-l-2 ${
+      className={`group flex items-center justify-between rounded-lg border-l-2 px-2.5 py-2 text-[14px] transition-colors duration-150 ${
         active
           ? "border-[#10a37f] bg-[#252525] text-white"
           : "border-transparent text-zinc-400 hover:bg-[#252525] hover:text-zinc-200"
@@ -32,7 +32,9 @@ function ProjectItem({
     >
       <span className="flex items-center gap-2 min-w-0">
         <Folder size={13} />
-        <span className="truncate">{project.name}</span>
+        <span className="truncate font-medium tracking-[-0.01em]">
+          {project.name}
+        </span>
       </span>
 
       <button
@@ -49,17 +51,17 @@ function ChatItem({ chat }: { chat: RecentChat }) {
   return (
     <Link
       href={chat.href}
-      className="group flex items-start justify-between rounded-lg px-2 py-2 hover:bg-[#252525] transition-colors duration-150"
+      className="group flex items-start justify-between rounded-lg px-2.5 py-2.5 transition-colors duration-150 hover:bg-[#252525]"
     >
       <span className="flex gap-2 min-w-0">
         <MessageSquare size={13} className="mt-0.5 shrink-0 text-zinc-500" />
 
         <span className="min-w-0">
-          <span className="block truncate text-sm text-zinc-300 leading-tight">
+          <span className="block truncate text-[14px] font-medium leading-tight tracking-[-0.01em] text-zinc-300">
             {chat.title}
           </span>
 
-          <span className="mt-0.5 block truncate text-xs text-zinc-600 leading-tight">
+          <span className="mt-0.5 block truncate text-[12px] leading-tight text-zinc-600">
             {chat.preview}
           </span>
         </span>
@@ -102,18 +104,18 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="flex h-screen w-[248px] shrink-0 flex-col border-r border-[#272727] bg-[#1a1a1a]">
+    <aside className="flex h-screen w-62 shrink-0 flex-col border-r border-[#272727] bg-[#1a1a1a]">
       {/* Header */}
       <div className="border-b border-[#272727] p-3">
         <button
           onClick={handleCreateChat}
-          className="flex items-center justify-center rounded-xl bg-[#10a37f] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#0d8f6f]"
+          className="flex items-center justify-center rounded-xl bg-[#10a37f] px-3.5 py-2.5 text-[13px] font-semibold tracking-[-0.01em] text-white transition hover:bg-[#0d8f6f]"
         >
           <span className="mr-2">New Chat</span>
-          <Plus size={16} />
+          <Plus size={15} />
         </button>
 
-        <button className="mt-2 flex w-full items-center gap-2 rounded-xl bg-[#222222] px-3 py-2 text-sm text-zinc-400 hover:bg-[#2a2a2a] hover:text-zinc-200 transition">
+        <button className="mt-2 flex w-full items-center gap-2 rounded-xl bg-[#222222] px-3 py-2.5 text-[14px] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200">
           <Search size={14} />
           Search Chats
         </button>
@@ -122,7 +124,7 @@ export default function Sidebar() {
       {/* Projects */}
       <div className="px-3 pt-4 pb-1">
         <div className="group mb-1.5 flex w-full items-center justify-between px-1 py-1">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
             Projects
           </span>
 
@@ -141,7 +143,7 @@ export default function Sidebar() {
               className="rounded p-0.5 hover:bg-[#2a2a2a]"
             >
               <ChevronDown
-                size={13}
+                size={14}
                 className={`text-zinc-500 transition-transform ${
                   !projectsOpen ? "-rotate-90" : ""
                 }`}
@@ -171,7 +173,7 @@ export default function Sidebar() {
           onClick={() => setChatsOpen((v) => !v)}
           className="mb-1.5 flex w-full items-center justify-between px-1 py-1"
         >
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
             Recents
           </span>
 
@@ -196,7 +198,7 @@ export default function Sidebar() {
       <div className="border-t border-[#272727] p-3">
         <Link
           href="/settings"
-          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-zinc-400 hover:bg-[#252525] hover:text-zinc-200 transition"
+          className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[14px] text-zinc-400 transition hover:bg-[#252525] hover:text-zinc-200"
         >
           <Settings size={14} />
           Settings

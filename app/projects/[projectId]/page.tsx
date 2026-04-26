@@ -1,107 +1,103 @@
 "use client";
 
-import { Folder, Pin, Plus, Search } from "lucide-react";
-import { useParams } from "next/navigation";
+import { MessageSquare, Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { useAppStore } from "@/stores/app-store";
-
-const MODIFIED_BY_PROJECT_ID: Record<string, string> = {
-  "1": "Apr 14",
-  "2": "Apr 5",
-  "3": "Dec 15, 2025",
-  "4": "Apr 24",
-};
-
-function formatModified(projectId: string) {
-  return MODIFIED_BY_PROJECT_ID[projectId] ?? "Mar 6";
-}
 
 export default function ProjectPage() {
   const params = useParams<{ projectId: string }>();
+  const router = useRouter();
   const projects = useAppStore((store) => store.projects);
+  const recentChats = useAppStore((store) => store.recentChats);
+  const createChat = useAppStore((store) => store.createChat);
 
-  const pinnedProjectId = params.projectId;
+  const projectId = params.projectId;
+  const project = projects.find((item) => item.id === projectId);
+  const projectChats = recentChats.filter(
+    (chat) => chat.projectId === projectId,
+  );
+
+  const handleCreateProjectChat = () => {
+    const chat = createChat(projectId);
+    router.push(chat.href);
+  };
 
   return (
-    <div className="relative h-full overflow-hidden bg-[#111111] px-8 py-7 lg:px-10">
+    <div className="relative h-full overflow-hidden bg-[#111111] px-6 py-6 lg:px-8">
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 55% 45% at 65% 20%, rgba(16,163,127,0.06) 0%, transparent 72%)",
+            "radial-gradient(ellipse 55% 45% at 60% 30%, rgba(16,163,127,0.06) 0%, transparent 70%)",
         }}
       />
 
-      <div className="relative z-10 h-full max-w-6xl">
+      <div className="relative z-10 h-full max-w-5xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-[44px] font-semibold tracking-tight text-zinc-100">
-            Projects
-          </h1>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+              Project
+            </p>
+            <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-zinc-100">
+              {project?.name ?? "Project"}
+            </h1>
+          </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-[340px] items-center gap-2 rounded-full border border-[#343434] bg-[#171717] px-5 text-zinc-400">
-              <Search size={17} />
-              <span className="text-[31px] leading-none">Search projects</span>
+            <div className="flex h-10 w-72 items-center gap-2 rounded-full border border-[#343434] bg-[#171717] px-4 text-zinc-400">
+              <Search size={14} />
+              <span className="text-[14px]">Search chats</span>
             </div>
 
-            <button className="flex h-12 items-center rounded-full bg-zinc-100 px-5 text-[31px] leading-none font-medium text-zinc-900 transition hover:bg-white">
-              New
+            <button
+              onClick={handleCreateProjectChat}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-[#10a37f] px-4 text-sm font-medium text-white transition hover:bg-[#0d8f6f]"
+            >
+              <Plus size={14} />
+              New chat
             </button>
           </div>
         </div>
 
-        <div className="mt-9 inline-flex items-center rounded-full bg-[#2b2b2b] px-5 py-2 text-[31px] leading-none text-zinc-100">
-          All
+        <div className="mt-8 inline-flex items-center rounded-full bg-[#2b2b2b] px-4 py-1.5 text-[13px] text-zinc-100">
+          Chats in this project
         </div>
 
-        <div className="mt-10 grid grid-cols-[minmax(320px,1fr)_180px_54px] items-center px-1 text-[36px] leading-none text-zinc-300">
-          <span>Name</span>
-          <span>Modified</span>
-          <span className="sr-only">Pinned</span>
+        <div className="mt-4 grid grid-cols-[minmax(280px,1fr)_150px] items-center px-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+          <span>Chat</span>
+          <span>Location</span>
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-[#242424] bg-[#151515]/50">
-          {projects.map((project, index) => {
-            const isPinned = project.id === pinnedProjectId || index < 2;
+        <div className="mt-2 overflow-hidden rounded-2xl border border-[#242424] bg-[#151515]/40">
+          {projectChats.length === 0 && (
+            <div className="px-4 py-6 text-sm text-zinc-500">
+              No chats in this project yet. Create one to get started.
+            </div>
+          )}
 
-            return (
-              <div
-                key={project.id}
-                className="grid grid-cols-[minmax(320px,1fr)_180px_54px] items-center border-b border-[#262626] px-1 last:border-b-0"
-              >
-                <div className="flex items-center gap-4 py-5">
-                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#3a3a3a] bg-[#181818]">
-                    <Folder
-                      size={24}
-                      className={
-                        project.id === "2" ? "text-[#10a37f]" : "text-zinc-200"
-                      }
-                    />
-                  </span>
-                  <span className="text-[34px] leading-none text-zinc-100">
-                    {project.name}
-                  </span>
-                </div>
-
-                <span className="text-[34px] leading-none text-zinc-300">
-                  {formatModified(project.id)}
+          {projectChats.map((chat) => (
+            <Link
+              key={chat.id}
+              href={chat.href}
+              className="grid grid-cols-[minmax(280px,1fr)_150px] items-center border-b border-[#262626] px-3 py-3 last:border-b-0 transition-colors duration-150 hover:bg-[#1b1b1b] active:bg-[#202020]"
+            >
+              <div className="min-w-0">
+                <span className="flex items-center gap-2 text-[14px] font-medium text-zinc-200">
+                  <MessageSquare size={14} className="shrink-0 text-zinc-500" />
+                  <span className="truncate">{chat.title}</span>
                 </span>
-
-                <button
-                  className={`inline-flex items-center justify-center ${
-                    isPinned ? "text-zinc-300" : "text-zinc-700"
-                  }`}
-                >
-                  <Pin size={24} />
-                </button>
+                <p className="mt-1 truncate text-[12px] text-zinc-500">
+                  {chat.preview}
+                </p>
               </div>
-            );
-          })}
-        </div>
 
-        <button className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#343434] bg-[#171717] px-5 py-2 text-[31px] leading-none text-zinc-300 transition hover:border-[#3f3f3f] hover:text-zinc-100">
-          <Plus size={16} />
-          Add project
-        </button>
+              <span className="text-[12px] text-zinc-400">
+                /{project?.name?.toLowerCase() ?? "project"}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
