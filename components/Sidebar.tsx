@@ -91,6 +91,7 @@ export default function Sidebar() {
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [recentsOpen, setRecentsOpen] = useState(false);
 
   const handleCreateProject = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -110,92 +111,158 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-[#272727] bg-[#1a1a1a] transition-[width] duration-200 ${
-        collapsed ? "w-18.5" : "w-62"
-      }`}
+      className="flex h-screen shrink-0 flex-col border-r border-[#272727] bg-[#1a1a1a] transition-[width] duration-200"
+      style={{ width: collapsed ? "74px" : "15.5rem" }}
     >
       <div className="border-b border-[#272727] p-2">
-        <div className="flex items-center justify-between gap-1">
+        {collapsed ? (
           <button
             type="button"
-            onClick={() => setCollapsed((value) => !value)}
-            className="rounded-lg p-2 text-zinc-500 transition hover:bg-[#252525] hover:text-zinc-200"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setCollapsed(false)}
+            className="flex h-9 w-full items-center justify-center rounded-xl border border-[#2b2b2b] bg-[#202020] text-zinc-400 transition hover:border-[#3a3a3a] hover:text-zinc-200"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
           >
-            {collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+            <ChevronRight size={15} />
           </button>
+        ) : (
+          <div className="flex items-center justify-between gap-1">
+            <button
+              type="button"
+              onClick={() => setCollapsed((value) => !value)}
+              className="rounded-lg p-2 text-zinc-500 transition hover:bg-[#252525] hover:text-zinc-200"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft size={15} />
+            </button>
 
+            <button
+              onClick={handleCreateChat}
+              className="flex items-center justify-center rounded-xl bg-[#10a37f] px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] text-white transition hover:bg-[#0d8f6f]"
+              title="New Chat"
+              aria-label="New Chat"
+            >
+              <span className="mr-1.5">New Chat</span>
+              <Plus size={13} />
+            </button>
+          </div>
+        )}
+
+        {!collapsed && (
           <button
-            onClick={handleCreateChat}
-            className={`flex items-center justify-center rounded-xl bg-[#10a37f] text-[12px] font-semibold tracking-[-0.01em] text-white transition hover:bg-[#0d8f6f] ${
-              collapsed ? "h-8 w-8" : "px-3 py-1.5"
-            }`}
-            title="New Chat"
-            aria-label="New Chat"
+            className="mt-1.5 flex w-full items-center gap-2 rounded-xl bg-[#222222] px-3 py-1.5 text-[12px] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200"
+            title="Search Chats"
+            aria-label="Search Chats"
           >
-            {!collapsed && <span className="mr-1.5">New Chat</span>}
-            <Plus size={13} />
+            <Search size={13} />
+            Search Chats
           </button>
-        </div>
-
-        <button
-          className={`mt-1.5 flex w-full items-center rounded-xl bg-[#222222] text-[12px] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200 ${
-            collapsed ? "justify-center px-0 py-2" : "gap-2 px-3 py-1.5"
-          }`}
-          title="Search Chats"
-          aria-label="Search Chats"
-        >
-          <Search size={13} />
-          {!collapsed && "Search Chats"}
-        </button>
+        )}
       </div>
 
       {collapsed ? (
         <>
-          <div className="flex flex-1 items-start justify-center px-2 pt-3">
+          <div className="flex flex-1 flex-col items-center gap-2 px-2 pt-3">
+            <div className="group relative">
+              <button
+                onClick={handleCreateChat}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#10a37f] text-white transition hover:bg-[#0d8f6f]"
+                title="New Chat"
+                aria-label="New Chat"
+              >
+                <Plus size={13} />
+              </button>
+
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[#2b2b2b] bg-[#1b1b1b] px-2 py-1 text-[11px] font-medium text-zinc-200 opacity-0 shadow-lg transition group-hover:opacity-100">
+                New Chat
+              </span>
+            </div>
+
             <div className="group relative">
               <button
                 type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#2b2b2b] bg-[#202020] text-zinc-400 transition hover:border-[#3a3a3a] hover:text-zinc-200"
+                onClick={() => {
+                  // Search is intentionally kept as a placeholder action in collapsed mode.
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#202020] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200"
+                title="Search Chats"
+                aria-label="Search Chats"
+              >
+                <Search size={13} />
+              </button>
+
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[#2b2b2b] bg-[#1b1b1b] px-2 py-1 text-[11px] font-medium text-zinc-200 opacity-0 shadow-lg transition group-hover:opacity-100">
+                Search Chats
+              </span>
+            </div>
+
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={() => setRecentsOpen((value) => !value)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#202020] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200"
                 title="Recents"
                 aria-label="Recents"
               >
                 <MessageSquare size={13} />
               </button>
 
-              <div className="pointer-events-none invisible absolute left-full top-0 z-20 ml-2 w-72 rounded-2xl border border-[#2b2b2b] bg-[#1b1b1b] p-2 opacity-0 shadow-2xl transition group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                  Recent Chats
-                </p>
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[#2b2b2b] bg-[#1b1b1b] px-2 py-1 text-[11px] font-medium text-zinc-200 opacity-0 shadow-lg transition group-hover:opacity-100">
+                Recents
+              </span>
 
-                <div className="mt-1 space-y-1">
-                  {collapsedRecentChats.length > 0 ? (
-                    collapsedRecentChats.map((chat) => (
-                      <Link
-                        key={chat.id}
-                        href={chat.href}
-                        className={`block rounded-xl border px-2.5 py-2 transition ${
-                          pathname === chat.href
-                            ? "border-[#10a37f] bg-[#0f2a23]"
-                            : "border-transparent hover:border-[#2f2f2f] hover:bg-[#232323]"
-                        }`}
-                      >
-                        <p className="truncate text-[13px] font-medium text-zinc-200">
-                          {chat.title}
-                        </p>
-                        <p className="truncate text-[11px] text-zinc-500">
-                          {chat.preview}
-                        </p>
-                      </Link>
-                    ))
-                  ) : (
-                    <div className="rounded-xl border border-[#2b2b2b] bg-[#202020] px-2.5 py-2 text-[12px] text-zinc-500">
-                      No recent chats yet
-                    </div>
-                  )}
+              {recentsOpen && (
+                <div className="absolute left-full top-0 z-20 ml-2 w-72 rounded-2xl border border-[#2b2b2b] bg-[#1b1b1b] p-2 shadow-2xl">
+                  <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                    Recent Chats
+                  </p>
+
+                  <div className="mt-1 space-y-1">
+                    {collapsedRecentChats.length > 0 ? (
+                      collapsedRecentChats.map((chat) => (
+                        <Link
+                          key={chat.id}
+                          href={chat.href}
+                          className={`block rounded-xl border px-2.5 py-2 transition ${
+                            pathname === chat.href
+                              ? "border-[#10a37f] bg-[#0f2a23]"
+                              : "border-transparent hover:border-[#2f2f2f] hover:bg-[#232323]"
+                          }`}
+                        >
+                          <p className="truncate text-[13px] font-medium text-zinc-200">
+                            {chat.title}
+                          </p>
+                          <p className="truncate text-[11px] text-zinc-500">
+                            {chat.preview}
+                          </p>
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="rounded-xl border border-[#2b2b2b] bg-[#202020] px-2.5 py-2 text-[12px] text-zinc-500">
+                        No recent chats yet
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-auto border-t border-[#272727] p-2.5">
+            <div className="group relative">
+              <Link
+                href="/settings"
+                className="flex items-center justify-center rounded-xl border border-[#2b2b2b] bg-[#202020] py-2 text-zinc-400 transition hover:border-[#3a3a3a] hover:text-zinc-200"
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings size={14} />
+              </Link>
+
+              <span className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[#2b2b2b] bg-[#1b1b1b] px-2 py-1 text-[11px] font-medium text-zinc-200 opacity-0 shadow-lg transition group-hover:opacity-100">
+                Settings
+              </span>
             </div>
           </div>
         </>

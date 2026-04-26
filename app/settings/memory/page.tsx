@@ -12,14 +12,14 @@ import SettingsShell from "../../../components/SettingsShell";
 
 const MEMORY_ITEMS = [
   "Preferences: concise answers, dark UI, premium feel",
-    <SettingsShell>
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-6">
-          background:
-            "radial-gradient(ellipse 55% 45% at 60% 18%, rgba(16,163,127,0.08) 0%, transparent 70%)",
-        }}
-      />
+  "Goals: build Forge, organize projects, move faster",
+  "Workflows: research, planning, coding, strategy",
+];
 
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-6">
+export default function MemorySettingsPage() {
+  return (
+    <SettingsShell>
+      <div className="flex w-full flex-col gap-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
@@ -107,13 +107,12 @@ const MEMORY_ITEMS = [
                   <p className="mt-1 text-[13px] leading-6 text-zinc-500">
                     Clear rules around what gets saved and how it is used.
                   </p>
-    </SettingsShell>
                 </div>
               </div>
             </div>
           </div>
         </section>
       </div>
-    </div>
+    </SettingsShell>
   );
 }
