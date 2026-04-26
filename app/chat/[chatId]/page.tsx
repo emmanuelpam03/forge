@@ -9,6 +9,23 @@ type ChatBlock =
       value: string;
     }
   | {
+      type: "quote";
+      value: string;
+    }
+  | {
+      type: "checklist";
+      items: Array<{
+        label: string;
+        checked: boolean;
+      }>;
+    }
+  | {
+      type: "inlineCode";
+      label: string;
+      code: string;
+      suffix?: string;
+    }
+  | {
       type: "heading";
       value: string;
     }
@@ -236,6 +253,70 @@ const STATIC_CHAT_CONTENT: Record<string, ChatMessage[]> = {
       ],
     },
   ],
+  "5": [
+    {
+      id: "u1",
+      role: "user",
+      blocks: [
+        {
+          type: "text",
+          value:
+            "Give me a technical planning brief for adding memory + search to Forge without overbuilding.",
+        },
+      ],
+    },
+    {
+      id: "a1",
+      role: "assistant",
+      blocks: [
+        {
+          type: "heading",
+          value: "Technical Brief",
+        },
+        {
+          type: "quote",
+          value:
+            "Build the smallest loop that proves value: capture useful context, retrieve it at the right time, and keep latency low.",
+        },
+        {
+          type: "checklist",
+          items: [
+            {
+              label:
+                "Define what memory is allowed to store (preferences, goals, recurring workflows)",
+              checked: true,
+            },
+            {
+              label:
+                "Add event logging for search and memory retrieval quality",
+              checked: true,
+            },
+            {
+              label:
+                "Implement simple relevance scoring before advanced reranking",
+              checked: false,
+            },
+            {
+              label:
+                "Set latency budget and fail gracefully when retrieval is slow",
+              checked: false,
+            },
+          ],
+        },
+        {
+          type: "inlineCode",
+          label: "Start with",
+          code: "topK = 5",
+          suffix: "and evolve from observed precision.",
+        },
+        {
+          type: "text",
+          value:
+            "Ship in phases: baseline retrieval first, quality instrumentation second, optimization third.",
+        },
+      ],
+    },
+  ],
 };
 
 const DEFAULT_CHAT: ChatMessage[] = [
@@ -273,6 +354,53 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
               className="whitespace-pre-wrap text-sm leading-relaxed"
             >
               {block.value}
+            </p>
+          );
+        }
+
+        if (block.type === "quote") {
+          return (
+            <blockquote
+              key={index}
+              className="rounded-xl border border-[#2f2f2f] bg-[#171717] px-3 py-2.5 text-sm italic leading-relaxed text-zinc-300"
+            >
+              {block.value}
+            </blockquote>
+          );
+        }
+
+        if (block.type === "checklist") {
+          return (
+            <ul key={index} className="space-y-2 text-sm text-zinc-200">
+              {block.items.map((item, itemIndex) => (
+                <li
+                  key={`${index}-${itemIndex}`}
+                  className="flex items-start gap-2.5 leading-relaxed"
+                >
+                  <span
+                    className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] ${
+                      item.checked
+                        ? "border-[#10a37f] bg-[#0f2a23] text-[#10a37f]"
+                        : "border-[#3a3a3a] bg-[#191919] text-zinc-600"
+                    }`}
+                  >
+                    {item.checked ? "✓" : ""}
+                  </span>
+                  <span>{item.label}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.type === "inlineCode") {
+          return (
+            <p key={index} className="text-sm leading-relaxed text-zinc-200">
+              {block.label}{" "}
+              <code className="rounded bg-[#151515] px-1.5 py-0.5 text-[12px] text-zinc-100">
+                {block.code}
+              </code>{" "}
+              {block.suffix ?? ""}
             </p>
           );
         }

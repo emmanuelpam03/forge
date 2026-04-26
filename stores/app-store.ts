@@ -54,6 +54,18 @@ const initialState: AppState = {
       preview: "High protein low cost weekly meals...",
       href: "/chat/3",
     },
+    {
+      id: "4",
+      title: "30-day launch plan",
+      preview: "Structured rollout strategy with phases and milestones...",
+      href: "/chat/4",
+    },
+    {
+      id: "5",
+      title: "Memory + search brief",
+      preview: "Mixed markdown preview with checklist and quotes...",
+      href: "/chat/5",
+    },
   ],
 };
 
