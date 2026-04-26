@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CircleHelp, MoonStar, Sparkles, Type } from "lucide-react";
+import { ArrowLeft, CircleHelp, MoonStar, Sun, Type } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 import SettingsShell from "../../../components/SettingsShell";
 
 const APPEARANCE_CARDS = [
@@ -23,6 +24,12 @@ const APPEARANCE_CARDS = [
 ];
 
 export default function AppearanceSettingsPage() {
+  const { theme, toggleTheme, mounted } = useTheme();
+
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <SettingsShell>
       <div className="flex w-full flex-col gap-6">
@@ -56,20 +63,59 @@ export default function AppearanceSettingsPage() {
                   Theme
                 </h2>
                 <p className="mt-1 text-[13px] leading-6 text-zinc-500">
-                  Keep the visual system dark, focused, and calm.
+                  Toggle between light and dark mode.
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[14px] text-zinc-200">Dark premium</span>
-                <CircleHelp size={16} className="text-zinc-500" />
-              </div>
-              <p className="mt-2 text-[13px] leading-6 text-zinc-500">
-                This matches the current Forge interface and keeps contrast
-                high.
-              </p>
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={toggleTheme}
+                className={`w-full rounded-2xl border p-4 text-left transition ${
+                  theme === "dark"
+                    ? "border-[#10a37f] bg-[#0f2a23]"
+                    : "border-[#2a2a2a] bg-[#141414] hover:border-[#3a3a3a]"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] font-medium text-zinc-200">
+                    Dark
+                  </span>
+                  <MoonStar
+                    size={16}
+                    className={
+                      theme === "dark" ? "text-[#10a37f]" : "text-zinc-500"
+                    }
+                  />
+                </div>
+                <p className="mt-2 text-[13px] leading-6 text-zinc-500">
+                  Dark, focused, and calm interface.
+                </p>
+              </button>
+
+              <button
+                onClick={toggleTheme}
+                className={`w-full rounded-2xl border p-4 text-left transition ${
+                  theme === "light"
+                    ? "border-[#10a37f] bg-[#0f2a23]"
+                    : "border-[#2a2a2a] bg-[#141414] hover:border-[#3a3a3a]"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[14px] font-medium text-zinc-200">
+                    Light
+                  </span>
+                  <Sun
+                    size={16}
+                    className={
+                      theme === "light" ? "text-[#10a37f]" : "text-zinc-500"
+                    }
+                  />
+                </div>
+                <p className="mt-2 text-[13px] leading-6 text-zinc-500">
+                  Bright, clean, and clear interface.
+                </p>
+              </button>
             </div>
           </div>
 
@@ -106,34 +152,6 @@ export default function AppearanceSettingsPage() {
                   </p>
                 </div>
               ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-[#242424] bg-[#1a1a1a]/90 p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0f2a23] text-[#10a37f]">
-              <Sparkles size={18} />
-            </span>
-            <div>
-              <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-zinc-100">
-                Density presets
-              </h2>
-              <p className="mt-1 text-[13px] leading-6 text-zinc-500">
-                A few quick options for how spacious the interface should feel.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4 text-[14px] text-zinc-100">
-              Compact
-            </div>
-            <div className="rounded-2xl border border-[#10a37f] bg-[#0f2a23] p-4 text-[14px] text-zinc-100">
-              Balanced
-            </div>
-            <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-4 text-[14px] text-zinc-100">
-              Spacious
             </div>
           </div>
         </section>

@@ -11,7 +11,6 @@ import {
   Folder,
   MessageSquare,
   MoreHorizontal,
-  Search,
   Settings,
 } from "lucide-react";
 import { Project, RecentChat, useAppStore } from "@/stores/app-store";
@@ -148,17 +147,6 @@ export default function Sidebar() {
             </button>
           </div>
         )}
-
-        {!collapsed && (
-          <button
-            className="mt-1.5 flex w-full items-center gap-2 rounded-xl bg-[#222222] px-3 py-1.5 text-[12px] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200"
-            title="Search Chats"
-            aria-label="Search Chats"
-          >
-            <Search size={13} />
-            Search Chats
-          </button>
-        )}
       </div>
 
       {collapsed ? (
@@ -176,24 +164,6 @@ export default function Sidebar() {
 
               <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[#2b2b2b] bg-[#1b1b1b] px-2 py-1 text-[11px] font-medium text-zinc-200 opacity-0 shadow-lg transition group-hover:opacity-100">
                 New Chat
-              </span>
-            </div>
-
-            <div className="group relative">
-              <button
-                type="button"
-                onClick={() => {
-                  // Search is intentionally kept as a placeholder action in collapsed mode.
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#202020] text-zinc-400 transition hover:bg-[#2a2a2a] hover:text-zinc-200"
-                title="Search Chats"
-                aria-label="Search Chats"
-              >
-                <Search size={13} />
-              </button>
-
-              <span className="pointer-events-none absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-[#2b2b2b] bg-[#1b1b1b] px-2 py-1 text-[11px] font-medium text-zinc-200 opacity-0 shadow-lg transition group-hover:opacity-100">
-                Search Chats
               </span>
             </div>
 
