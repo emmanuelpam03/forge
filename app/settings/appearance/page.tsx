@@ -1,8 +1,9 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { ArrowLeft, CircleHelp, MoonStar, Sun, Type } from "lucide-react";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme } from "next-themes";
 import SettingsShell from "../../../components/SettingsShell";
 
 const APPEARANCE_CARDS = [
@@ -25,6 +26,15 @@ const APPEARANCE_CARDS = [
 
 export default function AppearanceSettingsPage() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <SettingsShell>
@@ -90,8 +100,8 @@ export default function AppearanceSettingsPage() {
                   Dark, focused, and calm interface.
                 </p>
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-[#1a1a1a] border border-[#242424]" />
-                  <div className="h-8 w-8 rounded-lg bg-[#0f2a23] border border-[#10a37f]" />
+                  <div className="h-8 w-8 rounded-lg bg-card border border-border" />
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary" />
                   <div className="text-[11px] text-muted-foreground">
                     Modern dark theme with emerald accent
                   </div>
@@ -123,8 +133,8 @@ export default function AppearanceSettingsPage() {
                   Premium light mode with the same emerald accent.
                 </p>
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-white border border-[#e0e0e0]" />
-                  <div className="h-8 w-8 rounded-lg bg-[#e8f5f0] border border-[#10a37f]" />
+                  <div className="h-8 w-8 rounded-lg bg-card border border-border" />
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary" />
                   <div className="text-[11px] text-muted-foreground">
                     Clean light theme with emerald accent
                   </div>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
-import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -72,10 +72,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${manrope.variable} ${spaceGrotesk.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-        <ThemeProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <Sidebar />
           <main className="flex-1 overflow-hidden">{children}</main>
         </ThemeProvider>

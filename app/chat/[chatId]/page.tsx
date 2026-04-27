@@ -142,7 +142,7 @@ const STATIC_CHAT_CONTENT: Record<string, ChatMessage[]> = {
           type: "code",
           language: "tsx",
           code: `<section className="relative px-8 py-20">
-  <h1 className="text-5xl font-semibold tracking-tight text-white">
+  <h1 className="text-5xl font-semibold tracking-tight text-foreground">
     Organize your ideas. Execute with AI.
   </h1>
   <p className="mt-4 max-w-xl text-muted-foreground">

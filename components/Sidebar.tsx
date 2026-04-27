@@ -14,6 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { Project, RecentChat, useAppStore } from "@/stores/app-store";
+import { ModeToggle } from "./mode-toggle";
 
 function ProjectItem({
   project,
@@ -40,7 +41,7 @@ function ProjectItem({
 
       <button
         onClick={(event) => event.preventDefault()}
-        className="rounded p-0.5 opacity-0 transition group-hover:opacity-100 hover:bg-zinc-700"
+        className="rounded p-0.5 opacity-0 transition group-hover:opacity-100 hover:bg-accent"
       >
         <MoreHorizontal size={13} />
       </button>
@@ -223,19 +224,22 @@ export default function Sidebar() {
           </div>
 
           <div className="mt-auto border-t border-sidebar-border p-2.5">
-            <div className="group relative">
-              <Link
-                href="/settings"
-                className="flex items-center justify-center rounded-xl border border-border bg-card py-2 text-muted-foreground transition hover:border-ring hover:text-foreground"
-                title="Settings"
-                aria-label="Settings"
-              >
-                <Settings size={14} />
-              </Link>
+            <div className="flex flex-col gap-2">
+              <ModeToggle />
+              <div className="group relative">
+                <Link
+                  href="/settings"
+                  className="flex items-center justify-center rounded-xl border border-border bg-card py-2 text-muted-foreground transition hover:border-ring hover:text-foreground"
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  <Settings size={14} />
+                </Link>
 
-              <span className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-lg transition group-hover:opacity-100">
-                Settings
-              </span>
+                <span className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-lg transition group-hover:opacity-100">
+                  Settings
+                </span>
+              </div>
             </div>
           </div>
         </>
@@ -243,7 +247,7 @@ export default function Sidebar() {
         <>
           <div className="px-3 pb-1 pt-4">
             <div className="group mb-1.5 flex w-full items-center justify-between px-1 py-1">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Projects
               </span>
 
@@ -317,13 +321,16 @@ export default function Sidebar() {
           </div>
 
           <div className="border-t border-sidebar-border p-2.5">
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-[14px] text-muted-foreground transition hover:bg-accent hover:text-foreground"
-            >
-              <Settings size={14} />
-              Settings
-            </Link>
+            <div className="flex items-center gap-2">
+              <ModeToggle />
+              <Link
+                href="/settings"
+                className="flex-1 flex items-center gap-2 rounded-xl px-3 py-2 text-[14px] text-muted-foreground transition hover:bg-accent hover:text-foreground"
+              >
+                <Settings size={14} />
+                Settings
+              </Link>
+            </div>
           </div>
         </>
       )}
