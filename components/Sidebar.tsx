@@ -296,53 +296,39 @@ export default function Sidebar() {
             <ChevronRight size={14} />
           </button>
         ) : (
-          <>
-            <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center justify-between gap-1">
+            <button
+              type="button"
+              onClick={() => setCollapsed((value) => !value)}
+              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setCollapsed((value) => !value)}
-                className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label="Collapse sidebar"
-                title="Collapse sidebar"
+                onClick={handleOpenSearch}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                title="Search (Cmd/Ctrl+K)"
+                aria-label="Search"
               >
-                <ChevronLeft size={14} />
+                <Search size={13} />
               </button>
 
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handleOpenSearch}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  title="Search (Cmd/Ctrl+K)"
-                  aria-label="Search"
-                >
-                  <Search size={13} />
-                </button>
-
-                <button
-                  onClick={handleCreateChat}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
-                  title="New Chat"
-                  aria-label="New Chat"
-                >
-                  <Plus size={12} strokeWidth={2.5} />
-                  <span>New Chat</span>
-                </button>
-              </div>
+              <button
+                onClick={handleCreateChat}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold tracking-[-0.01em] text-primary-foreground shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
+                title="New Chat"
+                aria-label="New Chat"
+              >
+                <Plus size={12} strokeWidth={2.5} />
+                <span>New Chat</span>
+              </button>
             </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-1 px-1 text-[10px] font-medium text-muted-foreground">
-              <span className="rounded-md border border-border bg-card px-1.5 py-0.5">
-                Search Cmd/Ctrl+K
-              </span>
-              <span className="rounded-md border border-border bg-card px-1.5 py-0.5">
-                New Chat Cmd/Ctrl+N
-              </span>
-              <span className="rounded-md border border-border bg-card px-1.5 py-0.5">
-                New Project Cmd/Ctrl+P
-              </span>
-            </div>
-          </>
+          </div>
         )}
       </div>
 
