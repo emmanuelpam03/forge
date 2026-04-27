@@ -49,11 +49,15 @@ function ProjectItem({
   );
 }
 
-function ChatItem({ chat }: { chat: RecentChat }) {
+function ChatItem({ chat, active }: { chat: RecentChat; active: boolean }) {
   return (
     <Link
       href={chat.href}
-      className="group flex items-start justify-between rounded-lg px-2.5 py-2 transition-colors duration-150 hover:bg-accent"
+      className={`group flex items-start justify-between rounded-lg px-2.5 py-2 transition-colors duration-150 ${
+        active
+          ? "border-l-2 border-primary bg-accent text-foreground"
+          : "border-l-2 border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+      }`}
     >
       <span className="flex min-w-0 gap-2">
         <MessageSquare
@@ -314,7 +318,11 @@ export default function Sidebar() {
             {chatsOpen && (
               <div className="space-y-0.5">
                 {recentChats.map((chat) => (
-                  <ChatItem key={chat.id} chat={chat} />
+                  <ChatItem
+                    key={chat.id}
+                    chat={chat}
+                    active={pathname === chat.href}
+                  />
                 ))}
               </div>
             )}
