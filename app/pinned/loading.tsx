@@ -1,5 +1,5 @@
 import { SiteLoading } from "@/components/site-loading";
 
 export default function Loading() {
-  return <SiteLoading variant="app" />;
+  return <SiteLoading variant="pinned" />;
 }

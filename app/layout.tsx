@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { FeedbackProvider } from "@/components/feedback-provider";
+import { AppShell } from "@/components/app-shell";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -86,8 +86,7 @@ export default function RootLayout({
         >
           <FeedbackProvider>
             <KeyboardShortcuts />
-            <Sidebar />
-            <main className="flex-1 overflow-hidden">{children}</main>
+            <AppShell>{children}</AppShell>
           </FeedbackProvider>
         </ThemeProvider>
       </body>
