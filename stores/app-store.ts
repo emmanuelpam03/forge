@@ -24,6 +24,10 @@ type AppState = {
 type AppActions = {
   createProject: () => Project;
   createChat: (projectId?: string) => RecentChat;
+  renameProject: (id: string, name: string) => void;
+  deleteProject: (id: string) => void;
+  renameChat: (id: string, title: string) => void;
+  deleteChat: (id: string) => void;
 };
 
 type AppStore = AppState & AppActions;
@@ -133,11 +137,50 @@ function createChat(projectId?: string) {
   return chat;
 }
 
+function renameProject(id: string, name: string) {
+  state = {
+    ...state,
+    projects: state.projects.map((p) => (p.id === id ? { ...p, name } : p)),
+  };
+  emit();
+}
+
+function deleteProject(id: string) {
+  state = {
+    ...state,
+    projects: state.projects.filter((p) => p.id !== id),
+    recentChats: state.recentChats.filter((c) => c.projectId !== id),
+  };
+  emit();
+}
+
+function renameChat(id: string, title: string) {
+  state = {
+    ...state,
+    recentChats: state.recentChats.map((c) =>
+      c.id === id ? { ...c, title } : c,
+    ),
+  };
+  emit();
+}
+
+function deleteChat(id: string) {
+  state = {
+    ...state,
+    recentChats: state.recentChats.filter((c) => c.id !== id),
+  };
+  emit();
+}
+
 function getSnapshot(): AppStore {
   return {
     ...state,
     createProject,
     createChat,
+    renameProject,
+    deleteProject,
+    renameChat,
+    deleteChat,
   };
 }
 

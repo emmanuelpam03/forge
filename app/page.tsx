@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, Mic, Bookmark, Layers, Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAppStore } from "@/stores/app-store";
 
 function ForgeLogo({ className }: { className?: string }) {
   return (
@@ -51,14 +52,15 @@ type MediaTab = (typeof MEDIA_TABS)[number];
 
 export default function HomePage() {
   const router = useRouter();
+  const createChat = useAppStore((store) => store.createChat);
 
   const [activeTab, setActiveTab] = useState<MediaTab>("All");
   const [input, setInput] = useState("");
 
   const handleSend = () => {
     if (!input.trim()) return;
-    const chatId = Date.now().toString();
-    router.push(`/chat/${chatId}`);
+    const chat = createChat();
+    router.push(chat.href);
   };
 
   return (

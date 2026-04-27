@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Eye,
   Globe,
+  Keyboard,
   Lock,
   MoonStar,
   PanelLeft,
@@ -55,6 +56,24 @@ const QUICK_TOGGLES = [
   {
     label: "Search suggestions",
     description: "Show recent chats and projects while searching.",
+  },
+];
+
+const KEYBOARD_SHORTCUTS = [
+  {
+    action: "Search",
+    keys: ["Cmd/Ctrl", "K"],
+    description: "Open global search for chats and projects.",
+  },
+  {
+    action: "New chat",
+    keys: ["Cmd/Ctrl", "N"],
+    description: "Go to the landing composer and start a new chat.",
+  },
+  {
+    action: "New project",
+    keys: ["Cmd/Ctrl", "P"],
+    description: "Create a project instantly and open it.",
   },
 ];
 
@@ -226,6 +245,51 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex h-7 w-12 items-center rounded-full bg-border p-1">
                     <div className="h-5 w-5 rounded-full bg-primary shadow-[0_0_0_1px_rgba(255,255,255,0.08)]" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-border bg-card/90 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                Productivity
+              </p>
+              <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.03em] text-foreground">
+                Keyboard shortcuts
+              </h2>
+            </div>
+            <Keyboard className="text-primary" size={18} />
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            {KEYBOARD_SHORTCUTS.map((item) => (
+              <div
+                key={item.action}
+                className="rounded-2xl border border-border bg-muted p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[14px] font-medium text-foreground">
+                      {item.action}
+                    </p>
+                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {item.keys.map((key) => (
+                      <span
+                        key={`${item.action}-${key}`}
+                        className="rounded-md border border-border bg-card px-2 py-1 text-[12px] font-semibold text-foreground"
+                      >
+                        {key}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
