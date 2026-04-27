@@ -57,10 +57,7 @@ export default function HomePage() {
 
   const handleSend = () => {
     if (!input.trim()) return;
-
-    // later replace with DB create + redirect
     const chatId = Date.now().toString();
-
     router.push(`/chat/${chatId}`);
   };
 
@@ -75,37 +72,41 @@ export default function HomePage() {
         }}
       />
 
-      <div className="relative z-10 flex w-full flex-col items-center gap-5 px-6">
+      <div className="relative z-10 flex w-full flex-col items-center gap-4 px-6">
         {/* Main Card */}
-        <div className="flex w-full max-w-110 flex-col gap-5 rounded-[18px] border border-border bg-card p-7">
+        <div className="flex w-full max-w-[440px] flex-col gap-5 rounded-2xl border border-border bg-card p-7 shadow-sm">
           {/* Header */}
-          <div className="flex flex-col items-center gap-2.5 text-center">
-            <ForgeLogo className="h-9 w-9 text-primary" />
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <ForgeLogo className="h-6 w-6 text-primary" />
+            </div>
 
-            <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
+            <h1 className="text-[25px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
               What do you want to build today?
             </h1>
 
-            <p className="max-w-72.5 text-[14px] leading-6 text-muted-foreground">
+            <p className="max-w-[280px] text-[13px] leading-[1.65] text-muted-foreground">
               Forge helps you think, create, research, organize projects, and
               move faster.
             </p>
           </div>
 
-          {/* Cards */}
+          {/* Feature Cards */}
           <div className="grid grid-cols-3 gap-2">
             {FEATURE_CARDS.map(({ id, icon: Icon, title, description }) => (
               <button
                 key={id}
-                className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-muted/40 p-3 text-left transition-colors duration-150 hover:bg-accent"
+                className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-muted/30 p-3 text-left transition-all duration-150 hover:border-primary/30 hover:bg-primary/5"
               >
-                <Icon size={17} className="text-primary" />
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-background ring-1 ring-border group-hover:ring-primary/30 transition-all">
+                  <Icon size={15} className="text-primary" />
+                </span>
 
-                <span className="text-center text-[13px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
+                <span className="text-center text-[12px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
                   {title}
                 </span>
 
-                <span className="text-center text-[12px] leading-snug text-muted-foreground">
+                <span className="text-center text-[11px] leading-snug text-muted-foreground">
                   {description}
                 </span>
               </button>
@@ -113,15 +114,15 @@ export default function HomePage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center justify-center gap-0.5">
+          <div className="flex items-center justify-center rounded-lg bg-muted/40 p-0.5">
             {MEDIA_TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`border-b-2 px-2.5 py-1 pb-1.75 text-[14px] transition-colors ${
+                className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium tracking-[-0.01em] transition-all duration-150 ${
                   activeTab === tab
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab}
@@ -130,8 +131,8 @@ export default function HomePage() {
           </div>
 
           {/* Input */}
-          <div className="flex items-center gap-2.5 rounded-[14px] border border-border bg-muted/40 px-3 py-2.5 transition-colors duration-150 focus-within:border-ring">
-            <ForgeLogo className="h-5 w-5 shrink-0 text-primary" />
+          <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3.5 py-3 transition-all duration-150 focus-within:border-primary/40 focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/10">
+            <ForgeLogo className="h-[18px] w-[18px] shrink-0 text-primary" />
 
             <input
               type="text"
@@ -139,17 +140,21 @@ export default function HomePage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Message Forge"
-              className="flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
+              className="flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60"
             />
 
             <div className="flex shrink-0 items-center gap-1.5">
-              <button className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-                <Mic size={15} />
+              <button className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                <Mic size={14} />
               </button>
 
               <button
                 onClick={handleSend}
-                className="rounded-lg bg-primary p-1.5 text-primary-foreground transition-colors duration-150 hover:opacity-90"
+                className={`rounded-lg p-1.5 transition-all duration-150 ${
+                  input.trim()
+                    ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90"
+                    : "bg-muted text-muted-foreground"
+                }`}
               >
                 <ArrowRight size={14} />
               </button>
@@ -158,7 +163,7 @@ export default function HomePage() {
         </div>
 
         {/* Footer */}
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground/60">
           Forge can make mistakes. Verify important information.
         </p>
       </div>

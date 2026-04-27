@@ -83,7 +83,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                   isActive
                     ? "border-primary bg-primary/15 text-foreground"
                     : "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground"
-                } ${item.muted ? "opacity-70" : ""}`;
+                }`;
 
                 const itemContent = (
                   <>
