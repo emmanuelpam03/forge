@@ -124,7 +124,14 @@
   html {
     @apply font-sans;
     font-size: 17px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
+
+  html::-webkit-scrollbar {
+    display: none;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-size: 1.05rem;
@@ -160,5 +167,15 @@
   textarea,
   select {
     font: inherit;
+  }
+
+  /* Hide scrollbars while keeping scroll functionality */
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 }
