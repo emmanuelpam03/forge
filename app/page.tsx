@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRight, Mic, Bookmark, Layers, Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/stores/app-store";
+import { useFeedback } from "@/components/feedback-provider";
 
 function ForgeLogo({ className }: { className?: string }) {
   return (
@@ -51,16 +52,40 @@ const MEDIA_TABS = [
 type MediaTab = (typeof MEDIA_TABS)[number];
 
 export default function HomePage() {
+  const { showFeedback } = useFeedback();
   const router = useRouter();
   const createChat = useAppStore((store) => store.createChat);
 
   const [activeTab, setActiveTab] = useState<MediaTab>("All");
   const [input, setInput] = useState("");
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   const handleSend = () => {
-    if (!input.trim()) return;
-    const chat = createChat();
-    router.push(chat.href);
+    if (!input.trim()) {
+      showFeedback({
+        type: "error",
+        title: "Type a message first",
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingChat(true);
+      const chat = createChat();
+      showFeedback({
+        type: "success",
+        title: "Chat created",
+        description: "Opening your new conversation.",
+      });
+      router.push(chat.href);
+    } catch {
+      showFeedback({
+        type: "error",
+        title: "Could not create chat",
+        description: "Please try again.",
+      });
+      setIsCreatingChat(false);
+    }
   };
 
   return (
@@ -142,6 +167,7 @@ export default function HomePage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Message Forge"
+              disabled={isCreatingChat}
               className="flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground/60"
             />
 
@@ -152,13 +178,20 @@ export default function HomePage() {
 
               <button
                 onClick={handleSend}
+                disabled={isCreatingChat}
                 className={`rounded-lg p-1.5 transition-all duration-150 ${
-                  input.trim()
-                    ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90"
-                    : "bg-muted text-muted-foreground"
+                  isCreatingChat
+                    ? "bg-muted text-muted-foreground"
+                    : input.trim()
+                      ? "bg-primary text-primary-foreground shadow-sm hover:opacity-90"
+                      : "bg-muted text-muted-foreground"
                 }`}
               >
-                <ArrowRight size={14} />
+                {isCreatingChat ? (
+                  <span className="block h-[14px] w-[14px] animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                ) : (
+                  <ArrowRight size={14} />
+                )}
               </button>
             </div>
           </div>

@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, MessageSquare, Folder, X } from "lucide-react";
 import { useAppStore } from "@/stores/app-store";
+import { useFeedback } from "@/components/feedback-provider";
 
 export default function SearchPage() {
+  const { showFeedback } = useFeedback();
   const router = useRouter();
   const projects = useAppStore((store) => store.projects);
   const recentChats = useAppStore((store) => store.recentChats);
@@ -14,23 +16,39 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [filteredChats, setFilteredChats] = useState(recentChats);
   const [filteredProjects, setFilteredProjects] = useState(projects);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    const searchTerm = query.toLowerCase();
+    const searchTerm = query.trim().toLowerCase();
 
-    setFilteredChats(
-      recentChats.filter(
-        (chat) =>
-          chat.title.toLowerCase().includes(searchTerm) ||
-          chat.preview.toLowerCase().includes(searchTerm),
-      ),
-    );
+    if (!searchTerm) {
+      setFilteredChats(recentChats);
+      setFilteredProjects(projects);
+      setIsSearching(false);
+      return;
+    }
 
-    setFilteredProjects(
-      projects.filter((project) =>
-        project.name.toLowerCase().includes(searchTerm),
-      ),
-    );
+    setIsSearching(true);
+
+    const timer = window.setTimeout(() => {
+      setFilteredChats(
+        recentChats.filter(
+          (chat) =>
+            chat.title.toLowerCase().includes(searchTerm) ||
+            chat.preview.toLowerCase().includes(searchTerm),
+        ),
+      );
+
+      setFilteredProjects(
+        projects.filter((project) =>
+          project.name.toLowerCase().includes(searchTerm),
+        ),
+      );
+
+      setIsSearching(false);
+    }, 160);
+
+    return () => window.clearTimeout(timer);
   }, [query, recentChats, projects]);
 
   useEffect(() => {
@@ -45,6 +63,42 @@ export default function SearchPage() {
   }, [router]);
 
   const hasResults = filteredChats.length > 0 || filteredProjects.length > 0;
+  const totalResults = filteredChats.length + filteredProjects.length;
+
+  const handleSearchSubmit = () => {
+    const term = query.trim();
+
+    if (!term) {
+      showFeedback({
+        type: "error",
+        title: "Enter a search term",
+      });
+      return;
+    }
+
+    if (isSearching) {
+      showFeedback({
+        type: "info",
+        title: "Searching...",
+      });
+      return;
+    }
+
+    if (totalResults === 0) {
+      showFeedback({
+        type: "error",
+        title: "No matches found",
+        description: `No chats or projects match \"${term}\"`,
+      });
+      return;
+    }
+
+    showFeedback({
+      type: "success",
+      title: "Search complete",
+      description: `${totalResults} result${totalResults === 1 ? "" : "s"} found`,
+    });
+  };
 
   return (
     <div className="relative h-full overflow-hidden bg-background">
@@ -65,6 +119,7 @@ export default function SearchPage() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
               placeholder="Search chats and projects..."
               className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
             />
@@ -78,7 +133,16 @@ export default function SearchPage() {
 
           {/* Results */}
           <div className="max-h-[60vh] overflow-y-auto">
-            {!hasResults && query ? (
+            {isSearching ? (
+              <div className="space-y-2 px-3 py-3">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={`search-skeleton-${index}`}
+                    className="h-10 animate-pulse rounded-lg bg-muted/60"
+                  />
+                ))}
+              </div>
+            ) : !hasResults && query ? (
               <div className="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
                 <Search size={32} className="text-muted-foreground/40" />
                 <p className="text-[14px] text-muted-foreground">

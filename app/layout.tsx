@@ -4,6 +4,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { FeedbackProvider } from "@/components/feedback-provider";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -83,9 +84,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <KeyboardShortcuts />
-          <Sidebar />
-          <main className="flex-1 overflow-hidden">{children}</main>
+          <FeedbackProvider>
+            <KeyboardShortcuts />
+            <Sidebar />
+            <main className="flex-1 overflow-hidden">{children}</main>
+          </FeedbackProvider>
         </ThemeProvider>
       </body>
     </html>

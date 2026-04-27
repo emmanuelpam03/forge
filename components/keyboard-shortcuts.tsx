@@ -3,8 +3,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/stores/app-store";
+import { useFeedback } from "./feedback-provider";
 
 export function KeyboardShortcuts() {
+  const { showFeedback } = useFeedback();
   const router = useRouter();
   const createProject = useAppStore((store) => store.createProject);
 
@@ -30,13 +32,18 @@ export function KeyboardShortcuts() {
       if (key === "p") {
         e.preventDefault();
         const project = createProject();
+        showFeedback({
+          type: "success",
+          title: "Project created",
+          description: `Opened \"${project.name}\"`,
+        });
         router.push(project.href);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [createProject, router]);
+  }, [createProject, router, showFeedback]);
 
   return null;
 }

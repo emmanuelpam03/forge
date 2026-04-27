@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MouseEvent, useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 import {
   Plus,
   Search,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Project, RecentChat, useAppStore } from "@/stores/app-store";
 import { ModeToggle } from "./mode-toggle";
+import { useFeedback } from "./feedback-provider";
 
 // ─── ProjectItem ──────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ function ProjectItem({
   project: Project;
   active: boolean;
 }) {
+  const { showFeedback } = useFeedback();
   const renameProject = useAppStore((store) => store.renameProject);
   const deleteProject = useAppStore((store) => store.deleteProject);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -35,17 +37,36 @@ function ProjectItem({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleRename = () => {
-    if (newName.trim()) {
-      renameProject(project.id, newName.trim());
-    } else {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      showFeedback({
+        type: "error",
+        title: "Project name is required",
+      });
       setNewName(project.name);
+      setIsRenaming(false);
+      setMenuOpen(false);
+      return;
     }
+
+    renameProject(project.id, trimmed);
+    showFeedback({
+      type: "success",
+      title: "Project renamed",
+      description: `Updated to \"${trimmed}\"`,
+    });
+
     setIsRenaming(false);
     setMenuOpen(false);
   };
 
   const handleDelete = () => {
     deleteProject(project.id);
+    showFeedback({
+      type: "success",
+      title: "Project deleted",
+      description: `Removed \"${project.name}\"`,
+    });
     setMenuOpen(false);
   };
 
@@ -135,6 +156,7 @@ function ProjectItem({
 // ─── ChatItem ─────────────────────────────────────────────────────────────────
 
 function ChatItem({ chat, active }: { chat: RecentChat; active: boolean }) {
+  const { showFeedback } = useFeedback();
   const renameChat = useAppStore((store) => store.renameChat);
   const deleteChat = useAppStore((store) => store.deleteChat);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -142,17 +164,36 @@ function ChatItem({ chat, active }: { chat: RecentChat; active: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleRename = () => {
-    if (newTitle.trim()) {
-      renameChat(chat.id, newTitle.trim());
-    } else {
+    const trimmed = newTitle.trim();
+    if (!trimmed) {
+      showFeedback({
+        type: "error",
+        title: "Chat title is required",
+      });
       setNewTitle(chat.title);
+      setIsRenaming(false);
+      setMenuOpen(false);
+      return;
     }
+
+    renameChat(chat.id, trimmed);
+    showFeedback({
+      type: "success",
+      title: "Chat renamed",
+      description: `Updated to \"${trimmed}\"`,
+    });
+
     setIsRenaming(false);
     setMenuOpen(false);
   };
 
   const handleDelete = () => {
     deleteChat(chat.id);
+    showFeedback({
+      type: "success",
+      title: "Chat deleted",
+      description: `Removed \"${chat.title}\"`,
+    });
     setMenuOpen(false);
   };
 
@@ -249,6 +290,7 @@ function ChatItem({ chat, active }: { chat: RecentChat; active: boolean }) {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
+  const { showFeedback } = useFeedback();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -260,11 +302,22 @@ export default function Sidebar() {
   const [chatsOpen, setChatsOpen] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
+  const [isBooting, setIsBooting] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsBooting(false), 260);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const handleCreateProject = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    createProject();
+    const project = createProject();
+    showFeedback({
+      type: "success",
+      title: "Project created",
+      description: `Added \"${project.name}\"`,
+    });
     setProjectsOpen(true);
   };
 
@@ -347,7 +400,7 @@ export default function Sidebar() {
                 <Plus size={13} />
               </button>
 
-              <span className="pointer-events-none absolute left-full top-1/2 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-50">
                 New Chat
               </span>
             </div>
@@ -364,7 +417,7 @@ export default function Sidebar() {
                 <Search size={13} />
               </button>
 
-              <span className="pointer-events-none absolute left-full top-1/2 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-50">
                 Search
               </span>
             </div>
@@ -381,7 +434,7 @@ export default function Sidebar() {
                 <MessageSquare size={13} />
               </button>
 
-              <span className="pointer-events-none absolute left-full top-1/2 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
+              <span className="pointer-events-none absolute left-full top-1/2 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-50">
                 Recents
               </span>
 
@@ -481,13 +534,20 @@ export default function Sidebar() {
 
             {projectsOpen && (
               <div className="space-y-0.5">
-                {projects.map((project) => (
-                  <ProjectItem
-                    key={project.id}
-                    project={project}
-                    active={pathname === project.href}
-                  />
-                ))}
+                {isBooting
+                  ? Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={`project-skeleton-${index}`}
+                        className="h-8 animate-pulse rounded-lg bg-muted/60"
+                      />
+                    ))
+                  : projects.map((project) => (
+                      <ProjectItem
+                        key={project.id}
+                        project={project}
+                        active={pathname === project.href}
+                      />
+                    ))}
               </div>
             )}
           </div>
@@ -515,13 +575,20 @@ export default function Sidebar() {
 
             {chatsOpen && (
               <div className="space-y-0.5">
-                {recentChats.map((chat) => (
-                  <ChatItem
-                    key={chat.id}
-                    chat={chat}
-                    active={pathname === chat.href}
-                  />
-                ))}
+                {isBooting
+                  ? Array.from({ length: 5 }).map((_, index) => (
+                      <div
+                        key={`chat-skeleton-${index}`}
+                        className="h-11 animate-pulse rounded-lg bg-muted/60"
+                      />
+                    ))
+                  : recentChats.map((chat) => (
+                      <ChatItem
+                        key={chat.id}
+                        chat={chat}
+                        active={pathname === chat.href}
+                      />
+                    ))}
               </div>
             )}
           </div>
