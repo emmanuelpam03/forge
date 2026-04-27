@@ -145,10 +145,10 @@ const STATIC_CHAT_CONTENT: Record<string, ChatMessage[]> = {
   <h1 className="text-5xl font-semibold tracking-tight text-white">
     Organize your ideas. Execute with AI.
   </h1>
-  <p className="mt-4 max-w-xl text-zinc-400">
+  <p className="mt-4 max-w-xl text-muted-foreground">
     Forge turns scattered chats into structured progress.
   </p>
-  <button className="mt-8 rounded-xl bg-[#10a37f] px-5 py-3 text-sm font-medium text-white">
+  <button className="mt-8 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground">
     Start Building
   </button>
 </section>`,
@@ -362,7 +362,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
           return (
             <blockquote
               key={index}
-              className="rounded-xl border border-[#2f2f2f] bg-[#171717] px-3 py-2.5 text-[14px] italic leading-7 tracking-[-0.01em] text-zinc-300"
+              className="rounded-xl border border-border bg-card px-3 py-2.5 text-[14px] italic leading-7 tracking-[-0.01em] text-card-foreground"
             >
               {block.value}
             </blockquote>
@@ -371,7 +371,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
 
         if (block.type === "checklist") {
           return (
-            <ul key={index} className="space-y-2 text-[14px] text-zinc-200">
+            <ul key={index} className="space-y-2 text-[14px] text-foreground">
               {block.items.map((item, itemIndex) => (
                 <li
                   key={`${index}-${itemIndex}`}
@@ -380,8 +380,8 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
                   <span
                     className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[11px] ${
                       item.checked
-                        ? "border-[#10a37f] bg-[#0f2a23] text-[#10a37f]"
-                        : "border-[#3a3a3a] bg-[#191919] text-zinc-600"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-muted text-muted-foreground"
                     }`}
                   >
                     {item.checked ? "✓" : ""}
@@ -395,9 +395,9 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
 
         if (block.type === "inlineCode") {
           return (
-            <p key={index} className="text-[14px] leading-7 text-zinc-200">
+            <p key={index} className="text-[14px] leading-7 text-foreground">
               {block.label}{" "}
-              <code className="rounded bg-[#151515] px-1.5 py-0.5 text-[12px] text-zinc-100">
+              <code className="rounded bg-muted px-1.5 py-0.5 text-[12px] text-foreground">
                 {block.code}
               </code>{" "}
               {block.suffix ?? ""}
@@ -407,7 +407,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
 
         if (block.type === "heading") {
           return (
-            <h3 key={index} className="text-sm font-semibold text-zinc-100">
+            <h3 key={index} className="text-sm font-semibold text-foreground">
               {block.value}
             </h3>
           );
@@ -417,7 +417,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
           return (
             <ol
               key={index}
-              className="list-decimal space-y-1.5 pl-5 text-sm text-zinc-200"
+              className="list-decimal space-y-1.5 pl-5 text-sm text-foreground"
             >
               {block.items.map((item, itemIndex) => (
                 <li key={`${index}-${itemIndex}`} className="leading-relaxed">
@@ -432,17 +432,17 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
           return (
             <div key={index}>
               {block.title && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {block.title}
                 </p>
               )}
-              <ul className="space-y-1.5 text-[13px] text-zinc-200">
+              <ul className="space-y-1.5 text-[13px] text-foreground">
                 {block.items.map((item, itemIndex) => (
                   <li
                     key={`${index}-${itemIndex}`}
                     className="flex gap-2 leading-relaxed"
                   >
-                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#10a37f]" />
+                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-primary" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -455,12 +455,12 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
           return (
             <div
               key={index}
-              className="overflow-hidden rounded-xl border border-[#2f2f2f]"
+              className="overflow-hidden rounded-xl border border-border"
             >
-              <div className="border-b border-[#2f2f2f] bg-[#171717] px-3 py-1.5 text-[11px] uppercase tracking-wider text-zinc-500">
+              <div className="border-b border-border bg-card px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
                 {block.language}
               </div>
-              <pre className="overflow-x-auto bg-[#141414] p-3 text-[12px] leading-relaxed text-zinc-300">
+              <pre className="overflow-x-auto bg-muted p-3 text-[12px] leading-relaxed text-card-foreground">
                 <code>{block.code}</code>
               </pre>
             </div>
@@ -470,15 +470,15 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
         return (
           <div
             key={index}
-            className="overflow-x-auto rounded-xl border border-[#2f2f2f]"
+            className="overflow-x-auto rounded-xl border border-border"
           >
-            <table className="min-w-full border-collapse text-left text-xs text-zinc-300">
-              <thead className="bg-[#171717] text-zinc-400">
+            <table className="min-w-full border-collapse text-left text-xs text-card-foreground">
+              <thead className="bg-card text-muted-foreground">
                 <tr>
                   {block.headers.map((header) => (
                     <th
                       key={header}
-                      className="border-b border-[#2f2f2f] px-3 py-2 font-medium"
+                      className="border-b border-border px-3 py-2 font-medium"
                     >
                       {header}
                     </th>
@@ -489,7 +489,7 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
                 {block.rows.map((row, rowIndex) => (
                   <tr
                     key={rowIndex}
-                    className="odd:bg-[#151515] even:bg-[#1a1a1a]"
+                    className="odd:bg-muted even:bg-background"
                   >
                     {row.map((cell, cellIndex) => (
                       <td
@@ -516,7 +516,7 @@ export default function ChatPage() {
   const messages = STATIC_CHAT_CONTENT[chatId] ?? DEFAULT_CHAT;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#111111]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-background">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -525,18 +525,18 @@ export default function ChatPage() {
         }}
       />
 
-      <div className="relative z-10 flex items-center justify-between border-b border-[#272727] px-6 py-4">
+      <div className="relative z-10 flex items-center justify-between border-b border-border px-6 py-4">
         <div>
-          <p className="text-[11px] uppercase tracking-widest text-zinc-500">
+          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
             Chat
           </p>
-          <h1 className="text-lg font-semibold text-white">
+          <h1 className="text-lg font-semibold text-foreground">
             Conversation #{chatId}
           </h1>
         </div>
 
-        <span className="inline-flex items-center gap-1 rounded-full border border-[#2f2f2f] bg-[#1f1f1f] px-2.5 py-1 text-[11px] text-zinc-400">
-          <Sparkles size={12} className="text-[#10a37f]" />
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
+          <Sparkles size={12} className="text-primary" />
           Forge Preview
         </span>
       </div>
@@ -551,18 +551,18 @@ export default function ChatPage() {
               <div
                 className={`max-w-[80%] rounded-2xl border px-4 py-3 ${
                   message.role === "user"
-                    ? "border-[#1f6b58] bg-[#0f2a23] text-zinc-100"
-                    : "border-[#2d2d2d] bg-[#1b1b1b] text-zinc-200"
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border bg-card text-foreground"
                 }`}
               >
                 <MessageBlocks blocks={message.blocks} />
 
                 {message.role === "assistant" && (
-                  <div className="mt-3 flex items-center gap-1 text-zinc-500">
-                    <button className="rounded-md p-1.5 transition hover:bg-[#2a2a2a] hover:text-zinc-300">
+                  <div className="mt-3 flex items-center gap-1 text-muted-foreground">
+                    <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
                       <Copy size={13} />
                     </button>
-                    <button className="rounded-md p-1.5 transition hover:bg-[#2a2a2a] hover:text-zinc-300">
+                    <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
                       <RotateCcw size={13} />
                     </button>
                   </div>
@@ -573,20 +573,20 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="relative z-10 border-t border-[#272727] bg-[#131313]/80 px-6 py-4 backdrop-blur">
-        <div className="mx-auto w-full max-w-4xl rounded-2xl border border-[#333] bg-[#1f1f1f] px-3 py-2.5">
+      <div className="relative z-10 border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
+        <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-card px-3 py-2.5">
           <div className="flex items-end gap-2">
             <textarea
               placeholder="Message Forge"
               rows={1}
               readOnly
-              className="max-h-40 min-h-6 flex-1 resize-none bg-transparent text-sm text-zinc-300 outline-none placeholder:text-zinc-600"
+              className="max-h-40 min-h-6 flex-1 resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
-            <button className="rounded-lg bg-[#10a37f] p-2 text-white transition hover:bg-[#0d8f6f]">
+            <button className="rounded-lg bg-primary p-2 text-primary-foreground transition hover:opacity-90">
               <ArrowUp size={14} />
             </button>
           </div>
-          <p className="mt-1.5 text-[11px] text-zinc-600">
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
             Enter to send. Shift+Enter for a new line.
           </p>
         </div>

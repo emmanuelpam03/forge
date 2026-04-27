@@ -51,7 +51,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="relative h-full overflow-y-auto bg-[#111111] px-4 py-4 sm:px-6 lg:px-8">
+    <div className="relative h-full overflow-y-auto bg-background px-4 py-4 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -62,12 +62,12 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
 
       <div className="relative z-10 mx-auto flex w-full max-w-6xl gap-5">
         <aside className="hidden w-62.5 shrink-0 lg:block">
-          <div className="sticky top-4 rounded-3xl border border-[#242424] bg-[#1a1a1a]/90 p-3">
+          <div className="sticky top-4 rounded-3xl border border-border bg-card/90 p-3">
             <div className="px-2 py-1.5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                 Settings
               </p>
-              <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-zinc-100">
+              <h2 className="mt-1 text-[18px] font-semibold tracking-[-0.03em] text-foreground">
                 Navigation
               </h2>
             </div>
@@ -81,8 +81,8 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
 
                 const itemClassName = `flex items-center justify-between rounded-2xl border px-3 py-2.5 transition-colors ${
                   isActive
-                    ? "border-[#10a37f] bg-[#0f2a23] text-white"
-                    : "border-transparent bg-transparent text-zinc-400 hover:border-[#2a2a2a] hover:bg-[#141414] hover:text-zinc-200"
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground"
                 } ${item.muted ? "opacity-70" : ""}`;
 
                 const itemContent = (
@@ -95,7 +95,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                     </span>
                     <ChevronRight
                       size={14}
-                      className="shrink-0 text-zinc-500"
+                      className="shrink-0 text-muted-foreground"
                     />
                   </>
                 );

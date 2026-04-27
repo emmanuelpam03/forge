@@ -74,7 +74,7 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${spaceGrotesk.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex h-screen w-screen overflow-hidden bg-[#111111] text-white">
+      <body className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
         <ThemeProvider>
           <Sidebar />
           <main className="flex-1 overflow-hidden">{children}</main>

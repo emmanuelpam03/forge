@@ -24,7 +24,7 @@ export default function ProjectPage() {
   };
 
   return (
-    <div className="relative h-full overflow-hidden bg-[#111111] px-6 py-6 lg:px-8">
+    <div className="relative h-full overflow-hidden bg-background px-6 py-6 lg:px-8">
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -36,23 +36,23 @@ export default function ProjectPage() {
       <div className="relative z-10 h-full max-w-5xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Project
             </p>
-            <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-zinc-100">
+            <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-foreground">
               {project?.name ?? "Project"}
             </h1>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-72 items-center gap-2 rounded-full border border-[#343434] bg-[#171717] px-4 text-zinc-400">
+            <div className="flex h-10 w-72 items-center gap-2 rounded-full border border-border bg-card px-4 text-muted-foreground">
               <Search size={14} />
               <span className="text-[14px]">Search chats</span>
             </div>
 
             <button
               onClick={handleCreateProjectChat}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-[#10a37f] px-4 text-sm font-medium text-white transition hover:bg-[#0d8f6f]"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-90"
             >
               <Plus size={14} />
               New chat
@@ -60,18 +60,18 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        <div className="mt-8 inline-flex items-center rounded-full bg-[#2b2b2b] px-4 py-1.5 text-[13px] text-zinc-100">
+        <div className="mt-8 inline-flex items-center rounded-full bg-accent px-4 py-1.5 text-[13px] text-foreground">
           Chats in this project
         </div>
 
-        <div className="mt-4 grid grid-cols-[minmax(280px,1fr)_150px] items-center px-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+        <div className="mt-4 grid grid-cols-[minmax(280px,1fr)_150px] items-center px-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           <span>Chat</span>
           <span>Location</span>
         </div>
 
-        <div className="mt-2 overflow-hidden rounded-2xl border border-[#242424] bg-[#151515]/40">
+        <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-card/60">
           {projectChats.length === 0 && (
-            <div className="px-4 py-6 text-sm text-zinc-500">
+            <div className="px-4 py-6 text-sm text-muted-foreground">
               No chats in this project yet. Create one to get started.
             </div>
           )}
@@ -80,19 +80,22 @@ export default function ProjectPage() {
             <Link
               key={chat.id}
               href={chat.href}
-              className="grid grid-cols-[minmax(280px,1fr)_150px] items-center border-b border-[#262626] px-3 py-3 last:border-b-0 transition-colors duration-150 hover:bg-[#1b1b1b] active:bg-[#202020]"
+              className="grid grid-cols-[minmax(280px,1fr)_150px] items-center border-b border-border px-3 py-3 last:border-b-0 transition-colors duration-150 hover:bg-accent active:bg-accent/80"
             >
               <div className="min-w-0">
-                <span className="flex items-center gap-2 text-[14px] font-medium text-zinc-200">
-                  <MessageSquare size={14} className="shrink-0 text-zinc-500" />
+                <span className="flex items-center gap-2 text-[14px] font-medium text-foreground">
+                  <MessageSquare
+                    size={14}
+                    className="shrink-0 text-muted-foreground"
+                  />
                   <span className="truncate">{chat.title}</span>
                 </span>
-                <p className="mt-1 truncate text-[12px] text-zinc-500">
+                <p className="mt-1 truncate text-[12px] text-muted-foreground">
                   {chat.preview}
                 </p>
               </div>
 
-              <span className="text-[12px] text-zinc-400">
+              <span className="text-[12px] text-muted-foreground">
                 /{project?.name?.toLowerCase() ?? "project"}
               </span>
             </Link>

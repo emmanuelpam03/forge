@@ -65,7 +65,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-[#111111]">
+    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-background">
       {/* Ambient Glow */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -77,16 +77,16 @@ export default function HomePage() {
 
       <div className="relative z-10 flex w-full flex-col items-center gap-5 px-6">
         {/* Main Card */}
-        <div className="flex w-full max-w-110 flex-col gap-5 rounded-[18px] border border-[#2d2d2d] bg-[#1e1e1e] p-7">
+        <div className="flex w-full max-w-110 flex-col gap-5 rounded-[18px] border border-border bg-card p-7">
           {/* Header */}
           <div className="flex flex-col items-center gap-2.5 text-center">
-            <ForgeLogo className="h-9 w-9 text-[#10a37f]" />
+            <ForgeLogo className="h-9 w-9 text-primary" />
 
-            <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em] text-white">
+            <h1 className="text-[26px] font-semibold leading-tight tracking-[-0.03em] text-foreground">
               What do you want to build today?
             </h1>
 
-            <p className="max-w-72.5 text-[14px] leading-6 text-zinc-500">
+            <p className="max-w-72.5 text-[14px] leading-6 text-muted-foreground">
               Forge helps you think, create, research, organize projects, and
               move faster.
             </p>
@@ -97,15 +97,15 @@ export default function HomePage() {
             {FEATURE_CARDS.map(({ id, icon: Icon, title, description }) => (
               <button
                 key={id}
-                className="flex flex-col items-center gap-1.5 rounded-xl border border-[#333] bg-[#272727] p-3 text-left transition-colors duration-150 hover:bg-[#2e2e2e]"
+                className="flex flex-col items-center gap-1.5 rounded-xl border border-border bg-muted/40 p-3 text-left transition-colors duration-150 hover:bg-accent"
               >
-                <Icon size={17} className="text-[#10a37f]" />
+                <Icon size={17} className="text-primary" />
 
-                <span className="text-center text-[13px] font-semibold leading-snug tracking-[-0.01em] text-zinc-300">
+                <span className="text-center text-[13px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
                   {title}
                 </span>
 
-                <span className="text-center text-[12px] leading-snug text-zinc-500">
+                <span className="text-center text-[12px] leading-snug text-muted-foreground">
                   {description}
                 </span>
               </button>
@@ -120,8 +120,8 @@ export default function HomePage() {
                 onClick={() => setActiveTab(tab)}
                 className={`border-b-2 px-2.5 py-1 pb-1.75 text-[14px] transition-colors ${
                   activeTab === tab
-                    ? "border-[#10a37f] text-[#10a37f]"
-                    : "border-transparent text-zinc-500 hover:text-zinc-300"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab}
@@ -130,8 +130,8 @@ export default function HomePage() {
           </div>
 
           {/* Input */}
-          <div className="flex items-center gap-2.5 rounded-[14px] border border-[#333] bg-[#272727] px-3 py-2.5 transition-colors duration-150 focus-within:border-zinc-500">
-            <ForgeLogo className="h-5 w-5 shrink-0 text-[#10a37f]" />
+          <div className="flex items-center gap-2.5 rounded-[14px] border border-border bg-muted/40 px-3 py-2.5 transition-colors duration-150 focus-within:border-ring">
+            <ForgeLogo className="h-5 w-5 shrink-0 text-primary" />
 
             <input
               type="text"
@@ -139,17 +139,17 @@ export default function HomePage() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Message Forge"
-              className="flex-1 bg-transparent text-[15px] text-zinc-300 outline-none placeholder:text-zinc-600"
+              className="flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
             />
 
             <div className="flex shrink-0 items-center gap-1.5">
-              <button className="rounded-lg p-1 text-zinc-500 transition-colors hover:bg-zinc-700 hover:text-zinc-300">
+              <button className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                 <Mic size={15} />
               </button>
 
               <button
                 onClick={handleSend}
-                className="rounded-lg bg-[#10a37f] p-1.5 text-white transition-colors duration-150 hover:bg-[#0d8f6f]"
+                className="rounded-lg bg-primary p-1.5 text-primary-foreground transition-colors duration-150 hover:opacity-90"
               >
                 <ArrowRight size={14} />
               </button>
@@ -158,7 +158,7 @@ export default function HomePage() {
         </div>
 
         {/* Footer */}
-        <p className="text-[11px] text-zinc-700">
+        <p className="text-[11px] text-muted-foreground">
           Forge can make mistakes. Verify important information.
         </p>
       </div>
