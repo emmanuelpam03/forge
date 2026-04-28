@@ -1,8 +1,34 @@
 import "dotenv/config";
-import prisma from "@/lib/prisma";
+import * as readline from "readline";
 import { randomBytes } from "crypto";
+import prisma from "@/lib/prisma";
 
-async function createUser(name: string, email: string, image?: string) {
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+function ask(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => resolve(answer.trim()));
+  });
+}
+
+async function createUser() {
+  console.log("\n👤 Create a new user\n");
+
+  const name = await ask("Full name: ");
+  const email = await ask("Email address: ");
+  const image = await ask("Avatar URL (leave blank to skip): ");
+
+  if (!name || !email) {
+    console.error("\n❌ Name and email are required.");
+    rl.close();
+    process.exit(1);
+  }
+
+  rl.close();
+
   try {
     const user = await prisma.user.create({
       data: {
@@ -11,31 +37,29 @@ async function createUser(name: string, email: string, image?: string) {
         email,
         emailVerified: false,
         image: image || null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 
-    console.log("✅ User created successfully:");
-    console.log(user);
-    return user;
-  } catch (error) {
-    console.error("❌ Error creating user:", error);
-    throw error;
+    console.log("\n✅ User created successfully:");
+    console.table({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      image: user.image ?? "(none)",
+    });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      console.error("\n❌ A user with that email already exists.");
+    } else {
+      console.error("\n❌ Error creating user:", error?.message ?? error);
+    }
+    process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// Get arguments from command line
-const [name, email, image] = process.argv.slice(2);
-
-if (!name || !email) {
-  console.error(
-    "❌ Usage: pnpm tsx scripts/create-user.ts <name> <email> [image]",
-  );
-  console.error(
-    "Example: pnpm tsx scripts/create-user.ts 'John Doe' 'john@example.com'",
-  );
-  process.exit(1);
-}
-
-createUser(name, email, image).catch(() => process.exit(1));
+createUser();
