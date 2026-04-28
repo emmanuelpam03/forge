@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ArrowRight, Mic, Bookmark, Layers, Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAppStore } from "@/stores/app-store";
 import { useFeedback } from "@/components/feedback-provider";
 
 function ForgeLogo({ className }: { className?: string }) {
@@ -54,13 +53,12 @@ type MediaTab = (typeof MEDIA_TABS)[number];
 export default function HomePage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
-  const createChat = useAppStore((store) => store.createChat);
 
   const [activeTab, setActiveTab] = useState<MediaTab>("All");
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) {
       showFeedback({
         type: "error",
@@ -71,19 +69,31 @@ export default function HomePage() {
 
     try {
       setIsCreatingChat(true);
-      const chat = createChat();
-      showFeedback({
-        type: "success",
-        title: "Chat created",
-        description: "Opening your new conversation.",
-      });
-      router.push(chat.href);
-    } catch {
+      const { createChatWithMessage } = await import("@/lib/actions/chats");
+      const result = await createChatWithMessage(input.trim());
+
+      if (result.success) {
+        showFeedback({
+          type: "success",
+          title: "Chat created",
+          description: "Opening your new conversation.",
+        });
+        router.push(`/c/${result.chatId}`);
+        setInput("");
+      } else {
+        showFeedback({
+          type: "error",
+          title: "Failed to create chat",
+          description: result.error,
+        });
+      }
+    } catch (error) {
       showFeedback({
         type: "error",
-        title: "Could not create chat",
-        description: "Please try again.",
+        title: "Error",
+        description: "Failed to create chat",
       });
+    } finally {
       setIsCreatingChat(false);
     }
   };

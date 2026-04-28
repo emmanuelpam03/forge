@@ -518,9 +518,9 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
 export default async function ChatPage({
   params,
 }: {
-  params: { chatId: string };
+  params: Promise<{ chatId: string }>;
 }) {
-  const chatId = params.chatId;
+  const { chatId } = await params;
   const chat = await getChatById(chatId);
 
   if (!chat) {

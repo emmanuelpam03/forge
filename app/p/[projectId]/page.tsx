@@ -8,9 +8,9 @@ import { ProjectPageClient } from "./ProjectPageClient";
 export default async function ProjectPage({
   params,
 }: {
-  params: { projectId: string };
+  params: Promise<{ projectId: string }>;
 }) {
-  const projectId = params.projectId;
+  const { projectId } = await params;
   const project = await getProjectById(projectId);
 
   if (!project) {

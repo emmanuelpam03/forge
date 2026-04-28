@@ -103,3 +103,44 @@ export async function getProjectChats(projectId: string) {
     return [];
   }
 }
+
+export async function createChatWithMessage(
+  messageContent: string,
+  projectId?: string,
+) {
+  try {
+    // Create chat with title derived from first message
+    const title =
+      messageContent.length > 60
+        ? messageContent.substring(0, 60) + "..."
+        : messageContent;
+
+    const chat = await prisma.chat.create({
+      data: {
+        title,
+        projectId: projectId || null,
+      },
+    });
+
+    // Create the first user message
+    await prisma.message.create({
+      data: {
+        chatId: chat.id,
+        role: "user",
+        content: messageContent,
+      },
+    });
+
+    // Update chat's lastMessageAt
+    await prisma.chat.update({
+      where: { id: chat.id },
+      data: { lastMessageAt: new Date() },
+    });
+
+    revalidatePath("/", "layout");
+    return { success: true, chatId: chat.id };
+  } catch (error) {
+    console.error("Failed to create chat with message:", error);
+    return { success: false, error: "Failed to create chat" };
+  }
+}

@@ -23,7 +23,7 @@ import {
   updateProject,
   deleteProject,
 } from "@/lib/actions/projects";
-import { createChat } from "@/lib/actions/chats";
+
 import {
   Project as PrismaProject,
   Chat as PrismaChat,
@@ -364,16 +364,8 @@ export function SidebarClient({
     }
   };
 
-  const handleCreateChat = async () => {
-    const result = await createChat();
-    if (result.success) {
-      router.push(`/c/${result.chat?.id}`);
-    } else {
-      showFeedback({
-        type: "error",
-        title: "Failed to create chat",
-      });
-    }
+  const handleCreateChat = () => {
+    router.push("/");
   };
 
   const handleOpenSearch = () => {
