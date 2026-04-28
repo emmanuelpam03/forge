@@ -77,7 +77,10 @@ export async function getChatById(id: string) {
 export async function getRecentChats(limit: number = 5) {
   try {
     const chats = await prisma.chat.findMany({
-      where: { isArchived: false },
+      where: {
+        isArchived: false,
+        projectId: null,
+      },
       orderBy: { lastMessageAt: "desc" },
       take: limit,
     });
