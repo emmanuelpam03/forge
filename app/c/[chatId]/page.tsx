@@ -1,7 +1,12 @@
-"use client";
-
-import { ArrowUp, Copy, RotateCcw, Sparkles } from "lucide-react";
-import { useParams } from "next/navigation";
+import {
+  ArrowUp,
+  Copy,
+  RotateCcw,
+  Sparkles,
+  MessageSquare,
+} from "lucide-react";
+import { notFound } from "next/navigation";
+import { getChatById } from "@/lib/actions/chats";
 
 type ChatBlock =
   | {
@@ -510,10 +515,17 @@ function MessageBlocks({ blocks }: { blocks: ChatBlock[] }) {
   );
 }
 
-export default function ChatPage() {
-  const params = useParams<{ chatId: string }>();
+export default async function ChatPage({
+  params,
+}: {
+  params: { chatId: string };
+}) {
   const chatId = params.chatId;
-  const messages = STATIC_CHAT_CONTENT[chatId] ?? DEFAULT_CHAT;
+  const chat = await getChatById(chatId);
+
+  if (!chat) {
+    notFound();
+  }
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background">
@@ -531,7 +543,7 @@ export default function ChatPage() {
             Chat
           </p>
           <h1 className="text-lg font-semibold text-foreground">
-            Conversation #{chatId}
+            {chat.title}
           </h1>
         </div>
 
@@ -543,33 +555,47 @@ export default function ChatPage() {
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl border px-4 py-3 ${
-                  message.role === "user"
-                    ? "border-primary bg-primary/15 text-foreground"
-                    : "border-border bg-card text-foreground"
-                }`}
-              >
-                <MessageBlocks blocks={message.blocks} />
-
-                {message.role === "assistant" && (
-                  <div className="mt-3 flex items-center gap-1 text-muted-foreground">
-                    <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
-                      <Copy size={13} />
-                    </button>
-                    <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
-                      <RotateCcw size={13} />
-                    </button>
-                  </div>
-                )}
-              </div>
+          {chat.messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <MessageSquare size={32} className="mb-3 text-muted-foreground" />
+              <p className="text-[14px] font-medium text-foreground">
+                No messages yet
+              </p>
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                Start a conversation to begin.
+              </p>
             </div>
-          ))}
+          ) : (
+            chat.messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[80%] rounded-2xl border px-4 py-3 ${
+                    message.role === "user"
+                      ? "border-primary bg-primary/15 text-foreground"
+                      : "border-border bg-card text-foreground"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]">
+                    {message.content}
+                  </p>
+
+                  {message.role === "assistant" && (
+                    <div className="mt-3 flex items-center gap-1 text-muted-foreground">
+                      <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
+                        <Copy size={13} />
+                      </button>
+                      <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
+                        <RotateCcw size={13} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

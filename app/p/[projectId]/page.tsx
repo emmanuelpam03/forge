@@ -1,27 +1,23 @@
-"use client";
-
 import { MessageSquare, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useAppStore } from "@/stores/app-store";
+import { notFound } from "next/navigation";
+import { getProjectById } from "@/lib/actions/projects";
+import { getProjectChats } from "@/lib/actions/chats";
+import { ProjectPageClient } from "./ProjectPageClient";
 
-export default function ProjectPage() {
-  const params = useParams<{ projectId: string }>();
-  const router = useRouter();
-  const projects = useAppStore((store) => store.projects);
-  const recentChats = useAppStore((store) => store.recentChats);
-  const createChat = useAppStore((store) => store.createChat);
-
+export default async function ProjectPage({
+  params,
+}: {
+  params: { projectId: string };
+}) {
   const projectId = params.projectId;
-  const project = projects.find((item) => item.id === projectId);
-  const projectChats = recentChats.filter(
-    (chat) => chat.projectId === projectId,
-  );
+  const project = await getProjectById(projectId);
 
-  const handleCreateProjectChat = () => {
-    const chat = createChat(projectId);
-    router.push(chat.href);
-  };
+  if (!project) {
+    notFound();
+  }
+
+  const chats = await getProjectChats(projectId);
 
   return (
     <div className="relative h-full overflow-hidden bg-background px-6 py-6 lg:px-8">
@@ -40,7 +36,7 @@ export default function ProjectPage() {
               Project
             </p>
             <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-foreground">
-              {project?.name ?? "Project"}
+              {project.name}
             </h1>
           </div>
 
@@ -50,13 +46,7 @@ export default function ProjectPage() {
               <span className="text-[14px]">Search chats</span>
             </div>
 
-            <button
-              onClick={handleCreateProjectChat}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-            >
-              <Plus size={14} />
-              New chat
-            </button>
+            <ProjectPageClient projectId={projectId} />
           </div>
         </div>
 
@@ -70,36 +60,38 @@ export default function ProjectPage() {
         </div>
 
         <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-card/60">
-          {projectChats.length === 0 && (
+          {chats.length === 0 ? (
             <div className="px-4 py-6 text-sm text-muted-foreground">
-              No chats in this project yet. Create one to get started.
+              No chats in this project yet
+              <br />
+              Create one to begin.
             </div>
-          )}
+          ) : (
+            chats.map((chat) => (
+              <Link
+                key={chat.id}
+                href={`/c/${chat.id}`}
+                className="grid grid-cols-[minmax(280px,1fr)_150px] items-center border-b border-border px-3 py-3 last:border-b-0 transition-colors duration-150 hover:bg-accent active:bg-accent/80"
+              >
+                <div className="min-w-0">
+                  <span className="flex items-center gap-2 text-[14px] font-medium text-foreground">
+                    <MessageSquare
+                      size={14}
+                      className="shrink-0 text-muted-foreground"
+                    />
+                    <span className="truncate">{chat.title}</span>
+                  </span>
+                  <p className="mt-1 truncate text-[12px] text-muted-foreground">
+                    {chat.summary || "No summary yet"}
+                  </p>
+                </div>
 
-          {projectChats.map((chat) => (
-            <Link
-              key={chat.id}
-              href={chat.href}
-              className="grid grid-cols-[minmax(280px,1fr)_150px] items-center border-b border-border px-3 py-3 last:border-b-0 transition-colors duration-150 hover:bg-accent active:bg-accent/80"
-            >
-              <div className="min-w-0">
-                <span className="flex items-center gap-2 text-[14px] font-medium text-foreground">
-                  <MessageSquare
-                    size={14}
-                    className="shrink-0 text-muted-foreground"
-                  />
-                  <span className="truncate">{chat.title}</span>
+                <span className="text-[12px] text-muted-foreground">
+                  /{project.name.toLowerCase()}
                 </span>
-                <p className="mt-1 truncate text-[12px] text-muted-foreground">
-                  {chat.preview}
-                </p>
-              </div>
-
-              <span className="text-[12px] text-muted-foreground">
-                /{project?.name?.toLowerCase() ?? "project"}
-              </span>
-            </Link>
-          ))}
+              </Link>
+            ))
+          )}
         </div>
       </div>
     </div>
