@@ -54,7 +54,14 @@ export const ModelName = {
   User: 'User',
   Session: 'Session',
   Account: 'Account',
-  Verification: 'Verification'
+  Verification: 'Verification',
+  Project: 'Project',
+  Chat: 'Chat',
+  Message: 'Message',
+  Preference: 'Preference',
+  MemorySummary: 'MemorySummary',
+  ChatRunAnalytics: 'ChatRunAnalytics',
+  Document: 'Document'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -129,6 +136,107 @@ export const VerificationScalarFieldEnum = {
 } as const
 
 export type VerificationScalarFieldEnum = (typeof VerificationScalarFieldEnum)[keyof typeof VerificationScalarFieldEnum]
+
+
+export const ProjectScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  color: 'color',
+  isPinned: 'isPinned',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProjectScalarFieldEnum = (typeof ProjectScalarFieldEnum)[keyof typeof ProjectScalarFieldEnum]
+
+
+export const ChatScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  title: 'title',
+  summary: 'summary',
+  lastMessageAt: 'lastMessageAt',
+  isPinned: 'isPinned',
+  isArchived: 'isArchived',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ChatScalarFieldEnum = (typeof ChatScalarFieldEnum)[keyof typeof ChatScalarFieldEnum]
+
+
+export const MessageScalarFieldEnum = {
+  id: 'id',
+  chatId: 'chatId',
+  role: 'role',
+  content: 'content',
+  modelUsed: 'modelUsed',
+  provider: 'provider',
+  tokensInput: 'tokensInput',
+  tokensOutput: 'tokensOutput',
+  latencyMs: 'latencyMs',
+  runId: 'runId',
+  traceId: 'traceId',
+  createdAt: 'createdAt'
+} as const
+
+export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
+
+
+export const PreferenceScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  value: 'value',
+  category: 'category',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PreferenceScalarFieldEnum = (typeof PreferenceScalarFieldEnum)[keyof typeof PreferenceScalarFieldEnum]
+
+
+export const MemorySummaryScalarFieldEnum = {
+  id: 'id',
+  summary: 'summary',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MemorySummaryScalarFieldEnum = (typeof MemorySummaryScalarFieldEnum)[keyof typeof MemorySummaryScalarFieldEnum]
+
+
+export const ChatRunAnalyticsScalarFieldEnum = {
+  id: 'id',
+  chatId: 'chatId',
+  modelUsed: 'modelUsed',
+  provider: 'provider',
+  latencyMs: 'latencyMs',
+  tokensInput: 'tokensInput',
+  tokensOutput: 'tokensOutput',
+  estimatedCost: 'estimatedCost',
+  runId: 'runId',
+  traceId: 'traceId',
+  status: 'status',
+  createdAt: 'createdAt'
+} as const
+
+export type ChatRunAnalyticsScalarFieldEnum = (typeof ChatRunAnalyticsScalarFieldEnum)[keyof typeof ChatRunAnalyticsScalarFieldEnum]
+
+
+export const DocumentScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  name: 'name',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
+  storageUrl: 'storageUrl',
+  extractedText: 'extractedText',
+  createdAt: 'createdAt'
+} as const
+
+export type DocumentScalarFieldEnum = (typeof DocumentScalarFieldEnum)[keyof typeof DocumentScalarFieldEnum]
 
 
 export const SortOrder = {

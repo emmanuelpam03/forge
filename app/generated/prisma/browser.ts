@@ -37,3 +37,38 @@ export type Account = Prisma.AccountModel
  * 
  */
 export type Verification = Prisma.VerificationModel
+/**
+ * Model Project
+ * 
+ */
+export type Project = Prisma.ProjectModel
+/**
+ * Model Chat
+ * 
+ */
+export type Chat = Prisma.ChatModel
+/**
+ * Model Message
+ * 
+ */
+export type Message = Prisma.MessageModel
+/**
+ * Model Preference
+ * 
+ */
+export type Preference = Prisma.PreferenceModel
+/**
+ * Model MemorySummary
+ * 
+ */
+export type MemorySummary = Prisma.MemorySummaryModel
+/**
+ * Model ChatRunAnalytics
+ * 
+ */
+export type ChatRunAnalytics = Prisma.ChatRunAnalyticsModel
+/**
+ * Model Document
+ * 
+ */
+export type Document = Prisma.DocumentModel

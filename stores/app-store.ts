@@ -34,45 +34,45 @@ type AppStore = AppState & AppActions;
 
 const initialState: AppState = {
   projects: [
-    { id: "1", name: "Work", href: "/projects/1" },
-    { id: "2", name: "Investing", href: "/projects/2" },
-    { id: "3", name: "Clients", href: "/projects/3" },
-    { id: "4", name: "Ideas", href: "/projects/4" },
+    { id: "1", name: "Work", href: "/p/1" },
+    { id: "2", name: "Investing", href: "/p/2" },
+    { id: "3", name: "Clients", href: "/p/3" },
+    { id: "4", name: "Ideas", href: "/p/4" },
   ],
   recentChats: [
     {
       id: "1",
       title: "Forex growth strategy",
       preview: "Build a scalable forex plan with risk control...",
-      href: "/chat/1",
+      href: "/c/1",
       projectId: "2",
     },
     {
       id: "2",
       title: "Landing page ideas",
       preview: "Modern hero section ideas for Forge...",
-      href: "/chat/2",
+      href: "/c/2",
       projectId: "1",
     },
     {
       id: "3",
       title: "Fitness meal prep",
       preview: "High protein low cost weekly meals...",
-      href: "/chat/3",
+      href: "/c/3",
       projectId: "4",
     },
     {
       id: "4",
       title: "30-day launch plan",
       preview: "Structured rollout strategy with phases and milestones...",
-      href: "/chat/4",
+      href: "/c/4",
       projectId: "3",
     },
     {
       id: "5",
       title: "Memory + search brief",
       preview: "Mixed markdown preview with checklist and quotes...",
-      href: "/chat/5",
+      href: "/c/5",
       projectId: "1",
     },
   ],
@@ -106,7 +106,7 @@ function createProject() {
   const project: Project = {
     id,
     name: "New Project",
-    href: `/projects/${id}`,
+    href: `/p/${id}`,
   };
 
   state = {
@@ -124,7 +124,7 @@ function createChat(projectId?: string) {
     id,
     title: "New Chat",
     preview: "Start a conversation...",
-    href: `/chat/${id}`,
+    href: `/c/${id}`,
     ...(projectId ? { projectId } : {}),
   };
 
