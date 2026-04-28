@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { MessageRole } from "@/app/generated/prisma";
+import { MessageRole } from "@/app/generated/prisma/enums";
 import { revalidatePath } from "next/cache";
 
 export async function createMessage(

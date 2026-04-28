@@ -2,6 +2,11 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@/app/generated/prisma/client";
+
+type ChatWithMessages = Prisma.ChatGetPayload<{
+  include: { messages: true };
+}>;
 
 export async function createChat(projectId?: string) {
   try {
@@ -57,7 +62,9 @@ export async function deleteChat(id: string) {
   }
 }
 
-export async function getChatById(id: string) {
+export async function getChatById(
+  id: string,
+): Promise<ChatWithMessages | null> {
   try {
     const chat = await prisma.chat.findUnique({
       where: { id },
@@ -67,7 +74,7 @@ export async function getChatById(id: string) {
         },
       },
     });
-    return chat;
+    return chat as ChatWithMessages | null;
   } catch (error) {
     console.error("Failed to get chat:", error);
     return null;

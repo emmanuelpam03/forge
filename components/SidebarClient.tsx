@@ -27,7 +27,7 @@ import {
 import {
   Project as PrismaProject,
   Chat as PrismaChat,
-} from "@/app/generated/prisma";
+} from "@/app/generated/prisma/browser";
 
 export type ProjectItemData = {
   id: string;
