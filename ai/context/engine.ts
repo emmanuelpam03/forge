@@ -314,10 +314,13 @@ function applyTokenBudget(
   sections: ContextSection[],
   budget: number = TOKEN_BUDGET,
 ): ContextSection[] {
+  // Sort by priority (lower number = higher priority)
+  const sorted = [...sections].sort((a, b) => a.priority - b.priority);
+
   const selected: ContextSection[] = [];
   let remaining = budget;
 
-  for (const section of sections) {
+  for (const section of sorted) {
     if (remaining >= section.estimatedTokens) {
       selected.push(section);
       remaining -= section.estimatedTokens;
@@ -326,7 +329,6 @@ function applyTokenBudget(
 
   return selected;
 }
-
 /**
  * Main context loading function.
  * Orchestrates all context loading and selection.
@@ -655,9 +657,13 @@ export async function updateUserMemory(extractedFact: string): Promise<void> {
   const deduplicated = deduplicateMemories(allMemories);
 
   // Keep only most relevant (top 10) to avoid unbounded growth
-  const ranked = rankMemories(
-    deduplicated.map((text) => ({ text, createdAt: new Date() })),
-  );
+  // Assign timestamps: new fact gets current time, existing get consolidation time
+  const memoriesWithTimestamps = deduplicated.map((text) => ({
+    text,
+    createdAt:
+      text === extractedFact ? new Date() : (latest?.updatedAt ?? new Date()),
+  }));
+  const ranked = rankMemories(memoriesWithTimestamps);
   const top10 = ranked.slice(0, 10).map((r) => r.text);
 
   // Update or create memory summary
@@ -696,7 +702,10 @@ export async function pruneOldMemories(maxCount: number = 10): Promise<void> {
 
   if (memories.length > maxCount) {
     // Rank and keep top N
-    const ranked = rankMemories(memories.map((text) => ({ text })));
+    // Use summary's updatedAt as timestamp for all memories (they're part of same summary)
+    const ranked = rankMemories(
+      memories.map((text) => ({ text, createdAt: summary.updatedAt })),
+    );
     const kept = ranked.slice(0, maxCount).map((r) => r.text);
 
     await prisma.memorySummary.update({

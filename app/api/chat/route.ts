@@ -61,19 +61,44 @@ export async function POST(request: NextRequest) {
             },
           );
 
-          send("done", {
-            chatId: result.chatId,
-            assistantMessage: result.assistantMessage,
-            modelUsed: result.modelUsed,
-            provider: result.provider,
-            inputTokens: result.inputTokens,
-            outputTokens: result.outputTokens,
-            latencyMs: result.latencyMs,
-            runId: result.runId,
-            intent: result.intent,
-            toolsUsed: result.toolsUsed,
-            generatedTitle: result.generatedTitle,
-          });
+          // Route-level validation: ensure response is not empty
+          const finalMessage = (
+            result.assistantMessage || assistantMessage
+          ).trim();
+
+          if (!finalMessage) {
+            console.error(
+              `Chat route: Empty response after streaming. Chat: ${result.chatId}, Intent: ${result.intent}, Tools: ${(result.toolsUsed || []).join(", ")}`,
+            );
+            send("done", {
+              chatId: result.chatId,
+              assistantMessage:
+                "I wasn't able to generate a response. Please try again or rephrase your question.",
+              modelUsed: result.modelUsed,
+              provider: result.provider,
+              inputTokens: result.inputTokens,
+              outputTokens: result.outputTokens,
+              latencyMs: result.latencyMs,
+              runId: result.runId,
+              intent: result.intent,
+              toolsUsed: result.toolsUsed,
+              generatedTitle: result.generatedTitle,
+            });
+          } else {
+            send("done", {
+              chatId: result.chatId,
+              assistantMessage: finalMessage,
+              modelUsed: result.modelUsed,
+              provider: result.provider,
+              inputTokens: result.inputTokens,
+              outputTokens: result.outputTokens,
+              latencyMs: result.latencyMs,
+              runId: result.runId,
+              intent: result.intent,
+              toolsUsed: result.toolsUsed,
+              generatedTitle: result.generatedTitle,
+            });
+          }
 
           controller.close();
         })().catch((error) => {

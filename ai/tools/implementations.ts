@@ -149,6 +149,42 @@ export function datetimeTool(action: DateTimeAction = "now"): ToolResult {
 }
 
 /**
+ * Detect if a query is asking for current/dynamic information
+ * Examples: president, stock price, bitcoin, latest, current, today, now, weather
+ */
+function isCurrentInfoQuery(text: string): boolean {
+  const dynamicPatterns = [
+    /\b(who|what|current|latest|today|now|recent|trending|president|stock|price|btc|crypto|weather|news|release|earnings|rank|top|best)\b/i,
+  ];
+  return dynamicPatterns.some((p) => p.test(text));
+}
+
+/**
+ * Qualify query for freshness: auto-add year/month for time-sensitive queries
+ * Example: "president" → "president of the US 2025"
+ */
+function qualifyQueryForFreshness(originalQuery: string): string {
+  if (!isCurrentInfoQuery(originalQuery)) {
+    return originalQuery;
+  }
+
+  // Add year context if not already present
+  const year = new Date().getFullYear();
+  if (!originalQuery.toLowerCase().includes(String(year))) {
+    // For president/leader questions, add location + year
+    if (/president|leader|prime minister|governor/i.test(originalQuery)) {
+      return `${originalQuery} ${year}`;
+    }
+    // For price/market questions, add "today" or current year
+    if (/price|market|cost|value|rate/i.test(originalQuery)) {
+      return `${originalQuery} today`;
+    }
+  }
+
+  return originalQuery;
+}
+
+/**
  * Web Search tool: Stub implementation for Phase 2
  * In Phase 3, integrate with Tavily, SerpAPI, or Perplexity
  */
@@ -184,6 +220,11 @@ export async function webSearchToolAsync(
   }
 
   try {
+    // Qualify query for freshness (e.g., add year, "today", etc.)
+    const qualifiedQuery = qualifyQueryForFreshness(query);
+    // Use advanced search depth for current information queries
+    const searchDepth = isCurrentInfoQuery(query) ? "advanced" : "basic";
+
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: {
@@ -191,9 +232,9 @@ export async function webSearchToolAsync(
       },
       body: JSON.stringify({
         api_key: apiKey,
-        query,
+        query: qualifiedQuery,
         max_results: Math.min(Math.max(maxResults, 1), 10),
-        search_depth: "basic",
+        search_depth: searchDepth,
         include_answer: true,
       }),
     });

@@ -121,12 +121,20 @@ function isValidNumericExpression(text: string): boolean {
 export async function loadContextNode(state: ChatGraphState) {
   const selectedContext = await loadContextForChat(state.chatId);
 
+  // Derive memorySummary from selectedContext to indicate if context is available
+  // Prioritize: projectContext > userMemory > chatSummary
+  const memorySummary =
+    selectedContext.projectContext ||
+    selectedContext.userMemory ||
+    selectedContext.chatSummary ||
+    null;
+
   return {
     selectedContext,
     contextBudgetTokens: selectedContext.budgetUsed,
     previousMessages: selectedContext.recentTurns,
     preferences: selectedContext.preferences,
-    memorySummary: null,
+    memorySummary,
   };
 }
 
@@ -135,7 +143,23 @@ export async function generateResponseNode(state: ChatGraphState) {
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   const response = (await model.invoke(messages as BaseMessage[])) as AIMessage;
-  const assistantMessage = toTextContent(response.content);
+  let assistantMessage = toTextContent(response.content).trim();
+
+  // If response is empty but we have tool evidence, use it as fallback
+  if (!assistantMessage && state.toolContext) {
+    assistantMessage =
+      "Based on the information I found:\n\n" + state.toolContext;
+  }
+
+  // If still empty, use explicit fallback message
+  if (!assistantMessage) {
+    assistantMessage =
+      "I encountered an issue generating a response. Please try again or rephrase your question.";
+    console.warn(
+      `Empty response for chat ${state.chatId}. Intent: ${state.intent}, Tools: ${(state.toolsUsed || []).join(", ")}`,
+    );
+  }
+
   const { inputTokens, outputTokens } = getUsageCounts(response);
 
   return {

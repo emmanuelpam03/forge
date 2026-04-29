@@ -178,7 +178,7 @@ export function ChatClient({
             currentMessage.id === assistantPlaceholderId
               ? {
                   ...currentMessage,
-                  content: content || delta,
+                  content: finalAssistantMessage,
                   pending: true,
                   streaming: true,
                   status: "Writing...",
@@ -189,7 +189,22 @@ export function ChatClient({
       };
 
       const finalizeStream = (content: string) => {
-        const finalContent = content || finalAssistantMessage;
+        const finalContent = (content || finalAssistantMessage || "").trim();
+
+        // Frontend validation: never finalize with empty message
+        if (!finalContent) {
+          setError("No response generated. Please try again.");
+          setMessages((currentMessages) =>
+            currentMessages.filter(
+              (currentMessage) =>
+                currentMessage.id !== userMessageId &&
+                currentMessage.id !== assistantPlaceholderId,
+            ),
+          );
+          setDraft(message);
+          return;
+        }
+
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
             currentMessage.id === assistantPlaceholderId
@@ -264,12 +279,31 @@ export function ChatClient({
               );
             }
 
+            // Error event: clean up UI and propagate error
             if (message.event === "error") {
-              throw new Error(
-                message.payload?.error ?? "Failed to generate a response.",
+              const errorMsg =
+                message.payload?.error ?? "Failed to generate a response.";
+              // Clean up placeholder before throwing
+              setMessages((currentMessages) =>
+                currentMessages.filter(
+                  (currentMessage) =>
+                    currentMessage.id !== userMessageId &&
+                    currentMessage.id !== assistantPlaceholderId,
+                ),
               );
+              // Propagate error to outer error handler
+              throw new Error(errorMsg);
             }
           } catch (parseError) {
+            // Re-throw if it's a stream error (from message.event === "error")
+            // Otherwise, it's a JSON parse error, just log it
+            if (
+              parseError instanceof Error &&
+              parseError.message &&
+              !parseError.message.includes("JSON.parse")
+            ) {
+              throw parseError; // Re-throw stream errors
+            }
             console.error("Failed to parse stream payload:", parseError);
           }
         }

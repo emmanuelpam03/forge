@@ -106,18 +106,29 @@ export async function runChatGraphStream(
   let inputTokens = 0;
   let outputTokens = 0;
 
-  const stream = await model.stream(messages as BaseMessage[]);
+  try {
+    const stream = await model.stream(messages as BaseMessage[]);
 
-  for await (const chunk of stream as AsyncIterable<unknown>) {
-    const text = toTextContent(
-      (chunk as { content?: unknown })?.content ?? chunk,
-    );
-    if (!text) {
-      continue;
+    for await (const chunk of stream as AsyncIterable<unknown>) {
+      const text = toTextContent(
+        (chunk as { content?: unknown })?.content ?? chunk,
+      );
+      if (!text) {
+        continue;
+      }
+
+      assistantMessage += text;
+      onChunk(text);
     }
-
-    assistantMessage += text;
-    onChunk(text);
+  } catch (error) {
+    onStatus?.("error");
+    throw error;
+  }
+  // Stream validation: log if response is empty
+  if (!assistantMessage.trim()) {
+    console.warn(
+      `Stream validation: Empty response after streaming. Chat: ${input.chatId}, Intent: ${state.intent}`,
+    );
   }
 
   outputTokens = estimateTokens(assistantMessage);
@@ -138,16 +149,41 @@ export async function runChatGraphStream(
     latencyMs: Date.now() - startedAt,
   });
 
-  Object.assign(state, await saveMessagesNode(state));
-  const titleResult = await generateTitleNode(state);
-  Object.assign(state, titleResult);
-  if (titleResult.generatedTitle) {
-    await prisma.chat.update({
-      where: { id: state.chatId },
-      data: { title: titleResult.generatedTitle },
-    });
+  // Post-stream step 1: Save messages to database
+  try {
+    const saveResult = await saveMessagesNode(state);
+    Object.assign(state, saveResult);
+  } catch (error) {
+    console.error(`Failed to save messages for chat ${input.chatId}:`, error);
+    // Continue - don't block title generation or memory extraction
   }
-  Object.assign(state, await extractMemoryNode(state));
+
+  // Post-stream step 2: Generate and persist chat title
+  try {
+    const titleResult = await generateTitleNode(state);
+    Object.assign(state, titleResult);
+    if (titleResult.generatedTitle) {
+      await prisma.chat.update({
+        where: { id: state.chatId },
+        data: { title: titleResult.generatedTitle },
+      });
+    }
+  } catch (error) {
+    console.error(
+      `Failed to generate/persist title for chat ${input.chatId}:`,
+      error,
+    );
+    // Continue - don't block memory extraction
+  }
+
+  // Post-stream step 3: Extract and store user memory
+  try {
+    const memoryResult = await extractMemoryNode(state);
+    Object.assign(state, memoryResult);
+  } catch (error) {
+    console.error(`Failed to extract memory for chat ${input.chatId}:`, error);
+    // Continue - this is the final step but we should still return state
+  }
 
   return state;
 }
