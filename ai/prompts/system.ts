@@ -152,8 +152,14 @@ Quality rules:
 
 When summarizing, prefer structured output (bullets, numbered lists, or labeled sections) appropriate to the requested format.
 
+WRITING POLICY
+
+When writing for users:
 If critical constraints are ambiguous and will materially change the summary (e.g., audience, level of detail, or which document to use), ask one concise follow-up question and then proceed.
 `;
+
+export const WRITING_POLICY = `
+When writing for users:
 ==================================================
 WRITING POLICY
 ==================================================
