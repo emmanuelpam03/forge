@@ -29,11 +29,26 @@ export async function POST(request: NextRequest) {
     });
 
     // Update chat title if one was generated (first message)
+    // Isolated try-catch to prevent title persistence failure from aborting the response
     if (result.generatedTitle) {
-      await prisma.chat.update({
-        where: { id: result.chatId },
-        data: { title: result.generatedTitle },
-      });
+      try {
+        await prisma.chat.update({
+          where: { id: result.chatId },
+          data: { title: result.generatedTitle },
+        });
+      } catch (titleError) {
+        console.error(
+          `Failed to update chat title for chatId=${result.chatId}:`,
+          {
+            generatedTitle: result.generatedTitle,
+            error:
+              titleError instanceof Error
+                ? titleError.message
+                : String(titleError),
+          },
+        );
+        // Continue without rethrowing—title update is non-critical
+      }
     }
 
     return NextResponse.json({

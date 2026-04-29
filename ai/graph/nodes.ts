@@ -73,6 +73,32 @@ function getModelName(message: AIMessage): string {
   );
 }
 
+/**
+ * Sanitize user input to prevent prompt injection attacks.
+ * Removes/escapes common injection patterns and truncates excessively long inputs.
+ */
+function sanitizeUserInput(input: string, maxLength: number = 2000): string {
+  // Truncate to max length
+  let sanitized = input.slice(0, maxLength).trim();
+
+  // Remove common prompt injection patterns
+  const injectionPatterns = [
+    /ignore\s+all\s+previous\s+instructions?/gi,
+    /forget\s+about/gi,
+    /disregard\s+everything\s+above/gi,
+    /new\s+system\s+prompt/gi,
+    /override\s+your\s+instructions/gi,
+    /respond\s+as\s+if/gi,
+    /pretend\s+you\s+are/gi,
+  ];
+
+  for (const pattern of injectionPatterns) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+
+  return sanitized.trim();
+}
+
 export async function loadContextNode(state: ChatGraphState) {
   const context = await loadChatContext(state.chatId);
 
@@ -167,7 +193,11 @@ export async function saveMessagesNode(state: ChatGraphState) {
 export async function planTaskNode(state: ChatGraphState) {
   try {
     const model = createGeminiModel();
-    const prompt = `You are a tool planner for Forge. Analyze the user request and decide which tools would improve the answer.
+
+    // Sanitize user input to prevent prompt injection
+    const sanitizedMessage = sanitizeUserInput(state.userMessage);
+
+    const systemPrompt = `You are a tool planner for Forge. Analyze the user request and decide which tools would improve the answer.
 
 Available tools:
 - calculator: For arithmetic, percentages, conversions, risk calculations
@@ -175,10 +205,6 @@ Available tools:
 - webSearch: For current facts, news, prices, products, changing information
 - summarizeText: For summarizing long content or extracting key points
 - projectContextLookup: For project history, prior decisions, or project-specific notes
-
-User message: "${state.userMessage}"
-User intent: ${state.intent}
-Project context available: ${state.memorySummary ? "yes" : "no"}
 
 Return a JSON object with:
 {
@@ -196,7 +222,14 @@ Rules:
 - Only ask follow-up for constraints that fundamentally change the answer.
 - Respond with ONLY the JSON object, no markdown or explanation.`;
 
-    const response = await model.invoke([new HumanMessage(prompt)]);
+    const userPrompt = `User intent: ${state.intent}
+Project context available: ${state.memorySummary ? "yes" : "no"}
+User request: ${sanitizedMessage}`;
+
+    const response = await model.invoke([
+      new SystemMessage(systemPrompt),
+      new HumanMessage(userPrompt),
+    ]);
     const responseText = toTextContent(response.content);
 
     let parsedPlan;
@@ -280,6 +313,7 @@ export async function toolRouterNode(state: ChatGraphState) {
       timestamp: string;
     }> = [];
     const toolsUsed = new Set<string>();
+    let intermediateContext = state.toolContext;
 
     // Handle information-search intent with direct webSearch execution
     if (
@@ -309,14 +343,15 @@ export async function toolRouterNode(state: ChatGraphState) {
           state.executionMode === "multi-sequential" &&
           state.toolPlan.toolsNeeded.length > 1
         ) {
-          // Store webSearch result for later tools
-          state.toolContext = `Web Search Result:\n${toolResultText}`;
+          // Store webSearch result for later tools without mutating input state
+          intermediateContext = `Web Search Result:\n${toolResultText}`;
         }
 
         if (state.executionMode === "single") {
           return {
             toolsUsed: Array.from(toolsUsed),
             evidenceBundles,
+            toolContext: intermediateContext,
           };
         }
       }
@@ -385,16 +420,16 @@ export async function toolRouterNode(state: ChatGraphState) {
 
         try {
           let args: Record<string, unknown> = {};
-          if (toolName === "calculator" && state.toolContext) {
+          if (toolName === "calculator" && intermediateContext) {
             // Use previous result if available
-            args = { expression: state.toolContext };
+            args = { expression: intermediateContext };
           } else if (toolName === "calculator") {
             args = { expression: state.userMessage };
           } else if (toolName === "currentDateTime") {
             args = { mode: "now" };
           } else if (toolName === "summarizeText") {
             args = {
-              text: state.toolContext || state.userMessage,
+              text: intermediateContext || state.userMessage,
               maxSentences: 3,
             };
           } else if (toolName === "projectContextLookup") {
@@ -414,8 +449,8 @@ export async function toolRouterNode(state: ChatGraphState) {
             timestamp: new Date().toISOString(),
           });
 
-          // Store result for potential use by next tool
-          state.toolContext = toolResultText;
+          // Store result for potential use by next tool without mutating input state
+          intermediateContext = toolResultText;
         } catch (err) {
           console.error(`Tool ${toolName} failed:`, err);
         }
@@ -424,12 +459,14 @@ export async function toolRouterNode(state: ChatGraphState) {
       return {
         toolsUsed: Array.from(toolsUsed),
         evidenceBundles,
+        toolContext: intermediateContext,
       };
     }
 
     return {
       toolsUsed: Array.from(toolsUsed),
       evidenceBundles,
+      toolContext: intermediateContext,
     };
   } catch (error) {
     console.error("Tool router failed:", error);
@@ -644,13 +681,14 @@ export async function optionalToolNode(state: ChatGraphState) {
       },
     });
 
+    const sanitizedMessage = sanitizeUserInput(state.userMessage);
     const loopMessages: BaseMessage[] = [
       new SystemMessage(`You are a tool router for Forge.
 Use tools when they improve factual correctness or precision.
 Available tools: calculator, currentDateTime, webSearch, summarizeText, projectContextLookup.
 If a tool is unnecessary, respond without tool calls.`),
       new HumanMessage(
-        `Intent: ${state.intent}\nUser message: ${state.userMessage}`,
+        `Intent: ${state.intent}\nUser message: ${sanitizedMessage}`,
       ),
     ];
 
@@ -720,10 +758,12 @@ export async function generateTitleNode(state: ChatGraphState) {
     }
 
     const model = createGeminiModel();
+    const sanitizedMessage = sanitizeUserInput(state.userMessage);
+    const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
     const prompt = `Generate a short, 3–7 word chat title based on this exchange:
 
-User: "${state.userMessage}"
-Assistant: "${state.assistantMessage}"
+User: "${sanitizedMessage}"
+Assistant: "${sanitizedAssistant}"
 
 Respond with ONLY the title, no quotes or punctuation.`;
 
@@ -752,11 +792,13 @@ Respond with ONLY the title, no quotes or punctuation.`;
 export async function extractMemoryNode(state: ChatGraphState) {
   try {
     const model = createGeminiModel();
+    const sanitizedMessage = sanitizeUserInput(state.userMessage);
+    const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
     const prompt = `Extract ONE key fact or preference learned from this exchange. 
 Be specific and concise (max 10 words).
 
-User: "${state.userMessage}"
-Assistant: "${state.assistantMessage}"
+User: "${sanitizedMessage}"
+Assistant: "${sanitizedAssistant}"
 Intent: ${state.intent}
 
 Examples:
