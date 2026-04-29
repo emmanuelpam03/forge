@@ -39,22 +39,10 @@ const FEATURE_CARDS = [
   },
 ];
 
-const MEDIA_TABS = [
-  "All",
-  "Text",
-  "Image",
-  "Code",
-  "Research",
-  "Analytics",
-] as const;
-
-type MediaTab = (typeof MEDIA_TABS)[number];
-
 export default function HomePage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<MediaTab>("All");
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
 
@@ -185,23 +173,6 @@ export default function HomePage() {
                 <span className="text-center text-[11px] leading-snug text-muted-foreground">
                   {description}
                 </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center justify-center rounded-lg bg-muted/40 p-0.5">
-            {MEDIA_TABS.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 rounded-md px-2 py-1.5 text-[12px] font-medium tracking-[-0.01em] transition-all duration-150 ${
-                  activeTab === tab
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab}
               </button>
             ))}
           </div>

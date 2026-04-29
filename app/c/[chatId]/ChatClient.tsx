@@ -7,6 +7,7 @@ import {
   MessageSquare,
   RotateCcw,
   Sparkles,
+  Square,
 } from "lucide-react";
 import { useFeedback } from "@/components/feedback-provider";
 
@@ -17,6 +18,7 @@ type ChatMessage = {
   pending?: boolean;
   streaming?: boolean;
   status?: string;
+  error?: string;
 };
 
 type ChatClientProps = {
@@ -27,7 +29,7 @@ type ChatClientProps = {
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isStreamingAssistant = message.role === "assistant" && message.pending;
-  const streamingLabel = message.status ?? "Thinking...";
+  const streamingLabel = message.status ?? "Processing...";
 
   return (
     <div
@@ -47,17 +49,23 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           </div>
         ) : (
           <div className="space-y-2">
-            {message.pending ? (
+            {message.pending && message.status ? (
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {streamingLabel}
               </p>
             ) : null}
-            <p className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]">
-              {message.content}
-              {isStreamingAssistant ? (
-                <span className="ml-0.5 animate-pulse text-primary">▍</span>
-              ) : null}
-            </p>
+            {message.error ? (
+              <p className="text-[14px] leading-7 text-red-400">
+                {message.error}
+              </p>
+            ) : (
+              <p className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]">
+                {message.content}
+                {isStreamingAssistant ? (
+                  <span className="ml-0.5 animate-pulse text-primary">▍</span>
+                ) : null}
+              </p>
+            )}
           </div>
         )}
 
@@ -86,8 +94,10 @@ export function ChatClient({
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const hasMessages = useMemo(() => messages.length > 0, [messages.length]);
 
@@ -106,11 +116,23 @@ export function ChatClient({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [draft]);
 
-  const sendMessage = async () => {
-    const message = draft.trim();
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsSending(false);
+      showFeedback({
+        type: "success",
+        title: "Generation stopped",
+      });
+    }
+  };
+
+  const sendMessage = async (messageToSend?: string) => {
+    const message = (messageToSend || draft).trim();
 
     if (!message || isSending) {
-      if (!message) {
+      if (!message && !messageToSend) {
         showFeedback({
           type: "error",
           title: "Type a message first",
@@ -125,7 +147,10 @@ export function ChatClient({
 
     setIsSending(true);
     setError(null);
-    setDraft("");
+    setLastUserMessage(message);
+    if (!messageToSend) {
+      setDraft("");
+    }
     setMessages((currentMessages) => [
       ...currentMessages,
       {
@@ -138,8 +163,11 @@ export function ChatClient({
         role: "assistant",
         content: "",
         pending: true,
+        status: "Loading context...",
       },
     ]);
+
+    abortControllerRef.current = new AbortController();
 
     try {
       const response = await fetch("/api/chat", {
@@ -151,6 +179,7 @@ export function ChatClient({
           chatId,
           message,
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -259,7 +288,7 @@ export function ChatClient({
             }
 
             if (message.event === "status") {
-              const status = message.payload?.status ?? "Thinking...";
+              const status = message.payload?.status ?? "Processing...";
               setMessages((currentMessages) =>
                 currentMessages.map((currentMessage) =>
                   currentMessage.id === assistantPlaceholderId
@@ -311,6 +340,23 @@ export function ChatClient({
 
       finalizeStream(finalAssistantMessage);
     } catch (sendError) {
+      // Ignore abort errors (user clicked stop)
+      if (sendError instanceof Error && sendError.name === "AbortError") {
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  ...currentMessage,
+                  pending: false,
+                  streaming: false,
+                  status: "Stopped",
+                }
+              : currentMessage,
+          ),
+        );
+        return;
+      }
+
       const errorMessage =
         sendError instanceof Error
           ? sendError.message
@@ -323,7 +369,6 @@ export function ChatClient({
             currentMessage.id !== assistantPlaceholderId,
         ),
       );
-      setDraft(message);
       setError(errorMessage);
       showFeedback({
         type: "error",
@@ -331,6 +376,7 @@ export function ChatClient({
         description: errorMessage,
       });
     } finally {
+      abortControllerRef.current = null;
       setIsSending(false);
     }
   };
@@ -398,21 +444,36 @@ export function ChatClient({
               disabled={isSending}
               className="max-h-40 min-h-6 flex-1 resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
-            <button
-              onClick={() => void sendMessage()}
-              disabled={isSending || !draft.trim()}
-              className="rounded-lg bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSending ? (
-                <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/70 border-t-transparent" />
-              ) : (
+            {isSending ? (
+              <button
+                onClick={stopGeneration}
+                className="rounded-lg bg-destructive/20 p-2 text-destructive transition hover:bg-destructive/30"
+                title="Stop generation"
+              >
+                <Square size={14} />
+              </button>
+            ) : (
+              <button
+                onClick={() => void sendMessage()}
+                disabled={!draft.trim()}
+                className="rounded-lg bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 <ArrowUp size={14} />
-              )}
-            </button>
+              </button>
+            )}
           </div>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Enter to send. Shift+Enter for a new line.
-          </p>
+          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+            <p>Enter to send. Shift+Enter for a new line.</p>
+            {lastUserMessage && error && (
+              <button
+                onClick={() => void sendMessage(lastUserMessage)}
+                disabled={isSending}
+                className="rounded px-2 py-1 hover:bg-accent hover:text-foreground disabled:opacity-50"
+              >
+                Retry
+              </button>
+            )}
+          </div>
           {error ? (
             <p className="mt-2 text-[11px] text-red-400">{error}</p>
           ) : null}

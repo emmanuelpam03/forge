@@ -145,18 +145,34 @@ export async function generateResponseNode(state: ChatGraphState) {
   const response = (await model.invoke(messages as BaseMessage[])) as AIMessage;
   let assistantMessage = toTextContent(response.content).trim();
 
+  // Validate response content extraction
+  if (!response.content) {
+    console.error(
+      `[CRITICAL] Model returned null/undefined content. Chat: ${state.chatId}, Intent: ${state.intent}, RunId: ${state.runId}`,
+    );
+  }
+
   // If response is empty but we have tool evidence, use it as fallback
   if (!assistantMessage && state.toolContext) {
     assistantMessage =
       "Based on the information I found:\n\n" + state.toolContext;
   }
 
-  // If still empty, use explicit fallback message
+  // If response still empty after all fallbacks, use explicit message
   if (!assistantMessage) {
     assistantMessage =
       "I encountered an issue generating a response. Please try again or rephrase your question.";
-    console.warn(
-      `Empty response for chat ${state.chatId}. Intent: ${state.intent}, Tools: ${(state.toolsUsed || []).join(", ")}`,
+    console.error(
+      JSON.stringify({
+        error: "empty-response",
+        chat_id: state.chatId,
+        run_id: state.runId,
+        intent: state.intent,
+        tools_used: state.toolsUsed || [],
+        has_tool_context: !!state.toolContext,
+        evidence_bundles_count: state.evidenceBundles.length,
+        message_count: state.previousMessages.length,
+      }),
     );
   }
 
@@ -199,11 +215,17 @@ export async function saveMessagesNode(state: ChatGraphState) {
       },
     });
 
+    // Persist generated title if available (only on first turn)
+    const chatUpdateData: Record<string, unknown> = {
+      lastMessageAt: now,
+    };
+    if (state.generatedTitle && state.previousMessages.length === 0) {
+      chatUpdateData.title = state.generatedTitle;
+    }
+
     await tx.chat.update({
       where: { id: state.chatId },
-      data: {
-        lastMessageAt: now,
-      },
+      data: chatUpdateData,
     });
 
     await tx.chatRunAnalytics.create({

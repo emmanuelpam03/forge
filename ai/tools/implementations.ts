@@ -50,45 +50,233 @@ function lexicalScore(query: string, candidate: string): number {
 }
 
 /**
- * Calculator tool: Evaluates simple mathematical expressions
- * Supports: +, -, *, /, %, ^, sqrt(), sin(), cos(), tan(), etc.
+ * Calculator tool: Evaluates safe mathematical expressions
+ * Uses a recursive descent parser to safely evaluate math expressions.
+ * Supports: +, -, *, /, %, ^, parentheses, sqrt(), abs(), floor(), ceil(), round()
+ * Does NOT support: function calls (except predefined), variable access, string operations
  */
 export function calculatorTool(expression: string): ToolResult {
   try {
-    // Validate input: only allow safe mathematical operations
-    if (!/^[0-9+\-*/%().\s^a-zA-Z]+$/.test(expression)) {
+    // Strict validation: only allow numbers, operators, parentheses, whitespace, and function names
+    if (
+      !/^[0-9+\-*/%()^.\s(sqrt|abs|floor|ceil|round|pow|min|max)]*$/.test(
+        expression,
+      )
+    ) {
       return {
         success: false,
         result: "",
-        error: "Invalid characters in expression",
+        error:
+          "Invalid characters in expression. Only basic math operations allowed.",
       };
     }
 
-    // Handle ^ as power operator
-    const sanitized = expression.replace(/\^/g, "**");
+    const result = evaluateSafeExpression(expression);
 
-    // Use Function constructor with restricted scope (no access to globals)
-    // This is safe because we've validated the input above
-    const result = new Function(`return ${sanitized}`)();
-
-    if (typeof result !== "number" || !isFinite(result)) {
+    if (!Number.isFinite(result)) {
       return {
         success: false,
         result: "",
-        error: "Invalid calculation result",
+        error: "Calculation resulted in invalid number (NaN or Infinity)",
       };
     }
 
+    // Return with appropriate precision
     return {
       success: true,
-      result: result.toString(),
+      result: result.toFixed(10).replace(/\.?0+$/, ""), // Remove trailing zeros
     };
   } catch (error) {
     return {
       success: false,
       result: "",
-      error: `Calculation failed: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Calculation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
     };
+  }
+}
+
+/**
+ * Safe recursive descent parser for mathematical expressions.
+ * Grammar: expression := term (('+' | '-') term)*
+ *          term := factor (('*' | '/' | '%') factor)*
+ *          factor := power (('^') power)*
+ *          power := unary
+ *          unary := ('-' unary) | primary
+ *          primary := '(' expression ')' | number | function call
+ */
+function evaluateSafeExpression(expr: string): number {
+  const tokens = tokenizeExpression(expr);
+  const parser = new Parser(tokens);
+  return parser.parseExpression();
+}
+
+function tokenizeExpression(expr: string): string[] {
+  const tokens: string[] = [];
+  let i = 0;
+  expr = expr.trim();
+
+  while (i < expr.length) {
+    if (/\s/.test(expr[i])) {
+      i++;
+      continue;
+    }
+
+    if (/[0-9.]/.test(expr[i])) {
+      let num = "";
+      while (i < expr.length && /[0-9.]/.test(expr[i])) {
+        num += expr[i];
+        i++;
+      }
+      tokens.push(num);
+    } else if (/[a-z]/i.test(expr[i])) {
+      let func = "";
+      while (i < expr.length && /[a-z]/i.test(expr[i])) {
+        func += expr[i];
+        i++;
+      }
+      if (
+        ["sqrt", "abs", "floor", "ceil", "round", "pow", "min", "max"].includes(
+          func,
+        )
+      ) {
+        tokens.push(func);
+      } else {
+        throw new Error(`Unknown function: ${func}`);
+      }
+    } else if (/[+\-*/%()^]/.test(expr[i])) {
+      tokens.push(expr[i]);
+      i++;
+    } else {
+      throw new Error(`Unexpected character: ${expr[i]}`);
+    }
+  }
+
+  return tokens;
+}
+
+class Parser {
+  tokens: string[];
+  pos: number = 0;
+
+  constructor(tokens: string[]) {
+    this.tokens = tokens;
+  }
+
+  parseExpression(): number {
+    let result = this.parseTerm();
+
+    while (
+      this.pos < this.tokens.length &&
+      (this.tokens[this.pos] === "+" || this.tokens[this.pos] === "-")
+    ) {
+      const op = this.tokens[this.pos];
+      this.pos++;
+      const right = this.parseTerm();
+      result = op === "+" ? result + right : result - right;
+    }
+
+    return result;
+  }
+
+  parseTerm(): number {
+    let result = this.parseFactor();
+
+    while (
+      this.pos < this.tokens.length &&
+      (this.tokens[this.pos] === "*" ||
+        this.tokens[this.pos] === "/" ||
+        this.tokens[this.pos] === "%")
+    ) {
+      const op = this.tokens[this.pos];
+      this.pos++;
+      const right = this.parseFactor();
+      if (op === "*") result = result * right;
+      else if (op === "/") {
+        if (right === 0) throw new Error("Division by zero");
+        result = result / right;
+      } else result = result % right;
+    }
+
+    return result;
+  }
+
+  parseFactor(): number {
+    let result = this.parsePower();
+
+    while (this.pos < this.tokens.length && this.tokens[this.pos] === "^") {
+      this.pos++;
+      const right = this.parsePower();
+      result = Math.pow(result, right);
+    }
+
+    return result;
+  }
+
+  parsePower(): number {
+    if (this.pos < this.tokens.length && this.tokens[this.pos] === "-") {
+      this.pos++;
+      return -this.parsePower();
+    }
+
+    return this.parsePrimary();
+  }
+
+  parsePrimary(): number {
+    if (this.pos >= this.tokens.length) {
+      throw new Error("Unexpected end of expression");
+    }
+
+    const token = this.tokens[this.pos];
+
+    // Handle function calls
+    if (["sqrt", "abs", "floor", "ceil", "round"].includes(token)) {
+      this.pos++;
+      if (this.pos >= this.tokens.length || this.tokens[this.pos] !== "(") {
+        throw new Error(`Function ${token} requires parentheses`);
+      }
+      this.pos++;
+      const arg = this.parseExpression();
+      if (this.pos >= this.tokens.length || this.tokens[this.pos] !== ")") {
+        throw new Error("Missing closing parenthesis");
+      }
+      this.pos++;
+
+      switch (token) {
+        case "sqrt":
+          return Math.sqrt(arg);
+        case "abs":
+          return Math.abs(arg);
+        case "floor":
+          return Math.floor(arg);
+        case "ceil":
+          return Math.ceil(arg);
+        case "round":
+          return Math.round(arg);
+      }
+    }
+
+    // Handle parenthesized expression
+    if (token === "(") {
+      this.pos++;
+      const result = this.parseExpression();
+      if (this.pos >= this.tokens.length || this.tokens[this.pos] !== ")") {
+        throw new Error("Missing closing parenthesis");
+      }
+      this.pos++;
+      return result;
+    }
+
+    // Handle number
+    if (/^[0-9.]+$/.test(token)) {
+      this.pos++;
+      const num = parseFloat(token);
+      if (!Number.isFinite(num)) {
+        throw new Error(`Invalid number: ${token}`);
+      }
+      return num;
+    }
+
+    throw new Error(`Unexpected token: ${token}`);
   }
 }
 

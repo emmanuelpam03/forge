@@ -68,7 +68,14 @@ export async function POST(request: NextRequest) {
 
           if (!finalMessage) {
             console.error(
-              `Chat route: Empty response after streaming. Chat: ${result.chatId}, Intent: ${result.intent}, Tools: ${(result.toolsUsed || []).join(", ")}`,
+              JSON.stringify({
+                error: "empty-response-after-streaming",
+                chat_id: result.chatId,
+                run_id: result.runId,
+                intent: result.intent,
+                tools_used: result.toolsUsed || [],
+                streamed_length: assistantMessage.length,
+              }),
             );
             send("done", {
               chatId: result.chatId,

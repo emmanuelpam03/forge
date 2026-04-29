@@ -94,9 +94,9 @@ export async function runChatGraphStream(
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
 ) {
-  onStatus?.("loading-context");
+  onStatus?.("Loading context...");
   const state = await runGraphPreResponse(input);
-  onStatus?.("generating-response");
+  onStatus?.("Classifying intent...");
 
   const model = createGeminiModel();
   const messages = buildChatMessages(state);
@@ -107,6 +107,7 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
+    onStatus?.("Generating response...");
     const stream = await model.stream(messages as BaseMessage[]);
 
     for await (const chunk of stream as AsyncIterable<unknown>) {
