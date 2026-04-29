@@ -304,7 +304,6 @@ export async function toolRouterNode(state: ChatGraphState) {
           content: toolResultText,
           timestamp: new Date().toISOString(),
         });
-
         // For sequential execution, other tools might depend on this
         if (
           state.executionMode === "multi-sequential" &&

@@ -70,13 +70,16 @@ function formatToolContext(state: ChatGraphState): string {
 }
 
 function formatToolPlan(state: ChatGraphState): string {
-  if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
+  if (
+    !state.toolPlan ||
+    state.toolPlan.toolsNeeded.length === 0 ||
+    !state.executionMode
+  ) {
     return "";
   }
 
   return `Tools used: ${state.toolPlan.toolsNeeded.join(", ")} (${state.executionMode})`;
 }
-
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const context = [
     "Project context:",

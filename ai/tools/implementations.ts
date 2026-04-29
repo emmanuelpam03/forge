@@ -328,7 +328,7 @@ export function summarizeTextTool(input: SummarizeInput): ToolResult {
   }
 
   let result = "";
-  let metadata: Record<string, unknown> = { sentenceCount: sentences.length };
+  const metadata: Record<string, unknown> = { sentenceCount: sentences.length };
 
   switch (chooseFormat) {
     case "sentence":
@@ -337,16 +337,19 @@ export function summarizeTextTool(input: SummarizeInput): ToolResult {
       break;
 
     case "paragraph":
-      result = takeTop(Math.min(maxSentences, 4)).join(" ");
-      metadata.returned = Math.min(maxSentences, 4);
+      {
+        const top = takeTop(Math.min(maxSentences, 4));
+        result = top.join(" ");
+        metadata.returned = top.length;
+      }
       break;
-
     case "bullets":
       {
         const count = Math.min(Math.max(3, maxSentences), 12);
-        const points = takeTop(count).map((s) => `- ${s}`);
+        const top = takeTop(count);
+        const points = top.map((s) => `- ${s}`);
         result = points.join("\n");
-        metadata.returned = count;
+        metadata.returned = top.length;
       }
       break;
 
@@ -410,8 +413,11 @@ export function summarizeTextTool(input: SummarizeInput): ToolResult {
       break;
 
     default:
-      result = takeTop(Math.min(maxSentences, 4)).join(" ");
-      metadata.returned = Math.min(maxSentences, 4);
+      {
+        const top = takeTop(Math.min(maxSentences, 4));
+        result = top.join(" ");
+        metadata.returned = top.length;
+      }
       break;
   }
 
