@@ -25,7 +25,21 @@ export const webSearchToolSchema = z.object({
 
 export const summarizeTextToolSchema = z.object({
   text: z.string().min(1),
-  maxSentences: z.number().int().min(1).max(8).optional(),
+  maxSentences: z.number().int().min(1).max(24).optional(),
+  format: z
+    .enum([
+      "sentence",
+      "bullets",
+      "executive",
+      "technical",
+      "beginner",
+      "action_items",
+      "paragraph",
+    ])
+    .optional(),
+  audience: z.string().optional(),
+  purpose: z.string().optional(),
+  preserveFacts: z.boolean().optional(),
 });
 
 export const projectContextLookupToolSchema = z.object({
@@ -88,8 +102,22 @@ export function createForgeTools(
       name: "summarizeText",
       description: "Summarize long user-provided text into concise sentences.",
       schema: summarizeTextToolSchema,
-      func: async ({ text, maxSentences }) => {
-        const result = summarizeTextTool(text, maxSentences ?? 3);
+      func: async ({
+        text,
+        maxSentences,
+        format,
+        audience,
+        purpose,
+        preserveFacts,
+      }) => {
+        const result = summarizeTextTool({
+          text,
+          maxSentences: maxSentences ?? 3,
+          format,
+          audience,
+          purpose,
+          preserveFacts: preserveFacts ?? true,
+        });
         return formatToolOutput(result);
       },
     }),

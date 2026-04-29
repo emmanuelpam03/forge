@@ -28,6 +28,20 @@ export type MemorySummarySnapshot = {
   updatedAt: string;
 };
 
+export type ToolPlan = {
+  intent: string;
+  toolsNeeded: string[];
+  sequential: boolean;
+  followUpNeeded: boolean;
+  followUpQuestion?: string;
+};
+
+export type EvidenceBundle = {
+  tool: string;
+  content: string;
+  timestamp: string;
+};
+
 export type ChatGraphState = {
   chatId: string;
   userMessage: string;
@@ -47,6 +61,10 @@ export type ChatGraphState = {
   toolContext: string;
   extractedMemory: string;
   generatedTitle: string;
+  toolPlan: ToolPlan | null;
+  executionMode: "none" | "single" | "multi-parallel" | "multi-sequential";
+  evidenceBundles: EvidenceBundle[];
+  synthesisNote: string;
 };
 
 const lastValue = <T>(_: T, update: T) => update;
@@ -124,6 +142,24 @@ export const chatGraphState = Annotation.Root({
     default: () => "",
     reducer: lastValue,
   }),
+  toolPlan: Annotation<ToolPlan | null>({
+    default: () => null,
+    reducer: lastValue,
+  }),
+  executionMode: Annotation<
+    "none" | "single" | "multi-parallel" | "multi-sequential"
+  >({
+    default: () => "none",
+    reducer: lastValue,
+  }),
+  evidenceBundles: Annotation<EvidenceBundle[]>({
+    default: () => [],
+    reducer: lastValue,
+  }),
+  synthesisNote: Annotation<string>({
+    default: () => "",
+    reducer: lastValue,
+  }),
 });
 
 export type ChatGraphInput = Pick<
@@ -150,4 +186,8 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   toolContext: "",
   extractedMemory: "",
   generatedTitle: "",
+  toolPlan: null,
+  executionMode: "none",
+  evidenceBundles: [],
+  synthesisNote: "",
 });

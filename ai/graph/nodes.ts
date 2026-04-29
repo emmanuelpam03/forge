@@ -160,6 +160,330 @@ export async function saveMessagesNode(state: ChatGraphState) {
  */
 
 /**
+ * Plan which tools are needed
+ * Input: userMessage + intent + context
+ * Output: toolPlan + executionMode
+ */
+export async function planTaskNode(state: ChatGraphState) {
+  try {
+    const model = createGeminiModel();
+    const prompt = `You are a tool planner for Forge. Analyze the user request and decide which tools would improve the answer.
+
+Available tools:
+- calculator: For arithmetic, percentages, conversions, risk calculations
+- currentDateTime: For current time, timezones, dates, scheduling
+- webSearch: For current facts, news, prices, products, changing information
+- summarizeText: For summarizing long content or extracting key points
+- projectContextLookup: For project history, prior decisions, or project-specific notes
+
+User message: "${state.userMessage}"
+User intent: ${state.intent}
+Project context available: ${state.memorySummary ? "yes" : "no"}
+
+Return a JSON object with:
+{
+  "toolsNeeded": ["tool1", "tool2"] or [],
+  "sequential": false if independent, true if tool B needs tool A result,
+  "followUpNeeded": true only if a critical constraint is missing (budget, location, timeframe, project, account),
+  "followUpQuestion": "What is X?" if followUpNeeded is true
+}
+
+Rules:
+- Use tools proactively. Do not wait for explicit user requests like "search for", "calculate", etc.
+- If uncertain, default to no tools.
+- For independent tools (time + news), set sequential to false.
+- For dependent tools (search price → calculate margin), set sequential to true.
+- Only ask follow-up for constraints that fundamentally change the answer.
+- Respond with ONLY the JSON object, no markdown or explanation.`;
+
+    const response = await model.invoke([new HumanMessage(prompt)]);
+    const responseText = toTextContent(response.content);
+
+    let parsedPlan;
+    try {
+      parsedPlan = JSON.parse(responseText);
+    } catch {
+      console.warn("Failed to parse tool plan JSON, defaulting to no tools");
+      parsedPlan = {
+        toolsNeeded: [],
+        sequential: false,
+        followUpNeeded: false,
+      };
+    }
+
+    const toolsNeeded = Array.isArray(parsedPlan.toolsNeeded)
+      ? parsedPlan.toolsNeeded
+      : [];
+    const sequential = parsedPlan.sequential === true;
+    const followUpNeeded = parsedPlan.followUpNeeded === true;
+    const followUpQuestion = parsedPlan.followUpQuestion || "";
+
+    let executionMode:
+      | "none"
+      | "single"
+      | "multi-parallel"
+      | "multi-sequential" = "none";
+    if (toolsNeeded.length === 0) {
+      executionMode = "none";
+    } else if (toolsNeeded.length === 1) {
+      executionMode = "single";
+    } else if (sequential) {
+      executionMode = "multi-sequential";
+    } else {
+      executionMode = "multi-parallel";
+    }
+
+    return {
+      toolPlan: {
+        intent: state.intent,
+        toolsNeeded,
+        sequential,
+        followUpNeeded,
+        followUpQuestion,
+      },
+      executionMode,
+    };
+  } catch (error) {
+    console.error("Tool planning failed:", error);
+    return {
+      toolPlan: {
+        intent: state.intent,
+        toolsNeeded: [],
+        sequential: false,
+        followUpNeeded: false,
+      },
+      executionMode: "none",
+    };
+  }
+}
+
+/**
+ * Execute tools based on the plan
+ * Input: toolPlan + executionMode + userMessage
+ * Output: toolsUsed + evidenceBundles
+ */
+export async function toolRouterNode(state: ChatGraphState) {
+  try {
+    // If no tools needed, return early
+    if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
+      return {
+        toolsUsed: [],
+        evidenceBundles: [],
+      };
+    }
+
+    const tools = createForgeTools({ chatId: state.chatId });
+    const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
+    const evidenceBundles: Array<{
+      tool: string;
+      content: string;
+      timestamp: string;
+    }> = [];
+    const toolsUsed = new Set<string>();
+
+    // Handle information-search intent with direct webSearch execution
+    if (
+      state.intent === "information-search" &&
+      state.toolPlan.toolsNeeded.includes("webSearch")
+    ) {
+      const webSearchTool = toolByName.get("webSearch");
+      if (webSearchTool) {
+        const query = state.userMessage.trim();
+        const rawResult = await webSearchTool.invoke({
+          query,
+          maxResults: 5,
+        });
+        const toolResultText =
+          typeof rawResult === "string"
+            ? rawResult
+            : JSON.stringify(rawResult, null, 2);
+
+        toolsUsed.add("webSearch");
+        evidenceBundles.push({
+          tool: "webSearch",
+          content: toolResultText,
+          timestamp: new Date().toISOString(),
+        });
+
+        // For sequential execution, other tools might depend on this
+        if (
+          state.executionMode === "multi-sequential" &&
+          state.toolPlan.toolsNeeded.length > 1
+        ) {
+          // Store webSearch result for later tools
+          state.toolContext = `Web Search Result:\n${toolResultText}`;
+        }
+
+        if (state.executionMode === "single") {
+          return {
+            toolsUsed: Array.from(toolsUsed),
+            evidenceBundles,
+          };
+        }
+      }
+    }
+
+    // For multi-parallel execution, run independent tools concurrently
+    if (state.executionMode === "multi-parallel") {
+      const independentTools = state.toolPlan.toolsNeeded.filter(
+        (t) => t !== "webSearch" || state.intent !== "information-search",
+      );
+
+      const parallelResults = await Promise.all(
+        independentTools.map(async (toolName) => {
+          const tool = toolByName.get(toolName);
+          if (!tool) return null;
+
+          try {
+            let args: Record<string, unknown> = {};
+            // Build appropriate arguments based on tool
+            if (toolName === "calculator") {
+              args = { expression: state.userMessage };
+            } else if (toolName === "currentDateTime") {
+              args = { mode: "now" };
+            } else if (toolName === "summarizeText") {
+              args = { text: state.userMessage };
+            } else if (toolName === "projectContextLookup") {
+              args = { query: state.userMessage, maxResults: 5 };
+            }
+
+            const rawResult = await tool.invoke(args);
+            const toolResultText =
+              typeof rawResult === "string"
+                ? rawResult
+                : JSON.stringify(rawResult, null, 2);
+
+            return {
+              tool: toolName,
+              content: toolResultText,
+              timestamp: new Date().toISOString(),
+            };
+          } catch (err) {
+            console.error(`Tool ${toolName} failed:`, err);
+            return null;
+          }
+        }),
+      );
+
+      parallelResults.forEach((result) => {
+        if (result) {
+          toolsUsed.add(result.tool);
+          evidenceBundles.push(result);
+        }
+      });
+
+      return {
+        toolsUsed: Array.from(toolsUsed),
+        evidenceBundles,
+      };
+    }
+
+    // For multi-sequential execution, run tools in order
+    if (state.executionMode === "multi-sequential") {
+      for (const toolName of state.toolPlan.toolsNeeded) {
+        const tool = toolByName.get(toolName);
+        if (!tool) continue;
+
+        try {
+          let args: Record<string, unknown> = {};
+          if (toolName === "calculator" && state.toolContext) {
+            // Use previous result if available
+            args = { expression: state.toolContext };
+          } else if (toolName === "calculator") {
+            args = { expression: state.userMessage };
+          } else if (toolName === "currentDateTime") {
+            args = { mode: "now" };
+          } else if (toolName === "summarizeText") {
+            args = {
+              text: state.toolContext || state.userMessage,
+              maxSentences: 3,
+            };
+          } else if (toolName === "projectContextLookup") {
+            args = { query: state.userMessage, maxResults: 5 };
+          }
+
+          const rawResult = await tool.invoke(args);
+          const toolResultText =
+            typeof rawResult === "string"
+              ? rawResult
+              : JSON.stringify(rawResult, null, 2);
+
+          toolsUsed.add(toolName);
+          evidenceBundles.push({
+            tool: toolName,
+            content: toolResultText,
+            timestamp: new Date().toISOString(),
+          });
+
+          // Store result for potential use by next tool
+          state.toolContext = toolResultText;
+        } catch (err) {
+          console.error(`Tool ${toolName} failed:`, err);
+        }
+      }
+
+      return {
+        toolsUsed: Array.from(toolsUsed),
+        evidenceBundles,
+      };
+    }
+
+    return {
+      toolsUsed: Array.from(toolsUsed),
+      evidenceBundles,
+    };
+  } catch (error) {
+    console.error("Tool router failed:", error);
+    return {
+      toolsUsed: [],
+      evidenceBundles: [],
+    };
+  }
+}
+
+/**
+ * Synthesize evidence from tool execution
+ * Input: evidenceBundles + toolsUsed
+ * Output: toolContext (formatted evidence) + synthesisNote
+ */
+export async function synthesizeEvidenceNode(state: ChatGraphState) {
+  try {
+    if (state.evidenceBundles.length === 0) {
+      return {
+        toolContext: "",
+        synthesisNote: "",
+      };
+    }
+
+    // Format evidence bundles into a clear context
+    const contextLines = state.evidenceBundles.map(
+      (bundle) => `## ${bundle.tool.toUpperCase()}\n${bundle.content}`,
+    );
+
+    const toolContext = contextLines.join("\n\n");
+
+    // Determine synthesis note (confidence, freshness, any caveats)
+    const hasFreshSearch = state.evidenceBundles.some(
+      (b) => b.tool === "webSearch",
+    );
+    const synthesisNote = hasFreshSearch
+      ? "Results include recent web search data."
+      : "Results from local tools and project context.";
+
+    return {
+      toolContext,
+      synthesisNote,
+    };
+  } catch (error) {
+    console.error("Evidence synthesis failed:", error);
+    return {
+      toolContext: "",
+      synthesisNote: "",
+    };
+  }
+}
+
+/**
  * Classify user intent
  * Input: userMessage + context
  * Output: intent field
@@ -193,6 +517,59 @@ export async function classifyIntentNode(state: ChatGraphState) {
   }
 }
 
+function parseSummarizeDirective(message: string) {
+  const lower = message.toLowerCase();
+  const trigger = /\b(summariz|tl;dr|summary|summarise)\b/i;
+  if (!trigger.test(lower)) {
+    return { shouldSummarize: false };
+  }
+
+  // Try to extract explicit format or length
+  const formatMap: Array<[RegExp, string]> = [
+    [/\b1 sentence\b|\bone sentence\b/, "sentence"],
+    [/\b\d+ bullets?\b|\bbullets?\b/, "bullets"],
+    [/executive summary|executive\b/, "executive"],
+    [/technical summary|technical\b/, "technical"],
+    [/beginner|for beginners|explain like i'm five|eli5/, "beginner"],
+    [/action items|next steps|action items only/, "action_items"],
+  ];
+
+  let format: string | undefined;
+  for (const [rx, name] of formatMap) {
+    if (rx.test(lower)) {
+      format = name;
+      break;
+    }
+  }
+
+  // Try to extract a block of text after a colon or newline
+  let body = message;
+  const delimIndex = message.indexOf("\n\n");
+  if (delimIndex !== -1) {
+    body = message.slice(delimIndex + 2).trim();
+  } else if (message.includes("\n")) {
+    const parts = message
+      .split(/\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length > 1) body = parts.slice(1).join(" ").trim();
+  } else if (message.includes(":")) {
+    const parts = message.split(":");
+    if (parts.length > 1) body = parts.slice(1).join(":").trim();
+  }
+
+  // If the body is tiny, assume user wants the preceding text summarized
+  if (body.length < 30) body = message;
+
+  // Extract numeric sentence count if present
+  const m = lower.match(/(\d+)\s*(sentences|sentence|bullets)/);
+  const maxSentences = m
+    ? Math.min(24, Math.max(1, parseInt(m[1], 10)))
+    : undefined;
+
+  return { shouldSummarize: true, text: body, format, maxSentences };
+}
+
 /**
  * Execute tools based on intent
  * Input: intent + userMessage
@@ -201,6 +578,64 @@ export async function classifyIntentNode(state: ChatGraphState) {
 export async function optionalToolNode(state: ChatGraphState) {
   try {
     const tools = createForgeTools({ chatId: state.chatId });
+    const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
+    const toolContextLines: string[] = [];
+    const usedTools = new Set<string>();
+
+    // Detect explicit summarize requests and run summarizeText deterministically
+    const summarizeDirective = parseSummarizeDirective(state.userMessage);
+    if (summarizeDirective.shouldSummarize) {
+      const summarizeTool = toolByName.get("summarizeText");
+      if (summarizeTool) {
+        const rawResult = await summarizeTool.invoke({
+          text: summarizeDirective.text,
+          maxSentences: summarizeDirective.maxSentences,
+          format: summarizeDirective.format,
+        });
+        const toolResultText =
+          typeof rawResult === "string"
+            ? rawResult
+            : JSON.stringify(rawResult, null, 2);
+        usedTools.add("summarizeText");
+        toolContextLines.push(`Tool: summarizeText\n${toolResultText}`);
+
+        return {
+          toolsUsed: Array.from(usedTools),
+          toolContext: toolContextLines.join("\n\n"),
+        };
+      }
+    }
+
+    if (state.intent === "information-search") {
+      const webSearchTool = toolByName.get("webSearch");
+      if (!webSearchTool) {
+        return {
+          toolsUsed: [],
+          toolContext: "",
+        };
+      }
+
+      const query = state.userMessage.trim();
+      const rawResult = await webSearchTool.invoke({
+        query,
+        maxResults: 5,
+      });
+      const toolResultText =
+        typeof rawResult === "string"
+          ? rawResult
+          : JSON.stringify(rawResult, null, 2);
+
+      usedTools.add("webSearch");
+      toolContextLines.push(
+        `Tool: webSearch\nSearch query: ${query}\n${toolResultText}`,
+      );
+
+      return {
+        toolsUsed: Array.from(usedTools),
+        toolContext: toolContextLines.join("\n\n"),
+      };
+    }
+
     const modelWithTools = createGeminiToolModel(tools).withConfig({
       runName: "forge-tool-loop",
       tags: ["forge", "tools"],
@@ -209,10 +644,6 @@ export async function optionalToolNode(state: ChatGraphState) {
         intent: state.intent,
       },
     });
-
-    const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
-    const toolContextLines: string[] = [];
-    const usedTools = new Set<string>();
 
     const loopMessages: BaseMessage[] = [
       new SystemMessage(`You are a tool router for Forge.

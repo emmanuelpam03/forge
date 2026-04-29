@@ -1,7 +1,9 @@
 export const CHAT_GRAPH_NODES = {
   loadContext: "loadContext",
   classifyIntent: "classifyIntent",
-  optionalToolNode: "optionalToolNode",
+  planTask: "planTask",
+  toolRouter: "toolRouter",
+  synthesizeEvidence: "synthesizeEvidence",
   generateResponse: "generateResponse",
   saveMessages: "saveMessages",
   generateTitle: "generateTitle",

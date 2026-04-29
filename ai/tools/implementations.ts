@@ -247,10 +247,32 @@ export async function webSearchToolAsync(
   }
 }
 
-export function summarizeTextTool(
-  text: string,
-  maxSentences: number = 3,
-): ToolResult {
+export type SummarizeInput = {
+  text: string;
+  maxSentences?: number;
+  format?:
+    | "sentence"
+    | "bullets"
+    | "executive"
+    | "technical"
+    | "beginner"
+    | "action_items"
+    | "paragraph";
+  audience?: string;
+  purpose?: string;
+  preserveFacts?: boolean;
+};
+
+export function summarizeTextTool(input: SummarizeInput): ToolResult {
+  const {
+    text,
+    maxSentences = 3,
+    format,
+    audience,
+    purpose,
+    preserveFacts = true,
+  } = input;
+
   if (!text || text.trim().length === 0) {
     return {
       success: false,
@@ -260,25 +282,152 @@ export function summarizeTextTool(
   }
 
   const cleaned = text.replace(/\s+/g, " ").trim();
-  const sentences = cleaned
-    .split(/(?<=[.!?])\s+/)
-    .filter((sentence) => sentence.length > 0);
+  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter((s) => s.length > 0);
 
-  if (sentences.length === 0) {
-    return {
-      success: true,
-      result: cleaned.slice(0, 400),
-    };
+  // Helper extractors
+  const numbers = Array.from(
+    cleaned.matchAll(/\b\d+(?:[.,]\d+)?%?|\$\d+(?:[.,]\d+)?\b/g),
+  ).map((m) => m[0]);
+  const dates = Array.from(
+    cleaned.matchAll(
+      /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[\s\d,]+|\b\d{4}-\d{2}-\d{2}\b/g,
+    ),
+  ).map((m) => m[0]);
+  const facts: string[] = [];
+  if (preserveFacts) {
+    facts.push(...numbers.slice(0, 6));
+    facts.push(...dates.slice(0, 3));
   }
 
-  const capped = Math.min(Math.max(maxSentences, 1), 8);
+  const isMeeting = /meeting|minutes|decisions|attendees|next steps/i.test(
+    cleaned,
+  );
+  const isResearch =
+    /study|method|methods|findings|participants|results|we report|we found/i.test(
+      cleaned,
+    );
+  const isNews =
+    /reported|announced|released|breaking|today|yesterday|update/i.test(
+      cleaned,
+    );
+
+  const chooseFormat =
+    format ??
+    (isMeeting
+      ? "action_items"
+      : isResearch
+        ? "executive"
+        : isNews
+          ? "bullets"
+          : cleaned.length < 300
+            ? "paragraph"
+            : "bullets");
+
+  function takeTop(n: number) {
+    return sentences.slice(0, n).map((s) => s.trim());
+  }
+
+  let result = "";
+  let metadata: Record<string, unknown> = { sentenceCount: sentences.length };
+
+  switch (chooseFormat) {
+    case "sentence":
+      result = sentences[0] || cleaned.slice(0, 300);
+      metadata.returned = 1;
+      break;
+
+    case "paragraph":
+      result = takeTop(Math.min(maxSentences, 4)).join(" ");
+      metadata.returned = Math.min(maxSentences, 4);
+      break;
+
+    case "bullets":
+      {
+        const count = Math.min(Math.max(3, maxSentences), 12);
+        const points = takeTop(count).map((s) => `- ${s}`);
+        result = points.join("\n");
+        metadata.returned = count;
+      }
+      break;
+
+    case "executive":
+      {
+        const top = takeTop(Math.min(6, Math.max(3, maxSentences)));
+        const takeaway = top.slice(0, 2).join(" ");
+        const bullets = top.map((s) => `- ${s}`);
+        result = `Executive summary:\n${bullets.join("\n\n")}\n\nKey takeaway: ${takeaway}`;
+        metadata.returned = top.length;
+      }
+      break;
+
+    case "technical":
+      {
+        const top = takeTop(Math.min(8, Math.max(3, maxSentences)));
+        // Attempt to surface method/findings lines
+        const methods = top.filter((s) =>
+          /method|approach|implementation|algorithm|protocol/i.test(s),
+        );
+        const findings = top.filter((s) =>
+          /result|finding|show|demonstrate|observed|significant/i.test(s),
+        );
+        const sections = [] as string[];
+        if (methods.length)
+          sections.push(`Methods:\n- ${methods.join("\n- ")}`);
+        if (findings.length)
+          sections.push(`Findings:\n- ${findings.join("\n- ")}`);
+        if (!sections.length) sections.push(...top.map((s) => `- ${s}`));
+        result = sections.join("\n\n");
+        metadata.returned = top.length;
+      }
+      break;
+
+    case "beginner":
+      {
+        const top = takeTop(Math.min(6, Math.max(2, maxSentences)));
+        const simple = top.map(
+          (s) =>
+            `- ${s.replace(/\b(e.g.|i.e.|\bImplementation|protocol)\b/gi, "").trim()}`,
+        );
+        result = `Beginner summary:\n${simple.join("\n")}`;
+        metadata.returned = top.length;
+      }
+      break;
+
+    case "action_items":
+      {
+        // Find imperative sentences or decision markers
+        const candidates = sentences.filter((s) =>
+          /\b(should|need to|must|will|action|todo|next steps|decide|decision)\b/i.test(
+            s,
+          ),
+        );
+        const items = (
+          candidates.length ? candidates : takeTop(Math.min(6, maxSentences))
+        ).map((s) => `- ${s.replace(/^\s*-?\s*/, "")}`);
+        result = `Action items:\n${items.join("\n")}`;
+        metadata.returned = items.length;
+      }
+      break;
+
+    default:
+      result = takeTop(Math.min(maxSentences, 4)).join(" ");
+      metadata.returned = Math.min(maxSentences, 4);
+      break;
+  }
+
+  // Attach preserved facts if any and not already present in result
+  if (preserveFacts && facts.length > 0) {
+    const factSection = facts.filter((f) => !result.includes(f)).slice(0, 6);
+    if (factSection.length) {
+      result = `${result}\n\nKey facts: ${factSection.join(", ")}`;
+      metadata.keyFacts = factSection;
+    }
+  }
+
   return {
     success: true,
-    result: sentences.slice(0, capped).join(" "),
-    metadata: {
-      sentenceCount: sentences.length,
-      returnedSentences: capped,
-    },
+    result: result.trim(),
+    metadata,
   };
 }
 

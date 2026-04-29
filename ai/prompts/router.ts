@@ -45,11 +45,36 @@ function formatHistory(state: ChatGraphState): string {
 }
 
 function formatToolContext(state: ChatGraphState): string {
-  if (!state.toolContext) {
+  if (state.evidenceBundles.length === 0 && !state.toolContext) {
     return "No tool outputs captured.";
   }
 
-  return state.toolContext;
+  let context = "";
+
+  // Include evidence bundles if available (newer flow)
+  if (state.evidenceBundles.length > 0) {
+    context = state.evidenceBundles
+      .map((bundle) => `### ${bundle.tool}\n${bundle.content}`)
+      .join("\n\n");
+  } else if (state.toolContext) {
+    // Fallback to legacy toolContext
+    context = state.toolContext;
+  }
+
+  // Include synthesis note if available
+  if (state.synthesisNote) {
+    context += `\n\n**Note:** ${state.synthesisNote}`;
+  }
+
+  return context;
+}
+
+function formatToolPlan(state: ChatGraphState): string {
+  if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
+    return "";
+  }
+
+  return `Tools used: ${state.toolPlan.toolsNeeded.join(", ")} (${state.executionMode})`;
 }
 
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
@@ -61,6 +86,8 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
     "",
     "Tool context:",
     formatToolContext(state),
+    "",
+    formatToolPlan(state),
     "",
     "User preferences:",
     formatPreferences(state),

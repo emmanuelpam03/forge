@@ -12,7 +12,9 @@ import {
   loadContextNode,
   saveMessagesNode,
   classifyIntentNode,
-  optionalToolNode,
+  planTaskNode,
+  toolRouterNode,
+  synthesizeEvidenceNode,
   generateTitleNode,
   extractMemoryNode,
 } from "@/ai/graph/nodes";
@@ -20,15 +22,22 @@ import {
 const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.loadContext, loadContextNode)
   .addNode(CHAT_GRAPH_NODES.classifyIntent, classifyIntentNode)
-  .addNode(CHAT_GRAPH_NODES.optionalToolNode, optionalToolNode)
+  .addNode(CHAT_GRAPH_NODES.planTask, planTaskNode)
+  .addNode(CHAT_GRAPH_NODES.toolRouter, toolRouterNode)
+  .addNode(CHAT_GRAPH_NODES.synthesizeEvidence, synthesizeEvidenceNode)
   .addNode(CHAT_GRAPH_NODES.generateResponse, generateResponseNode)
   .addNode(CHAT_GRAPH_NODES.saveMessages, saveMessagesNode)
   .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode)
   .addNode(CHAT_GRAPH_NODES.extractMemory, extractMemoryNode)
   .addEdge(START, CHAT_GRAPH_NODES.loadContext)
   .addEdge(CHAT_GRAPH_NODES.loadContext, CHAT_GRAPH_NODES.classifyIntent)
-  .addEdge(CHAT_GRAPH_NODES.classifyIntent, CHAT_GRAPH_NODES.optionalToolNode)
-  .addEdge(CHAT_GRAPH_NODES.optionalToolNode, CHAT_GRAPH_NODES.generateResponse)
+  .addEdge(CHAT_GRAPH_NODES.classifyIntent, CHAT_GRAPH_NODES.planTask)
+  .addEdge(CHAT_GRAPH_NODES.planTask, CHAT_GRAPH_NODES.toolRouter)
+  .addEdge(CHAT_GRAPH_NODES.toolRouter, CHAT_GRAPH_NODES.synthesizeEvidence)
+  .addEdge(
+    CHAT_GRAPH_NODES.synthesizeEvidence,
+    CHAT_GRAPH_NODES.generateResponse,
+  )
   .addEdge(CHAT_GRAPH_NODES.generateResponse, CHAT_GRAPH_NODES.saveMessages)
   .addEdge(CHAT_GRAPH_NODES.saveMessages, CHAT_GRAPH_NODES.generateTitle)
   .addEdge(CHAT_GRAPH_NODES.generateTitle, CHAT_GRAPH_NODES.extractMemory)
