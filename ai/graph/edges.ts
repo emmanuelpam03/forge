@@ -1,7 +1,11 @@
 export const CHAT_GRAPH_NODES = {
   loadContext: "loadContext",
+  classifyIntent: "classifyIntent",
+  optionalToolNode: "optionalToolNode",
   generateResponse: "generateResponse",
   saveMessages: "saveMessages",
+  generateTitle: "generateTitle",
+  extractMemory: "extractMemory",
 } as const;
 
 export const CHAT_GRAPH_EDGE_LIST = [
