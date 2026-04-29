@@ -42,6 +42,11 @@ export type ChatGraphState = {
   outputTokens: number;
   latencyMs: number;
   traceId: string;
+  intent: string;
+  toolsUsed: string[];
+  toolContext: string;
+  extractedMemory: string;
+  generatedTitle: string;
 };
 
 const lastValue = <T>(_: T, update: T) => update;
@@ -99,6 +104,26 @@ export const chatGraphState = Annotation.Root({
     default: () => "",
     reducer: lastValue,
   }),
+  intent: Annotation<string>({
+    default: () => "",
+    reducer: lastValue,
+  }),
+  toolsUsed: Annotation<string[]>({
+    default: () => [],
+    reducer: lastValue,
+  }),
+  toolContext: Annotation<string>({
+    default: () => "",
+    reducer: lastValue,
+  }),
+  extractedMemory: Annotation<string>({
+    default: () => "",
+    reducer: lastValue,
+  }),
+  generatedTitle: Annotation<string>({
+    default: () => "",
+    reducer: lastValue,
+  }),
 });
 
 export type ChatGraphInput = Pick<
@@ -120,4 +145,9 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   outputTokens: 0,
   latencyMs: 0,
   traceId: "",
+  intent: "",
+  toolsUsed: [],
+  toolContext: "",
+  extractedMemory: "",
+  generatedTitle: "",
 });

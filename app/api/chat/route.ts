@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import prisma from "@/lib/prisma";
 import { runChatGraph } from "@/ai/graph";
 
 export const runtime = "nodejs";
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
       runId: crypto.randomUUID(),
     });
 
+    // Update chat title if one was generated (first message)
+    if (result.generatedTitle) {
+      await prisma.chat.update({
+        where: { id: result.chatId },
+        data: { title: result.generatedTitle },
+      });
+    }
+
     return NextResponse.json({
       chatId: result.chatId,
       assistantMessage: result.assistantMessage,
@@ -36,6 +45,9 @@ export async function POST(request: NextRequest) {
       outputTokens: result.outputTokens,
       latencyMs: result.latencyMs,
       runId: result.runId,
+      intent: result.intent,
+      toolsUsed: result.toolsUsed,
+      generatedTitle: result.generatedTitle,
     });
   } catch (error) {
     console.error("Chat route failed:", error);

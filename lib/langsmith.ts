@@ -11,7 +11,7 @@ export function getLangSmithConfig(): LangSmithConfig {
   return {
     tracing: process.env.LANGSMITH_TRACING === "true",
     apiKey: process.env.LANGSMITH_API_KEY?.trim() || undefined,
-    project: process.env.LANGSMITH_PROJECT?.trim() || "forge",
+    project: process.env.LANGSMITH_PROJECT?.trim() || "Forge",
     endpoint: process.env.LANGSMITH_ENDPOINT?.trim() || undefined,
   };
 }

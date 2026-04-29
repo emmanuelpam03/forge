@@ -59,7 +59,9 @@ export default function HomePage() {
   const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   const handleSend = async () => {
-    if (!input.trim()) {
+    const message = input.trim();
+
+    if (!message) {
       showFeedback({
         type: "error",
         title: "Type a message first",
@@ -69,29 +71,66 @@ export default function HomePage() {
 
     try {
       setIsCreatingChat(true);
-      const { createChatWithMessage } = await import("@/lib/actions/chats");
-      const result = await createChatWithMessage(input.trim());
+      const { createChat, updateChat, deleteChat } =
+        await import("@/lib/actions/chats");
 
-      if (result.success) {
-        showFeedback({
-          type: "success",
-          title: "Chat created",
-          description: "Opening your new conversation.",
-        });
-        router.push(`/c/${result.chatId}`);
-        setInput("");
-      } else {
-        showFeedback({
-          type: "error",
-          title: "Failed to create chat",
-          description: result.error,
-        });
+      const createResult = await createChat();
+
+      if (!createResult.success || !createResult.chat) {
+        throw new Error(createResult.error ?? "Failed to create chat");
       }
+
+      const chatId = createResult.chat.id;
+      const title =
+        message.length > 60 ? `${message.slice(0, 60)}...` : message;
+
+      const updateResult = await updateChat(chatId, { title });
+
+      if (!updateResult.success) {
+        throw new Error(updateResult.error ?? "Failed to update chat title");
+      }
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chatId,
+          message,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        try {
+          await deleteChat(chatId);
+        } catch {
+          // Best-effort cleanup only.
+        }
+
+        throw new Error(payload?.error ?? "Failed to generate a response.");
+      }
+
+      showFeedback({
+        type: "success",
+        title: "Chat created",
+        description: "Opening your new conversation.",
+      });
+
+      setInput("");
+      router.push(`/c/${chatId}`);
     } catch (error) {
+      const description =
+        error instanceof Error ? error.message : "Failed to create chat";
+
       showFeedback({
         type: "error",
         title: "Error",
-        description: "Failed to create chat",
+        description,
       });
     } finally {
       setIsCreatingChat(false);
@@ -111,7 +150,7 @@ export default function HomePage() {
 
       <div className="relative z-10 flex w-full flex-col items-center gap-4 px-6">
         {/* Main Card */}
-        <div className="flex w-full max-w-[440px] flex-col gap-5 rounded-2xl border border-border bg-card p-7 shadow-sm">
+        <div className="flex w-full max-w-110 flex-col gap-5 rounded-2xl border border-border bg-card p-7 shadow-sm">
           {/* Header */}
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
@@ -122,7 +161,7 @@ export default function HomePage() {
               What do you want to build today?
             </h1>
 
-            <p className="max-w-[280px] text-[13px] leading-[1.65] text-muted-foreground">
+            <p className="max-w-70 text-[13px] leading-[1.65] text-muted-foreground">
               Forge helps you think, create, research, organize projects, and
               move faster.
             </p>
@@ -169,7 +208,7 @@ export default function HomePage() {
 
           {/* Input */}
           <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3.5 py-3 transition-all duration-150 focus-within:border-primary/40 focus-within:bg-background focus-within:ring-2 focus-within:ring-primary/10">
-            <ForgeLogo className="h-[18px] w-[18px] shrink-0 text-primary" />
+            <ForgeLogo className="h-4.5 w-4.5 shrink-0 text-primary" />
 
             <input
               type="text"
@@ -198,7 +237,7 @@ export default function HomePage() {
                 }`}
               >
                 {isCreatingChat ? (
-                  <span className="block h-[14px] w-[14px] animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                  <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
                 ) : (
                   <ArrowRight size={14} />
                 )}

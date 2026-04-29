@@ -24,6 +24,7 @@ export async function loadChatContext(
       }),
       prisma.message.findMany({
         where: { chatId },
+        // take: 20,
         orderBy: { createdAt: "asc" },
       }),
       prisma.preference.findMany({
