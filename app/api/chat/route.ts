@@ -36,17 +36,18 @@ export async function POST(request: NextRequest) {
           where: { id: result.chatId },
           data: { title: result.generatedTitle },
         });
-      } catch (titleError) {
-        console.error(
-          `Failed to update chat title for chatId=${result.chatId}:`,
-          {
-            generatedTitle: result.generatedTitle,
-            error:
-              titleError instanceof Error
-                ? titleError.message
-                : String(titleError),
-          },
-        );
+        } catch (titleError) {
+          console.error(
+            `Failed to update chat title for chatId=${result.chatId}:`,
+            {
+              titleLength: result.generatedTitle?.length,
+              error:
+                titleError instanceof Error
+                  ? titleError.message
+                  : String(titleError),
+            },
+          );
+        }
         // Continue without rethrowing—title update is non-critical
       }
     }

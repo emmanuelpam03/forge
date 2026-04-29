@@ -99,6 +99,21 @@ function sanitizeUserInput(input: string, maxLength: number = 2000): string {
   return sanitized.trim();
 }
 
+/**
+ * Checks if text looks like a valid numeric expression for the calculator tool.
+ * The calculator needs expressions like "100 * 0.15", not prose like "Web search result: ..."
+ * This is needed for multi-sequential tool chaining where intermediate results are prose.
+ */
+function isValidNumericExpression(text: string): boolean {
+  if (!text || text.trim().length === 0) return false;
+  // Allow digits, operators, parentheses, decimal points, and basic function names
+  // Reject prose indicators (URLs, search results, colons indicating key-value pairs)
+  return (
+    /^[0-9+\-*/%().\s^a-zA-Z]+$/.test(text) &&
+    !/https?:\/\/|search|result|:/i.test(text)
+  );
+}
+
 export async function loadContextNode(state: ChatGraphState) {
   const context = await loadChatContext(state.chatId);
 
@@ -409,6 +424,7 @@ export async function toolRouterNode(state: ChatGraphState) {
       return {
         toolsUsed: Array.from(toolsUsed),
         evidenceBundles,
+        toolContext: intermediateContext,
       };
     }
 
@@ -420,11 +436,15 @@ export async function toolRouterNode(state: ChatGraphState) {
 
         try {
           let args: Record<string, unknown> = {};
-          if (toolName === "calculator" && intermediateContext) {
-            // Use previous result if available
-            args = { expression: intermediateContext };
-          } else if (toolName === "calculator") {
-            args = { expression: state.userMessage };
+          if (toolName === "calculator") {
+            // For sequential chaining, check if previous result is a valid numeric expression
+            // If previous tool returned prose (e.g., web search), fall back to user message
+            const expression =
+              intermediateContext &&
+              isValidNumericExpression(intermediateContext)
+                ? intermediateContext
+                : state.userMessage;
+            args = { expression };
           } else if (toolName === "currentDateTime") {
             args = { mode: "now" };
           } else if (toolName === "summarizeText") {
