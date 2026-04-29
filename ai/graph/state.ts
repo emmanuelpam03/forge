@@ -1,5 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
+import type { SelectedContext } from "@/ai/context/engine";
 
 export type ChatMessageSnapshot = {
   id: string;
@@ -49,6 +50,9 @@ export type ChatGraphState = {
   previousMessages: ChatMessageSnapshot[];
   preferences: PreferenceSnapshot[];
   memorySummary: MemorySummarySnapshot | null;
+  selectedContext?: SelectedContext;
+  contextBudgetTokens?: number;
+  retrievedSnippets?: string[];
   assistantMessage: string;
   modelUsed: string;
   provider: string;
@@ -92,6 +96,18 @@ export const chatGraphState = Annotation.Root({
   }),
   memorySummary: Annotation<MemorySummarySnapshot | null>({
     default: () => null,
+    reducer: lastValue,
+  }),
+  selectedContext: Annotation<SelectedContext | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  contextBudgetTokens: Annotation<number | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  retrievedSnippets: Annotation<string[] | undefined>({
+    default: () => undefined,
     reducer: lastValue,
   }),
   assistantMessage: Annotation<string>({
@@ -174,6 +190,9 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   previousMessages: [],
   preferences: [],
   memorySummary: null,
+  selectedContext: undefined,
+  contextBudgetTokens: undefined,
+  retrievedSnippets: undefined,
   assistantMessage: "",
   modelUsed: "",
   provider: "",

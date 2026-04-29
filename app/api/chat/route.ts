@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import prisma from "@/lib/prisma";
-import { runChatGraph } from "@/ai/graph";
+import { runChatGraphStream } from "@/ai/graph";
 
 export const runtime = "nodejs";
 
@@ -16,60 +15,93 @@ export async function POST(request: NextRequest) {
     const parsedBody = chatRequestSchema.safeParse(body);
 
     if (!parsedBody.success) {
-      return NextResponse.json(
-        { error: "Invalid chat request payload." },
-        { status: 400 },
+      return new Response(
+        JSON.stringify({ error: "Invalid chat request payload." }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
       );
     }
 
-    const result = await runChatGraph({
-      chatId: parsedBody.data.chatId,
-      userMessage: parsedBody.data.message,
-      runId: crypto.randomUUID(),
+    const runId = crypto.randomUUID();
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      start(controller) {
+        const send = (event: string, payload: unknown) => {
+          controller.enqueue(
+            encoder.encode(`${JSON.stringify({ event, payload })}\n`),
+          );
+        };
+
+        void (async () => {
+          send("start", {
+            chatId: parsedBody.data.chatId,
+            runId,
+          });
+
+          let assistantMessage = "";
+
+          const result = await runChatGraphStream(
+            {
+              chatId: parsedBody.data.chatId,
+              userMessage: parsedBody.data.message,
+              runId,
+            },
+            (chunk) => {
+              assistantMessage += chunk;
+              send("chunk", {
+                delta: chunk,
+                content: assistantMessage,
+              });
+            },
+            (status) => {
+              send("status", { status });
+            },
+          );
+
+          send("done", {
+            chatId: result.chatId,
+            assistantMessage: result.assistantMessage,
+            modelUsed: result.modelUsed,
+            provider: result.provider,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            latencyMs: result.latencyMs,
+            runId: result.runId,
+            intent: result.intent,
+            toolsUsed: result.toolsUsed,
+            generatedTitle: result.generatedTitle,
+          });
+
+          controller.close();
+        })().catch((error) => {
+          console.error("Chat stream failed:", error);
+          send("error", {
+            error: "Failed to generate a response.",
+          });
+          controller.close();
+        });
+      },
     });
 
-    // Update chat title if one was generated (first message)
-    // Isolated try-catch to prevent title persistence failure from aborting the response
-    if (result.generatedTitle) {
-      try {
-        await prisma.chat.update({
-          where: { id: result.chatId },
-          data: { title: result.generatedTitle },
-        });
-      } catch (titleError) {
-        console.error(
-          `Failed to update chat title for chatId=${result.chatId}:`,
-          {
-            titleLength: result.generatedTitle?.length,
-            error:
-              titleError instanceof Error
-                ? titleError.message
-                : String(titleError),
-          },
-        );
-      }
-      // Continue without rethrowing—title update is non-critical
-    }
-
-    return NextResponse.json({
-      chatId: result.chatId,
-      assistantMessage: result.assistantMessage,
-      modelUsed: result.modelUsed,
-      provider: result.provider,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      latencyMs: result.latencyMs,
-      runId: result.runId,
-      intent: result.intent,
-      toolsUsed: result.toolsUsed,
-      generatedTitle: result.generatedTitle,
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
     });
   } catch (error) {
     console.error("Chat route failed:", error);
 
-    return NextResponse.json(
-      { error: "Failed to generate a response." },
-      { status: 500 },
+    return new Response(
+      JSON.stringify({ error: "Failed to generate a response." }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
     );
   }
 }

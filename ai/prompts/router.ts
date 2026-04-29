@@ -3,7 +3,12 @@ import {
   SystemMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import { CHAT_SYSTEM_PROMPT } from "@/ai/prompts/system";
+import {
+  CHAT_SYSTEM_PROMPT,
+  SUMMARIZATION_POLICY,
+  WRITING_POLICY,
+} from "@/ai/prompts/system";
+import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 
 function formatPreferences(state: ChatGraphState): string {
@@ -81,28 +86,40 @@ function formatToolPlan(state: ChatGraphState): string {
   return `Tools used: ${state.toolPlan.toolsNeeded.join(", ")} (${state.executionMode})`;
 }
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
-  const context = [
-    "Project context:",
-    formatMemorySummary(state),
-    "",
-    formatIntent(state),
-    "",
-    "Tool context:",
-    formatToolContext(state),
-    "",
-    formatToolPlan(state),
-    "",
-    "User preferences:",
-    formatPreferences(state),
-    "",
-    "Recent conversation:",
-    formatHistory(state),
-  ]
-    .filter((line) => line !== "") // Remove empty intent lines
-    .join("\n");
+  // Use selected context from engine if available, otherwise fall back to raw snapshots
+  let context: string;
 
-  return [
-    new SystemMessage(`${CHAT_SYSTEM_PROMPT}\n\n${context}`),
-    new HumanMessage(state.userMessage),
-  ];
+  if (state.selectedContext) {
+    context = formatSelectedContext(state.selectedContext);
+  } else {
+    // Legacy fallback to raw snapshot formatting
+    context = [
+      "Project context:",
+      formatMemorySummary(state),
+      "",
+      formatIntent(state),
+      "",
+      "Tool context:",
+      formatToolContext(state),
+      "",
+      formatToolPlan(state),
+      "",
+      "User preferences:",
+      formatPreferences(state),
+      "",
+      "Recent conversation:",
+      formatHistory(state),
+    ]
+      .filter((line) => line !== "") // Remove empty intent lines
+      .join("\n");
+  }
+
+  const systemPrompt = [
+    CHAT_SYSTEM_PROMPT,
+    SUMMARIZATION_POLICY,
+    WRITING_POLICY,
+    context,
+  ].join("\n\n");
+
+  return [new SystemMessage(systemPrompt), new HumanMessage(state.userMessage)];
 }

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
+import { type BaseMessage } from "@langchain/core/messages";
+import prisma from "@/lib/prisma";
 import {
   createChatGraphSeed,
   chatGraphState,
@@ -18,6 +20,50 @@ import {
   generateTitleNode,
   extractMemoryNode,
 } from "@/ai/graph/nodes";
+import { createGeminiModel } from "@/ai/models";
+import { buildChatMessages } from "@/ai/prompts/router";
+
+function toTextContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === "string") {
+          return part;
+        }
+
+        if (part && typeof part === "object") {
+          const textPart = part as { text?: string; content?: string };
+          return textPart.text ?? textPart.content ?? "";
+        }
+
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+
+  return "";
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+async function runGraphPreResponse(input: ChatGraphInput) {
+  const state = createChatGraphSeed(input);
+
+  Object.assign(state, await loadContextNode(state));
+  Object.assign(state, await classifyIntentNode(state));
+  Object.assign(state, await planTaskNode(state));
+  Object.assign(state, await toolRouterNode(state));
+  Object.assign(state, await synthesizeEvidenceNode(state));
+
+  return state;
+}
 
 const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.loadContext, loadContextNode)
@@ -41,4 +87,67 @@ export const chatGraph = graphBuilder.compile();
 
 export async function runChatGraph(input: ChatGraphInput) {
   return chatGraph.invoke(createChatGraphSeed(input));
+}
+
+export async function runChatGraphStream(
+  input: ChatGraphInput,
+  onChunk: (chunk: string) => void,
+  onStatus?: (status: string) => void,
+) {
+  onStatus?.("loading-context");
+  const state = await runGraphPreResponse(input);
+  onStatus?.("generating-response");
+
+  const model = createGeminiModel();
+  const messages = buildChatMessages(state);
+  const startedAt = Date.now();
+
+  let assistantMessage = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  const stream = await model.stream(messages as BaseMessage[]);
+
+  for await (const chunk of stream as AsyncIterable<unknown>) {
+    const text = toTextContent(
+      (chunk as { content?: unknown })?.content ?? chunk,
+    );
+    if (!text) {
+      continue;
+    }
+
+    assistantMessage += text;
+    onChunk(text);
+  }
+
+  outputTokens = estimateTokens(assistantMessage);
+  inputTokens = estimateTokens(
+    messages
+      .map((message) =>
+        toTextContent((message as { content?: unknown }).content),
+      )
+      .join("\n"),
+  );
+
+  Object.assign(state, {
+    assistantMessage,
+    modelUsed: "gemini",
+    provider: "google-genai",
+    inputTokens,
+    outputTokens,
+    latencyMs: Date.now() - startedAt,
+  });
+
+  Object.assign(state, await saveMessagesNode(state));
+  const titleResult = await generateTitleNode(state);
+  Object.assign(state, titleResult);
+  if (titleResult.generatedTitle) {
+    await prisma.chat.update({
+      where: { id: state.chatId },
+      data: { title: titleResult.generatedTitle },
+    });
+  }
+  Object.assign(state, await extractMemoryNode(state));
+
+  return state;
 }

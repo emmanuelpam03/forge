@@ -11,7 +11,11 @@ import prisma from "@/lib/prisma";
 import { createGeminiModel, createGeminiToolModel } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
 import { buildIntentClassificationMessage } from "@/ai/prompts/intent";
-import { loadChatContext } from "@/ai/memory/extractor";
+import {
+  loadContextForChat,
+  maintainChatSummary,
+  updateUserMemory,
+} from "@/ai/context/engine";
 import { createForgeTools } from "@/ai/tools";
 import type { ChatGraphState } from "@/ai/graph/state";
 
@@ -115,12 +119,14 @@ function isValidNumericExpression(text: string): boolean {
 }
 
 export async function loadContextNode(state: ChatGraphState) {
-  const context = await loadChatContext(state.chatId);
+  const selectedContext = await loadContextForChat(state.chatId);
 
   return {
-    previousMessages: context.previousMessages,
-    preferences: context.preferences,
-    memorySummary: context.memorySummary,
+    selectedContext,
+    contextBudgetTokens: selectedContext.budgetUsed,
+    previousMessages: selectedContext.recentTurns,
+    preferences: selectedContext.preferences,
+    memorySummary: null,
   };
 }
 
@@ -189,6 +195,13 @@ export async function saveMessagesNode(state: ChatGraphState) {
         status: "completed",
       },
     });
+  });
+
+  // Phase 4: Maintain rolling chat summary
+  // This runs after message save completes
+  await maintainChatSummary(state.chatId).catch((err) => {
+    console.warn(`Failed to maintain chat summary for ${state.chatId}:`, err);
+    // Don't throw - summary maintenance is non-blocking
   });
 
   return {
@@ -832,6 +845,14 @@ Respond with ONLY the extracted fact, nothing else.`;
     const extractedMemory = toTextContent(response.content)
       .trim()
       .replace(/^["']|["']$/g, "");
+
+    // Phase 6: Update user memory with extracted fact (deduplicated & ranked)
+    if (extractedMemory) {
+      await updateUserMemory(extractedMemory).catch((err) => {
+        console.warn("Failed to update user memory:", err);
+        // Non-blocking - don't throw
+      });
+    }
 
     return {
       extractedMemory,

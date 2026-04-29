@@ -15,6 +15,8 @@ type ChatMessage = {
   role: string;
   content: string;
   pending?: boolean;
+  streaming?: boolean;
+  status?: string;
 };
 
 type ChatClientProps = {
@@ -24,6 +26,9 @@ type ChatClientProps = {
 };
 
 function MessageBubble({ message }: { message: ChatMessage }) {
+  const isStreamingAssistant = message.role === "assistant" && message.pending;
+  const streamingLabel = message.status ?? "Thinking...";
+
   return (
     <div
       className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
@@ -35,15 +40,25 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             : "border-border bg-card text-foreground"
         }`}
       >
-        {message.pending ? (
+        {message.pending && !message.content ? (
           <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
             <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-            <span>Thinking...</span>
+            <span>{streamingLabel}</span>
           </div>
         ) : (
-          <p className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]">
-            {message.content}
-          </p>
+          <div className="space-y-2">
+            {message.pending ? (
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                {streamingLabel}
+              </p>
+            ) : null}
+            <p className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]">
+              {message.content}
+              {isStreamingAssistant ? (
+                <span className="ml-0.5 animate-pulse text-primary">▍</span>
+              ) : null}
+            </p>
+          </div>
         )}
 
         {message.role === "assistant" && !message.pending && (
@@ -138,26 +153,129 @@ export function ChatClient({
         }),
       });
 
-      const payload = (await response.json().catch(() => null)) as {
-        assistantMessage?: string;
-        error?: string;
-      } | null;
-
       if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         throw new Error(payload?.error ?? "Failed to generate a response.");
       }
 
-      setMessages((currentMessages) =>
-        currentMessages.map((currentMessage) =>
-          currentMessage.id === assistantPlaceholderId
-            ? {
-                id: assistantPlaceholderId,
-                role: "assistant",
-                content: payload?.assistantMessage ?? "",
-              }
-            : currentMessage,
-        ),
-      );
+      const reader = response.body?.getReader();
+
+      if (!reader) {
+        throw new Error("Streaming response is not available.");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      let finalAssistantMessage = "";
+
+      const applyChunk = (delta: string, content: string) => {
+        finalAssistantMessage = content || `${finalAssistantMessage}${delta}`;
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  ...currentMessage,
+                  content: content || delta,
+                  pending: true,
+                  streaming: true,
+                  status: "Writing...",
+                }
+              : currentMessage,
+          ),
+        );
+      };
+
+      const finalizeStream = (content: string) => {
+        const finalContent = content || finalAssistantMessage;
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  id: assistantPlaceholderId,
+                  role: "assistant",
+                  content: finalContent,
+                  pending: false,
+                  streaming: false,
+                }
+              : currentMessage,
+          ),
+        );
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          newlineIndex = buffer.indexOf("\n");
+
+          if (!line) {
+            continue;
+          }
+
+          try {
+            const message = JSON.parse(line) as {
+              event?: string;
+              payload?: {
+                delta?: string;
+                content?: string;
+                status?: string;
+                assistantMessage?: string;
+                error?: string;
+              };
+            };
+
+            if (message.event === "chunk") {
+              applyChunk(
+                message.payload?.delta ?? "",
+                message.payload?.content ?? "",
+              );
+            }
+
+            if (message.event === "status") {
+              const status = message.payload?.status ?? "Thinking...";
+              setMessages((currentMessages) =>
+                currentMessages.map((currentMessage) =>
+                  currentMessage.id === assistantPlaceholderId
+                    ? {
+                        ...currentMessage,
+                        status,
+                        pending: true,
+                      }
+                    : currentMessage,
+                ),
+              );
+            }
+
+            if (message.event === "done") {
+              finalizeStream(
+                message.payload?.assistantMessage ?? finalAssistantMessage,
+              );
+            }
+
+            if (message.event === "error") {
+              throw new Error(
+                message.payload?.error ?? "Failed to generate a response.",
+              );
+            }
+          } catch (parseError) {
+            console.error("Failed to parse stream payload:", parseError);
+          }
+        }
+      }
+
+      finalizeStream(finalAssistantMessage);
     } catch (sendError) {
       const errorMessage =
         sendError instanceof Error
