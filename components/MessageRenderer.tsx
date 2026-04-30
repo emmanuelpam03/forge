@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -66,11 +66,21 @@ export function MessageRenderer({
           {children}
         </h6>
       ),
-      p: ({ children }) => (
-        <p className="mb-4 leading-7 text-foreground/90 last:mb-0">
-          {children}
-        </p>
-      ),
+      p: ({ children }) => {
+        const childArray = React.Children.toArray(children);
+        const hasBlockChild = childArray.some((child) =>
+          React.isValidElement(child) &&
+          (child.type === "pre" || child.type === "div" || child.type === CodeBlock),
+        );
+
+        const Wrapper: any = hasBlockChild ? "div" : "p";
+
+        return (
+          <Wrapper className="mb-4 leading-7 text-foreground/90 last:mb-0">
+            {children}
+          </Wrapper>
+        );
+      },
       ul: ({ children }) => (
         <ul className="mb-4 ml-6 list-disc space-y-2 text-foreground/90 [&_ul]:mt-2 [&_ul]:mb-0 [&_ul]:ml-5">
           {children}
@@ -123,17 +133,18 @@ export function MessageRenderer({
           {children}
         </a>
       ),
-      code: ({ className, children, ...props }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      code: (props: any) => {
+        const { className, children, inline, ...restProps } = props;
         const languageMatch = /language-(\w+)/.exec(className ?? "");
         const language = languageMatch?.[1];
         const codeText = String(children).replace(/\n$/, "");
-        const isBlockCode = Boolean(languageMatch);
-        const isCopied = copiedCode === codeText;
+        const isBlockCode = !(inline as boolean);
 
         if (!isBlockCode) {
           return (
             <code
-              {...props}
+              {...restProps}
               className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground"
             >
               {children}
@@ -141,32 +152,7 @@ export function MessageRenderer({
           );
         }
 
-        return (
-          <div className="relative mb-4 overflow-hidden rounded-xl border border-border bg-slate-950 text-slate-50 shadow-sm">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
-              <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                {language ?? "code"}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard.writeText(codeText);
-                  setCopiedCode(codeText);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
-                title={isCopied ? "Copied" : "Copy code"}
-              >
-                {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                {isCopied ? "Copied" : "Copy"}
-              </button>
-            </div>
-            <pre className="overflow-x-auto px-4 py-4 text-sm leading-7">
-              <code {...props} className={className}>
-                {children}
-              </code>
-            </pre>
-          </div>
-        );
+        return <CodeBlock language={language} code={codeText} />;
       },
       hr: () => <hr className="my-5 border-border" />,
       em: ({ children }) => (

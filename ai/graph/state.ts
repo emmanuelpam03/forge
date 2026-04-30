@@ -241,5 +241,5 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   evidenceBundles: [],
   synthesisNote: "",
   classifiedIntent: input.classifiedIntent ?? null,
-  forceTool: null,
+  forceTool: input.forceTool ?? null,
 });

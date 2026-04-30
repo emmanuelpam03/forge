@@ -162,7 +162,7 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
 /**
  * Build a prompt for classifying whether the user message requires fresh data.
  * The classifier should return a JSON object with fields:
- * {"intent": "factual|reasoning|coding|creative|chat", "requiresFreshData": true|false, "confidence": "high|medium|low"}
+ * {"intent": "factual|reasoning|code|creative", "requiresFreshData": true|false, "confidence": "high|medium|low"}
  */
 export function buildFreshnessClassificationMessage(
   userMessage: string,
@@ -171,7 +171,6 @@ export function buildFreshnessClassificationMessage(
 
 Return JSON ONLY in this exact shape:
 {"intent":"factual|reasoning|code|creative","requiresFreshData":true|false,"confidence":"high|medium|low"}
-
 Rules:
 - intent = factual for questions about real-world facts, people, places, organizations, products, rankings, prices, events, policies, dates, time-sensitive state, or anything that can become outdated.
 - intent = reasoning for explanation, analysis, comparison, or advice.

@@ -16,6 +16,7 @@ import {
   classifyIntentNode,
   planTaskNode,
   toolRouterNode,
+  toolRouterNodeImpl,
   synthesizeEvidenceNode,
   generateTitleNode,
   extractMemoryNode,
@@ -67,7 +68,7 @@ async function runGraphPreResponse(
   Object.assign(state, await loadContextNode(state));
   Object.assign(state, await classifyIntentNode(state));
   Object.assign(state, await planTaskNode(state));
-  Object.assign(state, await toolRouterNode(state, onEvent));
+  Object.assign(state, await toolRouterNodeImpl(state, onEvent));
   Object.assign(state, await synthesizeEvidenceNode(state));
 
   return state;

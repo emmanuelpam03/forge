@@ -482,7 +482,7 @@ User request: ${sanitizedMessage}`;
  * Input: toolPlan + executionMode + userMessage
  * Output: toolsUsed + evidenceBundles
  */
-export async function toolRouterNode(
+export async function toolRouterNodeImpl(
   state: ChatGraphState,
   onEvent?: (event: StreamEvent) => void,
 ) {
@@ -704,6 +704,12 @@ export async function toolRouterNode(
       evidenceBundles: [],
     };
   }
+}
+
+// Wrapper with NodeAction-compatible signature. The graph builder expects a single-arg
+// node action `(state) => Promise<...>`. Use this wrapper when registering the node.
+export async function toolRouterNode(state: ChatGraphState) {
+  return toolRouterNodeImpl(state);
 }
 
 /**
