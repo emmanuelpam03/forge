@@ -191,57 +191,60 @@ export async function generateResponseNode(state: ChatGraphState) {
 export async function saveMessagesNode(state: ChatGraphState) {
   const now = new Date();
 
-  await prisma.$transaction(async (tx) => {
-    await tx.message.create({
-      data: {
-        chatId: state.chatId,
-        role: "user",
-        content: state.userMessage,
-      },
-    });
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.message.create({
+        data: {
+          chatId: state.chatId,
+          role: "user",
+          content: state.userMessage,
+        },
+      });
 
-    await tx.message.create({
-      data: {
-        chatId: state.chatId,
-        role: "assistant",
-        content: state.assistantMessage,
-        modelUsed: state.modelUsed || null,
-        provider: state.provider || null,
-        tokensInput: state.inputTokens || null,
-        tokensOutput: state.outputTokens || null,
-        latencyMs: state.latencyMs || null,
-        runId: state.runId || null,
-        traceId: state.traceId || null,
-      },
-    });
+      await tx.message.create({
+        data: {
+          chatId: state.chatId,
+          role: "assistant",
+          content: state.assistantMessage,
+          modelUsed: state.modelUsed || null,
+          provider: state.provider || null,
+          tokensInput: state.inputTokens || null,
+          tokensOutput: state.outputTokens || null,
+          latencyMs: state.latencyMs || null,
+          runId: state.runId || null,
+          traceId: state.traceId || null,
+        },
+      });
 
-    // Persist generated title if available (only on first turn)
-    const chatUpdateData: Record<string, unknown> = {
-      lastMessageAt: now,
-    };
-    if (state.generatedTitle && state.previousMessages.length === 0) {
-      chatUpdateData.title = state.generatedTitle;
-    }
+      // Persist generated title if available (only on first turn)
+      const chatUpdateData: Record<string, unknown> = {
+        lastMessageAt: now,
+      };
+      if (state.generatedTitle && state.previousMessages.length === 0) {
+        chatUpdateData.title = state.generatedTitle;
+      }
 
-    await tx.chat.update({
-      where: { id: state.chatId },
-      data: chatUpdateData,
-    });
+      await tx.chat.update({
+        where: { id: state.chatId },
+        data: chatUpdateData,
+      });
 
-    await tx.chatRunAnalytics.create({
-      data: {
-        chatId: state.chatId,
-        modelUsed: state.modelUsed || null,
-        provider: state.provider || null,
-        latencyMs: state.latencyMs || null,
-        tokensInput: state.inputTokens || null,
-        tokensOutput: state.outputTokens || null,
-        runId: state.runId || null,
-        traceId: state.traceId || null,
-        status: "completed",
-      },
-    });
-  });
+      await tx.chatRunAnalytics.create({
+        data: {
+          chatId: state.chatId,
+          modelUsed: state.modelUsed || null,
+          provider: state.provider || null,
+          latencyMs: state.latencyMs || null,
+          tokensInput: state.inputTokens || null,
+          tokensOutput: state.outputTokens || null,
+          runId: state.runId || null,
+          traceId: state.traceId || null,
+          status: "completed",
+        },
+      });
+    },
+    { timeout: 15000 },
+  );
 
   // Phase 4: Maintain rolling chat summary
   // This runs after message save completes

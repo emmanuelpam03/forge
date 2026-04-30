@@ -57,8 +57,9 @@ function lexicalScore(query: string, candidate: string): number {
  */
 export function calculatorTool(expression: string): ToolResult {
   try {
-    // Strict validation: only allow numbers, operators, parentheses, whitespace, and function names
-    if (!/^[0-9+\-*/%()^.\s(sqrt|abs|floor|ceil|round)]*$/.test(expression)) {
+    // Strict validation: only allow numbers, operators, parentheses, whitespace, and letters (for function names)
+    // Specific function name validation happens in the tokenizer
+    if (!/^[0-9+\-*/%()^.\sA-Za-z]*$/.test(expression)) {
       return {
         success: false,
         result: "",
