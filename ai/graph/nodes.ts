@@ -270,16 +270,27 @@ export async function generateResponseNode(state: ChatGraphState) {
 
 export async function saveMessagesNode(state: ChatGraphState) {
   const now = new Date();
+  // Avoid duplicating the user message when the database already contains
+  // the edited user turn (edit flow). If the last previous message is a
+  // user message with identical content, skip creating a new user row.
+  const lastPrev = state.previousMessages?.[state.previousMessages.length - 1];
+  const shouldCreateUser = !(
+    lastPrev &&
+    lastPrev.role === "user" &&
+    lastPrev.content.trim() === state.userMessage.trim()
+  );
 
   await prisma.$transaction(
     async (tx) => {
-      await tx.message.create({
-        data: {
-          chatId: state.chatId,
-          role: "user",
-          content: state.userMessage,
-        },
-      });
+      if (shouldCreateUser) {
+        await tx.message.create({
+          data: {
+            chatId: state.chatId,
+            role: "user",
+            content: state.userMessage,
+          },
+        });
+      }
 
       await tx.message.create({
         data: {
