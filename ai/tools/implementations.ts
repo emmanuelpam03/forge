@@ -58,11 +58,7 @@ function lexicalScore(query: string, candidate: string): number {
 export function calculatorTool(expression: string): ToolResult {
   try {
     // Strict validation: only allow numbers, operators, parentheses, whitespace, and function names
-    if (
-      !/^[0-9+\-*/%()^.\s(sqrt|abs|floor|ceil|round|pow|min|max)]*$/.test(
-        expression,
-      )
-    ) {
+    if (!/^[0-9+\-*/%()^.\s(sqrt|abs|floor|ceil|round)]*$/.test(expression)) {
       return {
         success: false,
         result: "",
@@ -123,7 +119,16 @@ function tokenizeExpression(expr: string): string[] {
 
     if (/[0-9.]/.test(expr[i])) {
       let num = "";
+      let dotCount = 0;
       while (i < expr.length && /[0-9.]/.test(expr[i])) {
+        if (expr[i] === ".") {
+          dotCount++;
+          if (dotCount > 1) {
+            throw new Error(
+              `Malformed number: "${num}." contains multiple decimal points`,
+            );
+          }
+        }
         num += expr[i];
         i++;
       }
@@ -134,11 +139,7 @@ function tokenizeExpression(expr: string): string[] {
         func += expr[i];
         i++;
       }
-      if (
-        ["sqrt", "abs", "floor", "ceil", "round", "pow", "min", "max"].includes(
-          func,
-        )
-      ) {
+      if (["sqrt", "abs", "floor", "ceil", "round"].includes(func)) {
         tokens.push(func);
       } else {
         throw new Error(`Unknown function: ${func}`);
@@ -201,24 +202,24 @@ class Parser {
   }
 
   parseFactor(): number {
-    let result = this.parsePower();
-
-    while (this.pos < this.tokens.length && this.tokens[this.pos] === "^") {
-      this.pos++;
-      const right = this.parsePower();
-      result = Math.pow(result, right);
-    }
-
-    return result;
-  }
-
-  parsePower(): number {
     if (this.pos < this.tokens.length && this.tokens[this.pos] === "-") {
       this.pos++;
       return -this.parsePower();
     }
 
-    return this.parsePrimary();
+    return this.parsePower();
+  }
+
+  parsePower(): number {
+    let result = this.parsePrimary();
+
+    if (this.pos < this.tokens.length && this.tokens[this.pos] === "^") {
+      this.pos++;
+      const right = this.parseFactor();
+      result = Math.pow(result, right);
+    }
+
+    return result;
   }
 
   parsePrimary(): number {

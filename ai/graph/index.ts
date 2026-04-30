@@ -94,9 +94,8 @@ export async function runChatGraphStream(
   onChunk: (chunk: string) => void,
   onStatus?: (status: string) => void,
 ) {
-  onStatus?.("Loading context...");
+  onStatus?.("Analyzing your question...");
   const state = await runGraphPreResponse(input);
-  onStatus?.("Classifying intent...");
 
   const model = createGeminiModel();
   const messages = buildChatMessages(state);

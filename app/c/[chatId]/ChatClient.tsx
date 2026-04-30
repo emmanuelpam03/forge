@@ -349,7 +349,7 @@ export function ChatClient({
                   ...currentMessage,
                   pending: false,
                   streaming: false,
-                  status: "Stopped",
+                  error: "Stopped",
                 }
               : currentMessage,
           ),

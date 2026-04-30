@@ -170,8 +170,8 @@ export async function generateResponseNode(state: ChatGraphState) {
         intent: state.intent,
         tools_used: state.toolsUsed || [],
         has_tool_context: !!state.toolContext,
-        evidence_bundles_count: state.evidenceBundles.length,
-        message_count: state.previousMessages.length,
+        evidence_bundles_count: state.evidenceBundles?.length ?? 0,
+        message_count: state.previousMessages?.length ?? 0,
       }),
     );
   }

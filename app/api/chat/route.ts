@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { runChatGraphStream } from "@/ai/graph";
+import { hashIdentifierForLogging } from "@/lib/logging";
 
 export const runtime = "nodejs";
 
@@ -70,8 +71,8 @@ export async function POST(request: NextRequest) {
             console.error(
               JSON.stringify({
                 error: "empty-response-after-streaming",
-                chat_id: result.chatId,
-                run_id: result.runId,
+                chat_id: hashIdentifierForLogging(result.chatId),
+                run_id: hashIdentifierForLogging(result.runId),
                 intent: result.intent,
                 tools_used: result.toolsUsed || [],
                 streamed_length: assistantMessage.length,
