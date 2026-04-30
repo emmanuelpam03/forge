@@ -2,6 +2,20 @@ import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
 
+export type ClassificationIntent =
+  | "factual"
+  | "reasoning"
+  | "code"
+  | "creative";
+
+export type ClassificationConfidence = "high" | "medium" | "low";
+
+export type ClassifiedIntent = {
+  intent: ClassificationIntent;
+  requiresFreshData: boolean;
+  confidence: ClassificationConfidence;
+};
+
 export type ChatMessageSnapshot = {
   id: string;
   role: MessageRole;
@@ -69,6 +83,11 @@ export type ChatGraphState = {
   executionMode: "none" | "single" | "multi-parallel" | "multi-sequential";
   evidenceBundles: EvidenceBundle[];
   synthesisNote: string;
+  classifiedIntent: ClassifiedIntent | null;
+  /**
+   * When set, forces the graph to execute a specific tool (e.g. "webSearch").
+   */
+  forceTool?: string | null;
 };
 
 const lastValue = <T>(_: T, update: T) => update;
@@ -176,11 +195,23 @@ export const chatGraphState = Annotation.Root({
     default: () => "",
     reducer: lastValue,
   }),
+  classifiedIntent: Annotation<{
+    intent: ClassificationIntent;
+    requiresFreshData: boolean;
+    confidence: ClassificationConfidence;
+  } | null>({
+    default: () => null,
+    reducer: lastValue,
+  }),
+  forceTool: Annotation<string | null>({
+    default: () => null,
+    reducer: lastValue,
+  }),
 });
 
 export type ChatGraphInput = Pick<
   ChatGraphState,
-  "chatId" | "userMessage" | "runId"
+  "chatId" | "userMessage" | "runId" | "forceTool" | "classifiedIntent"
 >;
 
 export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
@@ -209,4 +240,6 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   executionMode: "none",
   evidenceBundles: [],
   synthesisNote: "",
+  classifiedIntent: input.classifiedIntent ?? null,
+  forceTool: null,
 });

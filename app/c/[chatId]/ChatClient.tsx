@@ -10,6 +10,7 @@ import {
   Square,
 } from "lucide-react";
 import { useFeedback } from "@/components/feedback-provider";
+import { MessageRenderer } from "@/components/MessageRenderer";
 
 type ChatMessage = {
   id: string;
@@ -29,7 +30,7 @@ type ChatClientProps = {
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isStreamingAssistant = message.role === "assistant" && message.pending;
-  const streamingLabel = message.status ?? "Processing...";
+  const showThinkingOnly = message.pending && !message.content;
 
   return (
     <div
@@ -42,29 +43,30 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             : "border-border bg-card text-foreground"
         }`}
       >
-        {message.pending && !message.content ? (
+        {showThinkingOnly ? (
           <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
             <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-            <span>{streamingLabel}</span>
+            <span>Thinking...</span>
           </div>
         ) : (
           <div className="space-y-2">
-            {message.pending && message.status ? (
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                {streamingLabel}
-              </p>
-            ) : null}
             {message.error ? (
               <p className="text-[14px] leading-7 text-red-400">
                 {message.error}
               </p>
             ) : (
-              <p className="whitespace-pre-wrap text-[14px] leading-7 tracking-[-0.01em]">
-                {message.content}
-                {isStreamingAssistant ? (
-                  <span className="ml-0.5 animate-pulse text-primary">▍</span>
-                ) : null}
-              </p>
+              <div className="text-[14px]">
+                {message.role === "assistant" ? (
+                  <MessageRenderer
+                    content={message.content}
+                    isStreaming={isStreamingAssistant}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap leading-7 tracking-[-0.01em]">
+                    {message.content}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -163,7 +165,6 @@ export function ChatClient({
         role: "assistant",
         content: "",
         pending: true,
-        status: "Loading context...",
       },
     ]);
 
@@ -210,7 +211,6 @@ export function ChatClient({
                   content: finalAssistantMessage,
                   pending: true,
                   streaming: true,
-                  status: "Writing...",
                 }
               : currentMessage,
           ),
@@ -288,18 +288,8 @@ export function ChatClient({
             }
 
             if (message.event === "status") {
-              const status = message.payload?.status ?? "Processing...";
-              setMessages((currentMessages) =>
-                currentMessages.map((currentMessage) =>
-                  currentMessage.id === assistantPlaceholderId
-                    ? {
-                        ...currentMessage,
-                        status,
-                        pending: true,
-                      }
-                    : currentMessage,
-                ),
-              );
+              // Status events are silently ignored - content is shown as it streams
+              // "Thinking..." indicator is handled by MessageBubble component
             }
 
             if (message.event === "done") {

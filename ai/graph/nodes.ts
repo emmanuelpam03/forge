@@ -9,14 +9,23 @@ import {
 } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
 import { createGeminiModel, createGeminiToolModel } from "@/ai/models";
-import { buildChatMessages } from "@/ai/prompts/router";
-import { buildIntentClassificationMessage } from "@/ai/prompts/intent";
+import {
+  buildChatMessages,
+  buildFreshnessClassificationMessage,
+} from "@/ai/prompts/router";
 import {
   loadContextForChat,
   maintainChatSummary,
   updateUserMemory,
 } from "@/ai/context/engine";
 import { createForgeTools } from "@/ai/tools";
+import { hashIdentifierForLogging } from "@/lib/logging";
+import {
+  normalizeClassificationConfidence,
+  normalizeClassificationIntent,
+  parseClassificationText,
+  shouldForceWebSearchFromClassification,
+} from "@/ai/graph/classification";
 import type { ChatGraphState } from "@/ai/graph/state";
 
 function toTextContent(content: unknown): string {
@@ -118,6 +127,53 @@ function isValidNumericExpression(text: string): boolean {
   );
 }
 
+async function executeWebSearchTool(
+  state: ChatGraphState,
+  tools: ReturnType<typeof createForgeTools>,
+  evidenceBundles: Array<{ tool: string; content: string; timestamp: string }>,
+  toolsUsed: Set<string>,
+) {
+  const webSearchTool = tools.find((tool) => tool.name === "webSearch");
+  if (!webSearchTool) {
+    return {
+      toolsUsed: Array.from(toolsUsed),
+      evidenceBundles,
+      toolContext: state.toolContext,
+    };
+  }
+
+  const rawResult = await webSearchTool.invoke({
+    query: state.userMessage,
+    maxResults: 5,
+  });
+  const toolResultText =
+    typeof rawResult === "string"
+      ? rawResult
+      : JSON.stringify(rawResult, null, 2);
+
+  toolsUsed.add("webSearch");
+  evidenceBundles.push({
+    tool: "webSearch",
+    content: toolResultText,
+    timestamp: new Date().toISOString(),
+  });
+
+  console.info(
+    JSON.stringify({
+      event: "webSearch.forced_result",
+      chatId: hashIdentifierForLogging(state.chatId),
+      runId: hashIdentifierForLogging(state.runId),
+      toolResult: toolResultText,
+    }),
+  );
+
+  return {
+    toolsUsed: Array.from(toolsUsed),
+    evidenceBundles,
+    toolContext: `Web Search Result:\n${toolResultText}`,
+  };
+}
+
 export async function loadContextNode(state: ChatGraphState) {
   const selectedContext = await loadContextForChat(state.chatId);
 
@@ -173,6 +229,13 @@ export async function generateResponseNode(state: ChatGraphState) {
         evidence_bundles_count: state.evidenceBundles?.length ?? 0,
         message_count: state.previousMessages?.length ?? 0,
       }),
+    );
+  }
+
+  // GUARANTEE: assistantMessage is always non-empty after fallbacks
+  if (!assistantMessage || !assistantMessage.trim()) {
+    throw new Error(
+      `[CRITICAL] generateResponseNode returned empty message. Chat: ${state.chatId}, RunId: ${state.runId}`,
     );
   }
 
@@ -269,6 +332,36 @@ export async function saveMessagesNode(state: ChatGraphState) {
  */
 export async function planTaskNode(state: ChatGraphState) {
   try {
+    // If an external caller forced a tool, short-circuit planning and honor it.
+    if (
+      state.forceTool ||
+      shouldForceWebSearchFromClassification(state.classifiedIntent)
+    ) {
+      const forced = state.forceTool;
+      const classifier = state.classifiedIntent;
+      if (classifier) {
+        console.info(
+          JSON.stringify({
+            event: "toolRouting.forced",
+            chatId: hashIdentifierForLogging(state.chatId),
+            runId: hashIdentifierForLogging(state.runId),
+            classifier,
+            forcedTool: forced || "webSearch",
+          }),
+        );
+      }
+
+      return {
+        toolPlan: {
+          intent: state.intent || state.classifiedIntent?.intent || "factual",
+          toolsNeeded: [forced || "webSearch"],
+          sequential: false,
+          followUpNeeded: false,
+        },
+        executionMode: "single",
+      };
+    }
+
     const model = createGeminiModel();
 
     // Sanitize user input to prevent prompt injection
@@ -376,6 +469,11 @@ export async function toolRouterNode(state: ChatGraphState) {
   try {
     // If no tools needed, return early
     if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
+      if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
+        const tools = createForgeTools({ chatId: state.chatId });
+        return executeWebSearchTool(state, tools, [], new Set<string>());
+      }
+
       return {
         toolsUsed: [],
         evidenceBundles: [],
@@ -392,44 +490,53 @@ export async function toolRouterNode(state: ChatGraphState) {
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
 
-    // Handle information-search intent with direct webSearch execution
-    if (
-      state.intent === "information-search" &&
-      state.toolPlan.toolsNeeded.includes("webSearch")
-    ) {
-      const webSearchTool = toolByName.get("webSearch");
-      if (webSearchTool) {
-        const query = state.userMessage.trim();
-        const rawResult = await webSearchTool.invoke({
-          query,
-          maxResults: 5,
-        });
-        const toolResultText =
-          typeof rawResult === "string"
-            ? rawResult
-            : JSON.stringify(rawResult, null, 2);
+    if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
+      console.info(
+        JSON.stringify({
+          event: "toolRouter.forced_web_search",
+          chatId: hashIdentifierForLogging(state.chatId),
+          runId: hashIdentifierForLogging(state.runId),
+          classifier: state.classifiedIntent,
+        }),
+      );
+      return executeWebSearchTool(state, tools, evidenceBundles, toolsUsed);
+    }
 
-        toolsUsed.add("webSearch");
-        evidenceBundles.push({
-          tool: "webSearch",
-          content: toolResultText,
-          timestamp: new Date().toISOString(),
-        });
-        // For sequential execution, other tools might depend on this
-        if (
-          state.executionMode === "multi-sequential" &&
-          state.toolPlan.toolsNeeded.length > 1
-        ) {
-          // Store webSearch result for later tools without mutating input state
-          intermediateContext = `Web Search Result:\n${toolResultText}`;
-        }
+    // If a caller forced a tool, run it deterministically and return its results.
+    if (state.forceTool) {
+      const forcedName = state.forceTool;
+      const forcedTool = toolByName.get(forcedName);
+      if (forcedTool) {
+        try {
+          let args: Record<string, unknown> = {};
+          if (forcedName === "webSearch") {
+            args = { query: state.userMessage, maxResults: 5 };
+          }
 
-        if (state.executionMode === "single") {
+          const rawResult = await forcedTool.invoke(args);
+          const toolResultText =
+            typeof rawResult === "string"
+              ? rawResult
+              : JSON.stringify(rawResult, null, 2);
+
+          toolsUsed.add(forcedName);
+          evidenceBundles.push({
+            tool: forcedName,
+            content: toolResultText,
+            timestamp: new Date().toISOString(),
+          });
+
+          // set toolContext to forced result for downstream nodes
+          intermediateContext = toolResultText;
+
           return {
             toolsUsed: Array.from(toolsUsed),
             evidenceBundles,
             toolContext: intermediateContext,
           };
+        } catch (err) {
+          console.error(`Forced tool ${forcedName} failed:`, err);
+          // fall through to normal processing (no forced output)
         }
       }
     }
@@ -437,7 +544,7 @@ export async function toolRouterNode(state: ChatGraphState) {
     // For multi-parallel execution, run independent tools concurrently
     if (state.executionMode === "multi-parallel") {
       const independentTools = state.toolPlan.toolsNeeded.filter(
-        (t) => t !== "webSearch" || state.intent !== "information-search",
+        (t) => t !== "webSearch",
       );
 
       const parallelResults = await Promise.all(
@@ -509,6 +616,8 @@ export async function toolRouterNode(state: ChatGraphState) {
             args = { expression };
           } else if (toolName === "currentDateTime") {
             args = { mode: "now" };
+          } else if (toolName === "webSearch") {
+            args = { query: state.userMessage, maxResults: 5 };
           } else if (toolName === "summarizeText") {
             args = {
               text: intermediateContext || state.userMessage,
@@ -608,30 +717,99 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
  */
 export async function classifyIntentNode(state: ChatGraphState) {
   try {
+    if (state.classifiedIntent) {
+      console.info(
+        JSON.stringify({
+          event: "classifier.seeded",
+          chatId: hashIdentifierForLogging(state.chatId),
+          runId: hashIdentifierForLogging(state.runId),
+          classifier: state.classifiedIntent,
+        }),
+      );
+
+      return {
+        intent: state.classifiedIntent.intent,
+        classifiedIntent: state.classifiedIntent,
+      };
+    }
+
     const model = createGeminiModel();
-    const message = buildIntentClassificationMessage(state.userMessage);
+    const message = buildFreshnessClassificationMessage(state.userMessage);
 
     const response = await model.invoke([new HumanMessage(message)]);
-    const intent = toTextContent(response.content).toLowerCase().trim();
+    const classifiedIntent = parseClassificationText(
+      toTextContent(response.content),
+    );
 
-    // Validate intent is one of the expected types
-    const validIntents = [
-      "calculation",
-      "datetime-query",
-      "code-request",
-      "information-search",
-      "chat",
-    ];
-    const classifiedIntent = validIntents.includes(intent) ? intent : "chat";
+    console.info(
+      JSON.stringify({
+        event: "classifier.output",
+        chatId: hashIdentifierForLogging(state.chatId),
+        runId: hashIdentifierForLogging(state.runId),
+        classifier: classifiedIntent,
+      }),
+    );
 
     return {
-      intent: classifiedIntent,
+      intent: classifiedIntent.intent,
+      classifiedIntent,
     };
   } catch (error) {
     console.error("Intent classification failed:", error);
     return {
-      intent: "chat", // Fallback to general chat
+      intent: "factual",
+      classifiedIntent: {
+        intent: "factual",
+        requiresFreshData: false,
+        confidence: "low",
+      },
     };
+  }
+}
+
+/**
+ * Classify whether the user message requires fresh, real-world data and produce
+ * a confidence score. Returns { intent, requiresFreshData, confidence }.
+ */
+export async function classifyFreshnessNode(state: ChatGraphState) {
+  try {
+    if (state.classifiedIntent) {
+      return state.classifiedIntent;
+    }
+
+    const model = createGeminiModel();
+    const message = buildFreshnessClassificationMessage(state.userMessage);
+
+    const response = await model.invoke([new HumanMessage(message)]);
+    const text = toTextContent(response.content).trim();
+
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      console.warn("Failed to parse freshness classifier output:", text);
+    }
+
+    const parsedObject = parsed as {
+      intent?: string;
+      requiresFreshData?: boolean;
+      confidence?: string;
+    } | null;
+
+    const intent = normalizeClassificationIntent(parsedObject?.intent);
+    const requiresFreshData = Boolean(parsedObject?.requiresFreshData === true);
+    const confidence = normalizeClassificationConfidence(
+      parsedObject?.confidence,
+    );
+
+    return {
+      intent,
+      requiresFreshData,
+      confidence,
+    };
+  } catch (error) {
+    console.error("Freshness classification failed:", error);
+    return { intent: "chat", requiresFreshData: false, confidence: "low" };
   }
 }
 
@@ -724,34 +902,8 @@ export async function optionalToolNode(state: ChatGraphState) {
       }
     }
 
-    if (state.intent === "information-search") {
-      const webSearchTool = toolByName.get("webSearch");
-      if (!webSearchTool) {
-        return {
-          toolsUsed: [],
-          toolContext: "",
-        };
-      }
-
-      const query = state.userMessage.trim();
-      const rawResult = await webSearchTool.invoke({
-        query,
-        maxResults: 5,
-      });
-      const toolResultText =
-        typeof rawResult === "string"
-          ? rawResult
-          : JSON.stringify(rawResult, null, 2);
-
-      usedTools.add("webSearch");
-      toolContextLines.push(
-        `Tool: webSearch\nSearch query: ${query}\n${toolResultText}`,
-      );
-
-      return {
-        toolsUsed: Array.from(usedTools),
-        toolContext: toolContextLines.join("\n\n"),
-      };
+    if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
+      return executeWebSearchTool(state, tools, [], new Set<string>());
     }
 
     const modelWithTools = createGeminiToolModel(tools).withConfig({
