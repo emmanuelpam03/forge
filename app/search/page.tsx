@@ -4,19 +4,40 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, MessageSquare, Folder, X } from "lucide-react";
-import { useAppStore } from "@/stores/app-store";
+import { getProjects } from "@/lib/actions/projects";
+import { getRecentChats } from "@/lib/actions/chats";
 import { useFeedback } from "@/components/feedback-provider";
 
 export default function SearchPage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
-  const projects = useAppStore((store) => store.projects);
-  const recentChats = useAppStore((store) => store.recentChats);
 
   const [query, setQuery] = useState("");
+  const [projects, setProjects] = useState<any[]>([]);
+  const [recentChats, setRecentChats] = useState<any[]>([]);
   const [filteredChats, setFilteredChats] = useState(recentChats);
   const [filteredProjects, setFilteredProjects] = useState(projects);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const [fetchedProjects, fetchedChats] = await Promise.all([
+        getProjects(),
+        getRecentChats(10),
+      ]);
+      setProjects(fetchedProjects);
+      setRecentChats(
+        fetchedChats.map((chat) => ({
+          id: chat.id,
+          title: chat.title,
+          preview: chat.messages[0]?.content || "",
+        })),
+      );
+      setIsLoading(false);
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     const searchTerm = query.trim().toLowerCase();
@@ -134,10 +155,19 @@ export default function SearchPage() {
           {/* Results */}
           <div className="max-h-[60vh] overflow-y-auto">
             {isSearching ? (
-              <div className="space-y-2 px-3 py-3">
+              <div className="space-y-2 px-3 py-3 h-48">
                 {Array.from({ length: 6 }).map((_, index) => (
                   <div
                     key={`search-skeleton-${index}`}
+                    className="h-10 animate-pulse rounded-lg bg-muted/60"
+                  />
+                ))}
+              </div>
+            ) : isLoading ? (
+              <div className="space-y-2 px-3 py-3 h-48">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div
+                    key={`load-skeleton-${index}`}
                     className="h-10 animate-pulse rounded-lg bg-muted/60"
                   />
                 ))}
@@ -169,7 +199,7 @@ export default function SearchPage() {
                       {filteredChats.map((chat) => (
                         <Link
                           key={chat.id}
-                          href={chat.href}
+                          href={`/c/${chat.id}`}
                           className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-accent transition-colors group"
                         >
                           <MessageSquare

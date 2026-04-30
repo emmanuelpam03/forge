@@ -1,34 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { runChatGraphStream } from "@/ai/graph";
-import { createGeminiModel } from "@/ai/models";
-import { HumanMessage } from "@langchain/core/messages";
-import { buildFreshnessClassificationMessage } from "@/ai/prompts/router";
-import { parseClassificationText } from "@/ai/graph/classification";
 import { hashIdentifierForLogging } from "@/lib/logging";
 
 export const runtime = "nodejs";
-
-function toTextContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === "string") return part;
-        if (part && typeof part === "object") {
-          const p = part as { text?: string; content?: string };
-          return p.text ?? p.content ?? "";
-        }
-        return "";
-      })
-      .join("");
-  }
-  if (content && typeof content === "object") {
-    const c = content as { text?: string; content?: string };
-    return c.text ?? c.content ?? "";
-  }
-  return String(content ?? "");
-}
 
 const chatRequestSchema = z.object({
   chatId: z.string().min(1),
@@ -69,75 +44,14 @@ export async function POST(request: NextRequest) {
 
           let assistantMessage = "";
 
-          // Run a quick classifier to detect whether the user message requires fresh data
-          let forceTool: string | null = null;
-          let classifiedIntent: {
-            intent: "factual" | "reasoning" | "code" | "creative";
-            requiresFreshData: boolean;
-            confidence: "high" | "medium" | "low";
-          } | null = null;
-          try {
-            const classifierModel = createGeminiModel();
-            const classifierPrompt = buildFreshnessClassificationMessage(
-              parsedBody.data.message,
-            );
-            const classifierResp = await classifierModel.invoke([
-              new HumanMessage(classifierPrompt),
-            ]);
-            const classifierText = toTextContent(
-              (classifierResp as { content?: unknown })?.content,
-            );
-
-            // Try parsing JSON from model output
-            try {
-              classifiedIntent = parseClassificationText(classifierText);
-
-              if (
-                classifiedIntent.intent === "factual" &&
-                (classifiedIntent.requiresFreshData ||
-                  classifiedIntent.confidence !== "high")
-              ) {
-                forceTool = "webSearch";
-              }
-
-              console.info(
-                JSON.stringify({
-                  event: "route.classifier.output",
-                  chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-                  runId: hashIdentifierForLogging(runId),
-                  classifier: classifiedIntent,
-                  forceTool,
-                }),
-              );
-            } catch (err) {
-              // If parsing fails, default to no forced tool
-              console.warn(
-                "Freshness classifier parsing failed:",
-                err,
-                classifierText,
-              );
-              classifiedIntent = {
-                intent: "factual",
-                requiresFreshData: false,
-                confidence: "low",
-              };
-            }
-          } catch (err) {
-            console.error("Freshness classifier failed:", err);
-            classifiedIntent = {
-              intent: "factual",
-              requiresFreshData: false,
-              confidence: "low",
-            };
-          }
-
+          // Graph handles all classification and tool forcing decisions
           const result = await runChatGraphStream(
             {
               chatId: parsedBody.data.chatId,
               userMessage: parsedBody.data.message,
               runId,
-              forceTool,
-              classifiedIntent,
+              forceTool: null,
+              classifiedIntent: null,
             },
             (chunk) => {
               assistantMessage += chunk;

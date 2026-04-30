@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   Copy,
@@ -9,8 +9,8 @@ import {
   Sparkles,
   Square,
 } from "lucide-react";
-import { useFeedback } from "@/components/feedback-provider";
 import { MessageRenderer } from "@/components/MessageRenderer";
+import { useFeedback } from "@/components/feedback-provider";
 
 type ChatMessage = {
   id: string;
@@ -26,11 +26,14 @@ type ChatClientProps = {
   chatId: string;
   title: string;
   initialMessages: ChatMessage[];
+  initialMessage?: string;
 };
 
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const isStreamingAssistant = message.role === "assistant" && message.pending;
-  const showThinkingOnly = message.pending && !message.content;
+  const isStreamingAssistant =
+    message.role === "assistant" && message.streaming;
+  const showThinkingOnly =
+    message.role === "assistant" && message.pending && !message.content;
 
   return (
     <div
@@ -71,7 +74,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           </div>
         )}
 
-        {message.role === "assistant" && !message.pending && (
+        {message.role === "assistant" &&
+        !message.pending &&
+        !message.streaming ? (
           <div className="mt-3 flex items-center gap-1 text-muted-foreground">
             <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
               <Copy size={13} />
@@ -80,7 +85,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               <RotateCcw size={13} />
             </button>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -90,6 +95,7 @@ export function ChatClient({
   chatId,
   title,
   initialMessages,
+  initialMessage,
 }: ChatClientProps) {
   const { showFeedback } = useFeedback();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -100,8 +106,9 @@ export function ChatClient({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hasAutoSentRef = useRef(false);
 
-  const hasMessages = useMemo(() => messages.length > 0, [messages.length]);
+  const hasMessages = messages.length > 0;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -119,19 +126,21 @@ export function ChatClient({
   }, [draft]);
 
   const stopGeneration = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsSending(false);
-      showFeedback({
-        type: "success",
-        title: "Generation stopped",
-      });
+    if (!abortControllerRef.current) {
+      return;
     }
+
+    abortControllerRef.current.abort();
+    abortControllerRef.current = null;
+    setIsSending(false);
+    showFeedback({
+      type: "success",
+      title: "Generation stopped",
+    });
   };
 
   const sendMessage = async (messageToSend?: string) => {
-    const message = (messageToSend || draft).trim();
+    const message = (messageToSend ?? draft).trim();
 
     if (!message || isSending) {
       if (!message && !messageToSend) {
@@ -150,9 +159,11 @@ export function ChatClient({
     setIsSending(true);
     setError(null);
     setLastUserMessage(message);
+
     if (!messageToSend) {
       setDraft("");
     }
+
     setMessages((currentMessages) => [
       ...currentMessages,
       {
@@ -165,6 +176,7 @@ export function ChatClient({
         role: "assistant",
         content: "",
         pending: true,
+        streaming: false,
       },
     ]);
 
@@ -198,7 +210,6 @@ export function ChatClient({
 
       const decoder = new TextDecoder();
       let buffer = "";
-
       let finalAssistantMessage = "";
 
       const applyChunk = (delta: string, content: string) => {
@@ -209,7 +220,7 @@ export function ChatClient({
               ? {
                   ...currentMessage,
                   content: finalAssistantMessage,
-                  pending: true,
+                  pending: false,
                   streaming: true,
                 }
               : currentMessage,
@@ -220,7 +231,6 @@ export function ChatClient({
       const finalizeStream = (content: string) => {
         const finalContent = (content || finalAssistantMessage || "").trim();
 
-        // Frontend validation: never finalize with empty message
         if (!finalContent) {
           setError("No response generated. Please try again.");
           setMessages((currentMessages) =>
@@ -269,7 +279,7 @@ export function ChatClient({
           }
 
           try {
-            const message = JSON.parse(line) as {
+            const streamMessage = JSON.parse(line) as {
               event?: string;
               payload?: {
                 delta?: string;
@@ -280,29 +290,25 @@ export function ChatClient({
               };
             };
 
-            if (message.event === "chunk") {
+            if (streamMessage.event === "chunk") {
               applyChunk(
-                message.payload?.delta ?? "",
-                message.payload?.content ?? "",
+                streamMessage.payload?.delta ?? "",
+                streamMessage.payload?.content ?? "",
               );
             }
 
-            if (message.event === "status") {
-              // Status events are silently ignored - content is shown as it streams
-              // "Thinking..." indicator is handled by MessageBubble component
-            }
-
-            if (message.event === "done") {
+            if (streamMessage.event === "done") {
               finalizeStream(
-                message.payload?.assistantMessage ?? finalAssistantMessage,
+                streamMessage.payload?.assistantMessage ??
+                  finalAssistantMessage,
               );
             }
 
-            // Error event: clean up UI and propagate error
-            if (message.event === "error") {
+            if (streamMessage.event === "error") {
               const errorMsg =
-                message.payload?.error ?? "Failed to generate a response.";
-              // Clean up placeholder before throwing
+                streamMessage.payload?.error ??
+                "Failed to generate a response.";
+
               setMessages((currentMessages) =>
                 currentMessages.filter(
                   (currentMessage) =>
@@ -310,19 +316,18 @@ export function ChatClient({
                     currentMessage.id !== assistantPlaceholderId,
                 ),
               );
-              // Propagate error to outer error handler
+
               throw new Error(errorMsg);
             }
           } catch (parseError) {
-            // Re-throw if it's a stream error (from message.event === "error")
-            // Otherwise, it's a JSON parse error, just log it
             if (
               parseError instanceof Error &&
               parseError.message &&
               !parseError.message.includes("JSON.parse")
             ) {
-              throw parseError; // Re-throw stream errors
+              throw parseError;
             }
+
             console.error("Failed to parse stream payload:", parseError);
           }
         }
@@ -330,7 +335,6 @@ export function ChatClient({
 
       finalizeStream(finalAssistantMessage);
     } catch (sendError) {
-      // Ignore abort errors (user clicked stop)
       if (sendError instanceof Error && sendError.name === "AbortError") {
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
@@ -370,6 +374,15 @@ export function ChatClient({
       setIsSending(false);
     }
   };
+
+  useEffect(() => {
+    if (!initialMessage || hasAutoSentRef.current || hasMessages || isSending) {
+      return;
+    }
+
+    hasAutoSentRef.current = true;
+    void sendMessage(initialMessage);
+  }, [initialMessage, hasMessages, isSending]);
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background">

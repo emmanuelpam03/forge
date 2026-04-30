@@ -59,8 +59,7 @@ export default function HomePage() {
 
     try {
       setIsCreatingChat(true);
-      const { createChat, updateChat, deleteChat } =
-        await import("@/lib/actions/chats");
+      const { createChat, updateChat } = await import("@/lib/actions/chats");
 
       const createResult = await createChat();
 
@@ -78,31 +77,6 @@ export default function HomePage() {
         throw new Error(updateResult.error ?? "Failed to update chat title");
       }
 
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          chatId,
-          message,
-        }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      if (!response.ok) {
-        try {
-          await deleteChat(chatId);
-        } catch {
-          // Best-effort cleanup only.
-        }
-
-        throw new Error(payload?.error ?? "Failed to generate a response.");
-      }
-
       showFeedback({
         type: "success",
         title: "Chat created",
@@ -110,7 +84,7 @@ export default function HomePage() {
       });
 
       setInput("");
-      router.push(`/c/${chatId}`);
+      router.push(`/c/${chatId}?initialMessage=${encodeURIComponent(message)}`);
     } catch (error) {
       const description =
         error instanceof Error ? error.message : "Failed to create chat";

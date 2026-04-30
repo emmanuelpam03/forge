@@ -3,12 +3,11 @@ import "server-only";
 import {
   HumanMessage,
   SystemMessage,
-  ToolMessage,
   type AIMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
-import { createGeminiModel, createGeminiToolModel } from "@/ai/models";
+import { createGeminiModel } from "@/ai/models";
 import {
   buildChatMessages,
   buildFreshnessClassificationMessage,
@@ -21,8 +20,6 @@ import {
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import {
-  normalizeClassificationConfidence,
-  normalizeClassificationIntent,
   parseClassificationText,
   shouldForceWebSearchFromClassification,
 } from "@/ai/graph/classification";
@@ -763,216 +760,6 @@ export async function classifyIntentNode(state: ChatGraphState) {
         requiresFreshData: false,
         confidence: "low",
       },
-    };
-  }
-}
-
-/**
- * Classify whether the user message requires fresh, real-world data and produce
- * a confidence score. Returns { intent, requiresFreshData, confidence }.
- */
-export async function classifyFreshnessNode(state: ChatGraphState) {
-  try {
-    if (state.classifiedIntent) {
-      return state.classifiedIntent;
-    }
-
-    const model = createGeminiModel();
-    const message = buildFreshnessClassificationMessage(state.userMessage);
-
-    const response = await model.invoke([new HumanMessage(message)]);
-    const text = toTextContent(response.content).trim();
-
-    let parsed: unknown = null;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      console.warn("Failed to parse freshness classifier output:", text);
-    }
-
-    const parsedObject = parsed as {
-      intent?: string;
-      requiresFreshData?: boolean;
-      confidence?: string;
-    } | null;
-
-    const intent = normalizeClassificationIntent(parsedObject?.intent);
-    const requiresFreshData = Boolean(parsedObject?.requiresFreshData === true);
-    const confidence = normalizeClassificationConfidence(
-      parsedObject?.confidence,
-    );
-
-    return {
-      intent,
-      requiresFreshData,
-      confidence,
-    };
-  } catch (error) {
-    console.error("Freshness classification failed:", error);
-    return { intent: "chat", requiresFreshData: false, confidence: "low" };
-  }
-}
-
-function parseSummarizeDirective(message: string) {
-  const lower = message.toLowerCase();
-  const trigger = /\b(summariz|tl;dr|summary|summarise)\b/i;
-  if (!trigger.test(lower)) {
-    return { shouldSummarize: false };
-  }
-
-  // Try to extract explicit format or length
-  const formatMap: Array<[RegExp, string]> = [
-    [/\b1 sentence\b|\bone sentence\b/, "sentence"],
-    [/\b\d+ bullets?\b|\bbullets?\b/, "bullets"],
-    [/executive summary|executive\b/, "executive"],
-    [/technical summary|technical\b/, "technical"],
-    [/beginner|for beginners|explain like i'm five|eli5/, "beginner"],
-    [/action items|next steps|action items only/, "action_items"],
-  ];
-
-  let format: string | undefined;
-  for (const [rx, name] of formatMap) {
-    if (rx.test(lower)) {
-      format = name;
-      break;
-    }
-  }
-
-  // Try to extract a block of text after a colon or newline
-  let body = message;
-  const delimIndex = message.indexOf("\n\n");
-  if (delimIndex !== -1) {
-    body = message.slice(delimIndex + 2).trim();
-  } else if (message.includes("\n")) {
-    const parts = message
-      .split(/\n/)
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (parts.length > 1) body = parts.slice(1).join(" ").trim();
-  } else if (message.includes(":")) {
-    const parts = message.split(":");
-    if (parts.length > 1) body = parts.slice(1).join(":").trim();
-  }
-
-  // If the body is tiny, assume user wants the preceding text summarized
-  if (body.length < 30) body = message;
-
-  // Extract numeric sentence count if present
-  const m = lower.match(/(\d+)\s*(sentences|sentence|bullets)/);
-  const maxSentences = m
-    ? Math.min(24, Math.max(1, parseInt(m[1], 10)))
-    : undefined;
-
-  return { shouldSummarize: true, text: body, format, maxSentences };
-}
-
-/**
- * Execute tools based on intent
- * Input: intent + userMessage
- * Output: toolsUsed
- */
-export async function optionalToolNode(state: ChatGraphState) {
-  try {
-    const tools = createForgeTools({ chatId: state.chatId });
-    const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
-    const toolContextLines: string[] = [];
-    const usedTools = new Set<string>();
-
-    // Detect explicit summarize requests and run summarizeText deterministically
-    const summarizeDirective = parseSummarizeDirective(state.userMessage);
-    if (summarizeDirective.shouldSummarize) {
-      const summarizeTool = toolByName.get("summarizeText");
-      if (summarizeTool) {
-        const rawResult = await summarizeTool.invoke({
-          text: summarizeDirective.text,
-          maxSentences: summarizeDirective.maxSentences,
-          format: summarizeDirective.format,
-        });
-        const toolResultText =
-          typeof rawResult === "string"
-            ? rawResult
-            : JSON.stringify(rawResult, null, 2);
-        usedTools.add("summarizeText");
-        toolContextLines.push(`Tool: summarizeText\n${toolResultText}`);
-
-        return {
-          toolsUsed: Array.from(usedTools),
-          toolContext: toolContextLines.join("\n\n"),
-        };
-      }
-    }
-
-    if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
-      return executeWebSearchTool(state, tools, [], new Set<string>());
-    }
-
-    const modelWithTools = createGeminiToolModel(tools).withConfig({
-      runName: "forge-tool-loop",
-      tags: ["forge", "tools"],
-      metadata: {
-        chatId: state.chatId,
-        intent: state.intent,
-      },
-    });
-
-    const sanitizedMessage = sanitizeUserInput(state.userMessage);
-    const loopMessages: BaseMessage[] = [
-      new SystemMessage(`You are a tool router for Forge.
-Use tools when they improve factual correctness or precision.
-Available tools: calculator, currentDateTime, webSearch, summarizeText, projectContextLookup.
-If a tool is unnecessary, respond without tool calls.`),
-      new HumanMessage(
-        `Intent: ${state.intent}\nUser message: ${sanitizedMessage}`,
-      ),
-    ];
-
-    for (let step = 0; step < 3; step += 1) {
-      const toolDecision = (await modelWithTools.invoke(
-        loopMessages,
-      )) as AIMessage;
-      loopMessages.push(toolDecision);
-
-      const toolCalls = toolDecision.tool_calls ?? [];
-      if (toolCalls.length === 0) {
-        break;
-      }
-
-      for (const toolCall of toolCalls) {
-        const tool = toolByName.get(toolCall.name);
-        if (!tool) {
-          continue;
-        }
-
-        const rawResult = await tool.invoke(
-          (toolCall.args ?? {}) as Record<string, unknown>,
-        );
-        const toolResultText =
-          typeof rawResult === "string"
-            ? rawResult
-            : JSON.stringify(rawResult, null, 2);
-
-        usedTools.add(toolCall.name);
-        toolContextLines.push(`Tool: ${toolCall.name}\n${toolResultText}`);
-
-        loopMessages.push(
-          new ToolMessage({
-            content: toolResultText,
-            tool_call_id:
-              toolCall.id || `${toolCall.name}-${Date.now().toString()}`,
-          }),
-        );
-      }
-    }
-
-    return {
-      toolsUsed: Array.from(usedTools),
-      toolContext: toolContextLines.join("\n\n"),
-    };
-  } catch (error) {
-    console.error("Tool execution failed:", error);
-    return {
-      toolsUsed: [],
-      toolContext: "",
     };
   }
 }

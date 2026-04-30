@@ -2,16 +2,15 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAppStore } from "@/stores/app-store";
+import { createProject } from "@/lib/actions/projects";
 import { useFeedback } from "./feedback-provider";
 
 export function KeyboardShortcuts() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
-  const createProject = useAppStore((store) => store.createProject);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.repeat) return;
 
       const key = e.key.toLowerCase();
@@ -31,19 +30,27 @@ export function KeyboardShortcuts() {
       // Cmd/Ctrl+P for new project
       if (key === "p") {
         e.preventDefault();
-        const project = createProject();
-        showFeedback({
-          type: "success",
-          title: "Project created",
-          description: `Opened \"${project.name}\"`,
-        });
-        router.push(project.href);
+        const result = await createProject();
+        if (result.success && result.project) {
+          showFeedback({
+            type: "success",
+            title: "Project created",
+            description: `Opened \"${result.project.name}\"`,
+          });
+          router.push(`/p/${result.project.id}`);
+        } else {
+          showFeedback({
+            type: "error",
+            title: "Failed to create project",
+            description: result.error,
+          });
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [createProject, router, showFeedback]);
+  }, [router, showFeedback]);
 
   return null;
 }
