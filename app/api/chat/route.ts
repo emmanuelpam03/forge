@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { runChatGraphStream } from "@/ai/graph";
+import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
 
 export const runtime = "nodejs";
@@ -30,93 +30,71 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       start(controller) {
-        const send = (event: string, payload: unknown) => {
+        const send = (event: StreamEvent) => {
           controller.enqueue(
-            encoder.encode(`${JSON.stringify({ event, payload })}\n`),
+            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
           );
         };
 
         void (async () => {
-          send("start", {
-            chatId: parsedBody.data.chatId,
-            runId,
-          });
-
           let assistantMessage = "";
 
-          // Graph handles all classification and tool forcing decisions
-          const result = await runChatGraphStream(
-            {
-              chatId: parsedBody.data.chatId,
-              userMessage: parsedBody.data.message,
-              runId,
-              forceTool: null,
-              classifiedIntent: null,
-            },
-            (chunk) => {
-              assistantMessage += chunk;
-              send("chunk", {
-                delta: chunk,
-                content: assistantMessage,
-              });
-            },
-            (status) => {
-              send("status", { status });
-            },
-          );
+          try {
+            // Graph handles all classification and tool forcing decisions
+            const result = await runChatGraphStream(
+              {
+                chatId: parsedBody.data.chatId,
+                userMessage: parsedBody.data.message,
+                runId,
+                forceTool: null,
+                classifiedIntent: null,
+              },
+              (event) => {
+                if (event.type === "token") {
+                  assistantMessage += event.content;
+                }
 
-          // Route-level validation: ensure response is not empty
-          const finalMessage = (
-            result.assistantMessage || assistantMessage
-          ).trim();
-
-          if (!finalMessage) {
-            console.error(
-              JSON.stringify({
-                error: "empty-response-after-streaming",
-                chat_id: hashIdentifierForLogging(result.chatId),
-                run_id: hashIdentifierForLogging(result.runId),
-                intent: result.intent,
-                tools_used: result.toolsUsed || [],
-                streamed_length: assistantMessage.length,
-              }),
+                send(event);
+              },
             );
-            send("done", {
-              chatId: result.chatId,
-              assistantMessage:
-                "I wasn't able to generate a response. Please try again or rephrase your question.",
-              modelUsed: result.modelUsed,
-              provider: result.provider,
-              inputTokens: result.inputTokens,
-              outputTokens: result.outputTokens,
-              latencyMs: result.latencyMs,
-              runId: result.runId,
-              intent: result.intent,
-              toolsUsed: result.toolsUsed,
-              generatedTitle: result.generatedTitle,
+
+            // Route-level validation: ensure response is not empty
+            const finalMessage = (
+              result.assistantMessage || assistantMessage
+            ).trim();
+
+            if (!finalMessage) {
+              console.error(
+                JSON.stringify({
+                  error: "empty-response-after-streaming",
+                  chat_id: hashIdentifierForLogging(result.chatId),
+                  run_id: hashIdentifierForLogging(result.runId),
+                  intent: result.intent,
+                  tools_used: result.toolsUsed || [],
+                  streamed_length: assistantMessage.length,
+                }),
+              );
+
+              send({
+                type: "status",
+                message:
+                  "I wasn't able to generate a response. Please try again.",
+              });
+            }
+
+            send({ type: "done" });
+          } catch (error) {
+            console.error("Chat stream failed:", error);
+            send({
+              type: "status",
+              message: "Failed to generate a response.",
             });
-          } else {
-            send("done", {
-              chatId: result.chatId,
-              assistantMessage: finalMessage,
-              modelUsed: result.modelUsed,
-              provider: result.provider,
-              inputTokens: result.inputTokens,
-              outputTokens: result.outputTokens,
-              latencyMs: result.latencyMs,
-              runId: result.runId,
-              intent: result.intent,
-              toolsUsed: result.toolsUsed,
-              generatedTitle: result.generatedTitle,
-            });
+            send({ type: "done" });
           }
 
           controller.close();
         })().catch((error) => {
           console.error("Chat stream failed:", error);
-          send("error", {
-            error: "Failed to generate a response.",
-          });
           controller.close();
         });
       },
@@ -124,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
       },

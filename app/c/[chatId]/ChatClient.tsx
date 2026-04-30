@@ -22,6 +22,11 @@ type ChatMessage = {
   error?: string;
 };
 
+type StreamEvent =
+  | { type: "status"; message: string }
+  | { type: "token"; content: string }
+  | { type: "done" };
+
 type ChatClientProps = {
   chatId: string;
   title: string;
@@ -34,6 +39,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     message.role === "assistant" && message.streaming;
   const showThinkingOnly =
     message.role === "assistant" && message.pending && !message.content;
+  const showStatus = message.role === "assistant" && message.status;
 
   return (
     <div
@@ -49,10 +55,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {showThinkingOnly ? (
           <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
             <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-            <span>Thinking...</span>
+            <span>{message.status ?? "Thinking..."}</span>
           </div>
         ) : (
           <div className="space-y-2">
+            {showStatus && message.content ? (
+              <p
+                className={`text-[11px] uppercase tracking-[0.18em] text-muted-foreground ${
+                  message.streaming ? "opacity-70" : ""
+                }`}
+              >
+                {message.status}
+              </p>
+            ) : null}
             {message.error ? (
               <p className="text-[14px] leading-7 text-red-400">
                 {message.error}
@@ -212,8 +227,8 @@ export function ChatClient({
       let buffer = "";
       let finalAssistantMessage = "";
 
-      const applyChunk = (delta: string, content: string) => {
-        finalAssistantMessage = content || `${finalAssistantMessage}${delta}`;
+      const applyChunk = (delta: string) => {
+        finalAssistantMessage = `${finalAssistantMessage}${delta}`;
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
             currentMessage.id === assistantPlaceholderId
@@ -222,13 +237,27 @@ export function ChatClient({
                   content: finalAssistantMessage,
                   pending: false,
                   streaming: true,
+                  status: currentMessage.status,
                 }
               : currentMessage,
           ),
         );
       };
 
-      const finalizeStream = (content: string) => {
+      const applyStatus = (status: string) => {
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  ...currentMessage,
+                  status,
+                }
+              : currentMessage,
+          ),
+        );
+      };
+
+      const applyDone = (content: string) => {
         const finalContent = (content || finalAssistantMessage || "").trim();
 
         if (!finalContent) {
@@ -253,6 +282,7 @@ export function ChatClient({
                   content: finalContent,
                   pending: false,
                   streaming: false,
+                  status: undefined,
                 }
               : currentMessage,
           ),
@@ -268,56 +298,32 @@ export function ChatClient({
 
         buffer += decoder.decode(value, { stream: true });
 
-        let newlineIndex = buffer.indexOf("\n");
-        while (newlineIndex !== -1) {
-          const line = buffer.slice(0, newlineIndex).trim();
-          buffer = buffer.slice(newlineIndex + 1);
-          newlineIndex = buffer.indexOf("\n");
+        let frameEndIndex = buffer.indexOf("\n\n");
+        while (frameEndIndex !== -1) {
+          const frame = buffer.slice(0, frameEndIndex).trim();
+          buffer = buffer.slice(frameEndIndex + 2);
+          frameEndIndex = buffer.indexOf("\n\n");
 
-          if (!line) {
+          if (!frame) {
             continue;
           }
 
           try {
-            const streamMessage = JSON.parse(line) as {
-              event?: string;
-              payload?: {
-                delta?: string;
-                content?: string;
-                status?: string;
-                assistantMessage?: string;
-                error?: string;
-              };
-            };
+            const payloadText = frame.startsWith("data:")
+              ? frame.replace(/^data:\s*/, "")
+              : frame;
+            const event = JSON.parse(payloadText) as StreamEvent;
 
-            if (streamMessage.event === "chunk") {
-              applyChunk(
-                streamMessage.payload?.delta ?? "",
-                streamMessage.payload?.content ?? "",
-              );
+            if (event.type === "status") {
+              applyStatus(event.message);
             }
 
-            if (streamMessage.event === "done") {
-              finalizeStream(
-                streamMessage.payload?.assistantMessage ??
-                  finalAssistantMessage,
-              );
+            if (event.type === "token") {
+              applyChunk(event.content);
             }
 
-            if (streamMessage.event === "error") {
-              const errorMsg =
-                streamMessage.payload?.error ??
-                "Failed to generate a response.";
-
-              setMessages((currentMessages) =>
-                currentMessages.filter(
-                  (currentMessage) =>
-                    currentMessage.id !== userMessageId &&
-                    currentMessage.id !== assistantPlaceholderId,
-                ),
-              );
-
-              throw new Error(errorMsg);
+            if (event.type === "done") {
+              applyDone(finalAssistantMessage);
             }
           } catch (parseError) {
             if (
@@ -333,7 +339,7 @@ export function ChatClient({
         }
       }
 
-      finalizeStream(finalAssistantMessage);
+      applyDone(finalAssistantMessage);
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
         setMessages((currentMessages) =>
@@ -343,6 +349,7 @@ export function ChatClient({
                   ...currentMessage,
                   pending: false,
                   streaming: false,
+                  status: undefined,
                   error: "Stopped",
                 }
               : currentMessage,

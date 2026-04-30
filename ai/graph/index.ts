@@ -23,6 +23,11 @@ import {
 import { createGeminiModel } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
 
+export type StreamEvent =
+  | { type: "status"; message: string }
+  | { type: "token"; content: string }
+  | { type: "done" };
+
 function toTextContent(content: unknown): string {
   if (typeof content === "string") {
     return content;
@@ -53,13 +58,16 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-async function runGraphPreResponse(input: ChatGraphInput) {
+async function runGraphPreResponse(
+  input: ChatGraphInput,
+  onEvent?: (event: StreamEvent) => void,
+) {
   const state = createChatGraphSeed(input);
 
   Object.assign(state, await loadContextNode(state));
   Object.assign(state, await classifyIntentNode(state));
   Object.assign(state, await planTaskNode(state));
-  Object.assign(state, await toolRouterNode(state));
+  Object.assign(state, await toolRouterNode(state, onEvent));
   Object.assign(state, await synthesizeEvidenceNode(state));
 
   return state;
@@ -91,11 +99,10 @@ export async function runChatGraph(input: ChatGraphInput) {
 
 export async function runChatGraphStream(
   input: ChatGraphInput,
-  onChunk: (chunk: string) => void,
-  onStatus?: (status: string) => void,
+  onEvent?: (event: StreamEvent) => void,
 ) {
-  onStatus?.("Analyzing your question...");
-  const state = await runGraphPreResponse(input);
+  onEvent?.({ type: "status", message: "Analyzing your question..." });
+  const state = await runGraphPreResponse(input, onEvent);
 
   const model = createGeminiModel();
   const messages = buildChatMessages(state);
@@ -106,7 +113,7 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
-    onStatus?.("Generating response...");
+    onEvent?.({ type: "status", message: "Generating response..." });
     const stream = await model.stream(messages as BaseMessage[]);
 
     for await (const chunk of stream as AsyncIterable<unknown>) {
@@ -118,10 +125,9 @@ export async function runChatGraphStream(
       }
 
       assistantMessage += text;
-      onChunk(text);
+      onEvent?.({ type: "token", content: text });
     }
   } catch (error) {
-    onStatus?.("error");
     throw error;
   }
   // Stream validation: log if response is empty

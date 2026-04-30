@@ -24,6 +24,22 @@ import {
   shouldForceWebSearchFromClassification,
 } from "@/ai/graph/classification";
 import type { ChatGraphState } from "@/ai/graph/state";
+import type { StreamEvent } from "@/ai/graph/index";
+
+function emitStatus(
+  onEvent: ((event: StreamEvent) => void) | undefined,
+  message: string,
+) {
+  onEvent?.({ type: "status", message });
+}
+
+function getToolStatusMessage(toolName: string): string {
+  if (toolName === "webSearch") return "Searching...";
+  if (toolName === "calculator") return "Calculating...";
+  if (toolName === "summarizeText") return "Summarizing...";
+  if (toolName === "projectContextLookup") return "Loading context...";
+  return "Working...";
+}
 
 function toTextContent(content: unknown): string {
   if (typeof content === "string") {
@@ -129,6 +145,7 @@ async function executeWebSearchTool(
   tools: ReturnType<typeof createForgeTools>,
   evidenceBundles: Array<{ tool: string; content: string; timestamp: string }>,
   toolsUsed: Set<string>,
+  onEvent?: (event: StreamEvent) => void,
 ) {
   const webSearchTool = tools.find((tool) => tool.name === "webSearch");
   if (!webSearchTool) {
@@ -139,6 +156,7 @@ async function executeWebSearchTool(
     };
   }
 
+  emitStatus(onEvent, "Searching...");
   const rawResult = await webSearchTool.invoke({
     query: state.userMessage,
     maxResults: 5,
@@ -163,6 +181,8 @@ async function executeWebSearchTool(
       toolResult: toolResultText,
     }),
   );
+
+  emitStatus(onEvent, "Analyzing results...");
 
   return {
     toolsUsed: Array.from(toolsUsed),
@@ -462,13 +482,22 @@ User request: ${sanitizedMessage}`;
  * Input: toolPlan + executionMode + userMessage
  * Output: toolsUsed + evidenceBundles
  */
-export async function toolRouterNode(state: ChatGraphState) {
+export async function toolRouterNode(
+  state: ChatGraphState,
+  onEvent?: (event: StreamEvent) => void,
+) {
   try {
     // If no tools needed, return early
     if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
       if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
         const tools = createForgeTools({ chatId: state.chatId });
-        return executeWebSearchTool(state, tools, [], new Set<string>());
+        return executeWebSearchTool(
+          state,
+          tools,
+          [],
+          new Set<string>(),
+          onEvent,
+        );
       }
 
       return {
@@ -496,7 +525,13 @@ export async function toolRouterNode(state: ChatGraphState) {
           classifier: state.classifiedIntent,
         }),
       );
-      return executeWebSearchTool(state, tools, evidenceBundles, toolsUsed);
+      return executeWebSearchTool(
+        state,
+        tools,
+        evidenceBundles,
+        toolsUsed,
+        onEvent,
+      );
     }
 
     // If a caller forced a tool, run it deterministically and return its results.
@@ -510,6 +545,7 @@ export async function toolRouterNode(state: ChatGraphState) {
             args = { query: state.userMessage, maxResults: 5 };
           }
 
+          emitStatus(onEvent, getToolStatusMessage(forcedName));
           const rawResult = await forcedTool.invoke(args);
           const toolResultText =
             typeof rawResult === "string"
@@ -525,6 +561,8 @@ export async function toolRouterNode(state: ChatGraphState) {
 
           // set toolContext to forced result for downstream nodes
           intermediateContext = toolResultText;
+
+          emitStatus(onEvent, "Analyzing results...");
 
           return {
             toolsUsed: Array.from(toolsUsed),
@@ -624,6 +662,7 @@ export async function toolRouterNode(state: ChatGraphState) {
             args = { query: state.userMessage, maxResults: 5 };
           }
 
+          emitStatus(onEvent, getToolStatusMessage(toolName));
           const rawResult = await tool.invoke(args);
           const toolResultText =
             typeof rawResult === "string"
@@ -639,6 +678,8 @@ export async function toolRouterNode(state: ChatGraphState) {
 
           // Store result for potential use by next tool without mutating input state
           intermediateContext = toolResultText;
+
+          emitStatus(onEvent, "Analyzing results...");
         } catch (err) {
           console.error(`Tool ${toolName} failed:`, err);
         }
