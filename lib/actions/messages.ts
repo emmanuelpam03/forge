@@ -8,6 +8,7 @@ export async function createMessage(
   chatId: string,
   role: MessageRole,
   content: string,
+  opts?: { parentId?: string | null; branchId?: string | null },
 ) {
   try {
     const message = await prisma.message.create({
@@ -15,6 +16,8 @@ export async function createMessage(
         chatId,
         role,
         content,
+        parentId: opts?.parentId ?? null,
+        branchId: opts?.branchId ?? undefined,
       },
     });
 
@@ -41,6 +44,19 @@ export async function getMessagesByChat(chatId: string) {
     return messages;
   } catch (error) {
     console.error("Failed to get messages:", error);
+    return [];
+  }
+}
+
+export async function getBranchesForParent(parentMessageId: string) {
+  try {
+    const branches = await prisma.message.findMany({
+      where: { parentId: parentMessageId, role: "assistant" },
+      orderBy: { createdAt: "asc" },
+    });
+    return branches;
+  } catch (error) {
+    console.error("Failed to fetch branches:", error);
     return [];
   }
 }

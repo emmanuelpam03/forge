@@ -192,7 +192,10 @@ async function executeWebSearchTool(
 }
 
 export async function loadContextNode(state: ChatGraphState) {
-  const selectedContext = await loadContextForChat(state.chatId);
+  const selectedContext = await loadContextForChat(
+    state.chatId,
+    state.parentMessageId ?? null,
+  );
 
   // Derive memorySummary from selectedContext to indicate if context is available
   // Prioritize: projectContext > userMemory > chatSummary
@@ -280,9 +283,12 @@ export async function saveMessagesNode(state: ChatGraphState) {
     lastPrev.content.trim() === state.userMessage.trim()
   );
 
+  // Honor explicit skip flag for flows that already reference an existing user turn
+  const willCreateUser = shouldCreateUser && !state.skipUserCreate;
+
   await prisma.$transaction(
     async (tx) => {
-      if (shouldCreateUser) {
+      if (willCreateUser) {
         await tx.message.create({
           data: {
             chatId: state.chatId,
@@ -297,6 +303,8 @@ export async function saveMessagesNode(state: ChatGraphState) {
           chatId: state.chatId,
           role: "assistant",
           content: state.assistantMessage,
+          parentId: state.parentMessageId ?? null,
+          branchId: state.branchId ?? undefined,
           modelUsed: state.modelUsed || null,
           provider: state.provider || null,
           tokensInput: state.inputTokens || null,

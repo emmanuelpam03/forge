@@ -54,9 +54,27 @@ function estimateTokens(text: string): number {
 async function loadRecentTurns(
   chatId: string,
   limit: number = RECENT_TURN_WINDOW,
+  cutoffMessageId?: string | null,
 ): Promise<ChatMessageSnapshot[]> {
+  // If cutoffMessageId is provided, load its createdAt and limit results to messages
+  // created at or before that timestamp.
+  let whereClause: any = { chatId };
+
+  if (cutoffMessageId) {
+    const cutoffMsg = await prisma.message.findUnique({
+      where: { id: cutoffMessageId },
+      select: { createdAt: true },
+    });
+    if (cutoffMsg) {
+      whereClause = {
+        chatId,
+        createdAt: { lte: cutoffMsg.createdAt },
+      };
+    }
+  }
+
   const messages = await prisma.message.findMany({
-    where: { chatId },
+    where: whereClause,
     orderBy: { createdAt: "desc" },
     take: limit,
   });
@@ -336,6 +354,7 @@ function applyTokenBudget(
  */
 export async function loadContextForChat(
   chatId: string,
+  cutoffMessageId?: string | null,
 ): Promise<SelectedContext> {
   // Load project info first to decide what to load next
   const projectInfo = await loadProjectInfo(chatId);
@@ -349,7 +368,7 @@ export async function loadContextForChat(
     chatSummary,
     projectMemory,
   ] = await Promise.all([
-    loadRecentTurns(chatId),
+    loadRecentTurns(chatId, RECENT_TURN_WINDOW, cutoffMessageId),
     loadUserPreferences(),
     loadUserMemorySummary(),
     loadProjectContext(chatId),

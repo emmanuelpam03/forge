@@ -60,6 +60,9 @@ export type EvidenceBundle = {
 export type ChatGraphState = {
   chatId: string;
   userMessage: string;
+  parentMessageId?: string | null;
+  branchId?: string | null;
+  skipUserCreate?: boolean;
   runId: string;
   previousMessages: ChatMessageSnapshot[];
   preferences: PreferenceSnapshot[];
@@ -211,12 +214,22 @@ export const chatGraphState = Annotation.Root({
 
 export type ChatGraphInput = Pick<
   ChatGraphState,
-  "chatId" | "userMessage" | "runId" | "forceTool" | "classifiedIntent"
+  | "chatId"
+  | "userMessage"
+  | "runId"
+  | "forceTool"
+  | "classifiedIntent"
+  | "parentMessageId"
+  | "branchId"
+  | "skipUserCreate"
 >;
 
 export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   chatId: input.chatId,
   userMessage: input.userMessage,
+  parentMessageId: input.parentMessageId ?? null,
+  branchId: input.branchId ?? null,
+  skipUserCreate: input.skipUserCreate ?? false,
   runId: input.runId,
   previousMessages: [],
   preferences: [],

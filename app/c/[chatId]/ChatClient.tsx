@@ -51,6 +51,7 @@ function MessageBubble({
   setEditingContent: (s: string) => void;
   onSaveEdit: (id: string, newContent: string) => void;
   onCancelEdit: () => void;
+  onRegenerate?: (assistantMessageId: string) => void;
 }) {
   const isStreamingAssistant =
     message.role === "assistant" && message.streaming;
@@ -138,7 +139,10 @@ function MessageBubble({
             <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
               <Copy size={13} />
             </button>
-            <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
+            <button
+              onClick={() => onRegenerate?.(message.id)}
+              className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+            >
               <RotateCcw size={13} />
             </button>
           </div>
@@ -410,6 +414,182 @@ export function ChatClient({
       showFeedback({
         type: "error",
         title: "Edit failed",
+        description: errorMessage,
+      });
+    } finally {
+      abortControllerRef.current = null;
+      setIsSending(false);
+    }
+  };
+
+  const regenerateMessage = async (assistantMessageId: string) => {
+    if (isSending) return;
+
+    setIsSending(true);
+    setError(null);
+
+    const assistantPlaceholderId = `local-assistant-${crypto.randomUUID()}`;
+
+    setMessages((current) => [
+      ...current,
+      {
+        id: assistantPlaceholderId,
+        role: "assistant",
+        content: "",
+        pending: true,
+        streaming: false,
+      },
+    ]);
+
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const response = await fetch("/api/chat/regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId, assistantMessageId }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? "Failed to regenerate message.");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Streaming response is not available.");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalAssistantMessage = "";
+
+      const applyChunk = (delta: string) => {
+        finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  ...currentMessage,
+                  content: finalAssistantMessage,
+                  pending: false,
+                  streaming: true,
+                  status: currentMessage.status,
+                }
+              : currentMessage,
+          ),
+        );
+      };
+
+      const applyStatus = (status: string) => {
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  ...currentMessage,
+                  status,
+                }
+              : currentMessage,
+          ),
+        );
+      };
+
+      const applyDone = (content: string) => {
+        const finalContent = (content || finalAssistantMessage || "").trim();
+
+        if (!finalContent) {
+          setError("No response generated. Please try again.");
+          setMessages((currentMessages) =>
+            currentMessages.filter((m) => m.id !== assistantPlaceholderId),
+          );
+          return;
+        }
+
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  id: assistantPlaceholderId,
+                  role: "assistant",
+                  content: finalContent,
+                  pending: false,
+                  streaming: false,
+                  status: undefined,
+                }
+              : currentMessage,
+          ),
+        );
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let frameEndIndex = buffer.indexOf("\n\n");
+        while (frameEndIndex !== -1) {
+          const frame = buffer.slice(0, frameEndIndex).trim();
+          buffer = buffer.slice(frameEndIndex + 2);
+          frameEndIndex = buffer.indexOf("\n\n");
+
+          if (!frame) continue;
+
+          try {
+            const payloadText = frame.startsWith("data:")
+              ? frame.replace(/^data:\s*/, "")
+              : frame;
+            const event = JSON.parse(payloadText) as StreamEvent;
+
+            if (event.type === "status") applyStatus(event.message);
+            if (event.type === "token") applyChunk(event.content);
+            if (event.type === "done") applyDone(finalAssistantMessage);
+          } catch (parseError) {
+            if (
+              parseError instanceof Error &&
+              parseError.message &&
+              !parseError.message.includes("JSON.parse")
+            ) {
+              throw parseError;
+            }
+            console.error(
+              "Failed to parse regenerate stream payload:",
+              parseError,
+            );
+          }
+        }
+      }
+
+      applyDone(finalAssistantMessage);
+    } catch (sendError) {
+      if (sendError instanceof Error && sendError.name === "AbortError") {
+        setMessages((currentMessages) =>
+          currentMessages.map((currentMessage) =>
+            currentMessage.id === assistantPlaceholderId
+              ? {
+                  ...currentMessage,
+                  pending: false,
+                  streaming: false,
+                  status: undefined,
+                  error: "Stopped",
+                }
+              : currentMessage,
+          ),
+        );
+        return;
+      }
+
+      const errorMessage =
+        sendError instanceof Error
+          ? sendError.message
+          : "Failed to regenerate.";
+      setMessages((currentMessages) =>
+        currentMessages.filter((m) => m.id !== assistantPlaceholderId),
+      );
+      setError(errorMessage);
+      showFeedback({
+        type: "error",
+        title: "Regenerate failed",
         description: errorMessage,
       });
     } finally {
@@ -702,6 +882,7 @@ export function ChatClient({
                 setEditingContent={setEditingContent}
                 onSaveEdit={saveEdit}
                 onCancelEdit={cancelEdit}
+                onRegenerate={regenerateMessage}
               />
             ))
           )}
