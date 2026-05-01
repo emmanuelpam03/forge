@@ -387,11 +387,15 @@ export function SidebarClient({
   };
 
   const handleCreateChat = () => {
-    router.push("/");
+    window.setTimeout(() => {
+      router.push("/");
+    }, 0);
   };
 
   const handleOpenSearch = () => {
-    router.push("/search");
+    window.setTimeout(() => {
+      router.push("/search");
+    }, 0);
   };
 
   const collapsedRecentChats = recentChats.slice(0, 6);

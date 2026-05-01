@@ -78,7 +78,11 @@ export default function HomePage() {
       });
 
       setInput("");
-      router.push(`/c/${chatId}?initialMessage=${encodeURIComponent(message)}`);
+      window.setTimeout(() => {
+        router.push(
+          `/c/${chatId}?initialMessage=${encodeURIComponent(message)}`,
+        );
+      }, 0);
 
       void updateChat(chatId, { title }).catch((error) => {
         console.error("Failed to update chat title:", error);

@@ -18,13 +18,17 @@ export function KeyboardShortcuts() {
       // Cmd/Ctrl+K for search
       if (key === "k") {
         e.preventDefault();
-        router.push("/search");
+        window.setTimeout(() => {
+          router.push("/search");
+        }, 0);
       }
 
       // Cmd/Ctrl+N for new chat
       if (key === "n") {
         e.preventDefault();
-        router.push("/");
+        window.setTimeout(() => {
+          router.push("/");
+        }, 0);
       }
 
       // Cmd/Ctrl+P for new project
@@ -37,7 +41,9 @@ export function KeyboardShortcuts() {
             title: "Project created",
             description: `Opened \"${result.project.name}\"`,
           });
-          router.push(`/p/${result.project.id}`);
+          window.setTimeout(() => {
+            router.push(`/p/${result.project.id}`);
+          }, 0);
         } else {
           showFeedback({
             type: "error",
