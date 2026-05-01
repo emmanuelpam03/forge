@@ -182,32 +182,36 @@ export async function runChatGraphStream(
     // Continue - don't block title generation or memory extraction
   }
 
-  // Post-stream step 2: Generate and persist chat title
-  try {
-    const titleResult = await generateTitleNode(state);
-    Object.assign(state, titleResult);
-    if (titleResult.generatedTitle) {
-      await prisma.chat.update({
-        where: { id: state.chatId },
-        data: { title: titleResult.generatedTitle },
-      });
+  // Run post-processing in background so the stream can complete immediately.
+  void (async () => {
+    // Post-stream step 2: Generate and persist chat title
+    try {
+      const titleResult = await generateTitleNode(state);
+      Object.assign(state, titleResult);
+      if (titleResult.generatedTitle) {
+        await prisma.chat.update({
+          where: { id: state.chatId },
+          data: { title: titleResult.generatedTitle },
+        });
+      }
+    } catch (error) {
+      console.error(
+        `Failed to generate/persist title for chat ${input.chatId}:`,
+        error,
+      );
     }
-  } catch (error) {
-    console.error(
-      `Failed to generate/persist title for chat ${input.chatId}:`,
-      error,
-    );
-    // Continue - don't block memory extraction
-  }
 
-  // Post-stream step 3: Extract and store user memory
-  try {
-    const memoryResult = await extractMemoryNode(state);
-    Object.assign(state, memoryResult);
-  } catch (error) {
-    console.error(`Failed to extract memory for chat ${input.chatId}:`, error);
-    // Continue - this is the final step but we should still return state
-  }
+    // Post-stream step 3: Extract and store user memory
+    try {
+      const memoryResult = await extractMemoryNode(state);
+      Object.assign(state, memoryResult);
+    } catch (error) {
+      console.error(
+        `Failed to extract memory for chat ${input.chatId}:`,
+        error,
+      );
+    }
+  })();
 
   return state;
 }

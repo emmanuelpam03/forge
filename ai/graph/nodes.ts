@@ -362,11 +362,9 @@ export async function saveMessagesNode(state: ChatGraphState) {
     { timeout: 15000 },
   );
 
-  // Phase 4: Maintain rolling chat summary
-  // This runs after message save completes
-  await maintainChatSummary(state.chatId).catch((err) => {
+  // Maintain rolling chat summary in background so stream completion is not delayed.
+  void maintainChatSummary(state.chatId).catch((err) => {
     console.warn(`Failed to maintain chat summary for ${state.chatId}:`, err);
-    // Don't throw - summary maintenance is non-blocking
   });
 
   return {
