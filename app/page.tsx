@@ -71,12 +71,6 @@ export default function HomePage() {
       const title =
         message.length > 60 ? `${message.slice(0, 60)}...` : message;
 
-      const updateResult = await updateChat(chatId, { title });
-
-      if (!updateResult.success) {
-        throw new Error(updateResult.error ?? "Failed to update chat title");
-      }
-
       showFeedback({
         type: "success",
         title: "Chat created",
@@ -85,6 +79,10 @@ export default function HomePage() {
 
       setInput("");
       router.push(`/c/${chatId}?initialMessage=${encodeURIComponent(message)}`);
+
+      void updateChat(chatId, { title }).catch((error) => {
+        console.error("Failed to update chat title:", error);
+      });
     } catch (error) {
       const description =
         error instanceof Error ? error.message : "Failed to create chat";

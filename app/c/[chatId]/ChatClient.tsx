@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   MessageSquare,
+  MoreHorizontal,
   RotateCcw,
   Sparkles,
   Square,
@@ -98,6 +101,12 @@ function MessageBubble({
   );
   const previousBranch =
     currentBranchIndex > 0 ? branchOptions[currentBranchIndex - 1] : null;
+  const nextBranch =
+    currentBranchIndex !== -1 && currentBranchIndex < branchOptions.length - 1
+      ? branchOptions[currentBranchIndex + 1]
+      : null;
+  const hasBranches = branchOptions.length > 0;
+  const branchIndex = currentBranchIndex === -1 ? 0 : currentBranchIndex + 1;
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -173,25 +182,58 @@ function MessageBubble({
         {message.role === "assistant" &&
         !message.pending &&
         !message.streaming ? (
-          <div className="mt-3 flex items-center gap-2 text-muted-foreground">
-            <button className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground">
-              <Copy size={13} />
-            </button>
-            <button
-              onClick={() => onRegenerate?.(message.id)}
-              className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
-            >
-              <RotateCcw size={13} />
-            </button>
-            {previousBranch ? (
-              <button
-                type="button"
-                onClick={() => onSwitchBranch?.(message.id, previousBranch)}
-                className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
-              >
-                Back to previous response
-              </button>
+          <div className="mt-3 space-y-3">
+            {hasBranches ? (
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() =>
+                    previousBranch &&
+                    onSwitchBranch?.(message.id, previousBranch)
+                  }
+                  disabled={!previousBranch}
+                  className="rounded-md p-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:bg-accent hover:enabled:text-foreground"
+                  title="Previous response"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <span className="text-[11px] font-medium px-1.5 py-1 rounded-md">
+                  {branchIndex}/{branchOptions.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    nextBranch && onSwitchBranch?.(message.id, nextBranch)
+                  }
+                  disabled={!nextBranch}
+                  className="rounded-md p-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed hover:enabled:bg-accent hover:enabled:text-foreground"
+                  title="Next response"
+                >
+                  <ChevronRight size={13} />
+                </button>
+              </div>
             ) : null}
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <button
+                className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+                title="Copy response"
+              >
+                <Copy size={13} />
+              </button>
+              <button
+                onClick={() => onRegenerate?.(message.id)}
+                className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+                title="Regenerate response"
+              >
+                <RotateCcw size={13} />
+              </button>
+              <button
+                className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+                title="More options"
+              >
+                <MoreHorizontal size={13} />
+              </button>
+            </div>
           </div>
         ) : null}
 

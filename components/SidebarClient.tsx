@@ -184,7 +184,15 @@ function ProjectItem({
 
 // ─── ChatItem ─────────────────────────────────────────────────────────────────
 
-function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
+function ChatItem({
+  chat,
+  active,
+  onDelete,
+}: {
+  chat: ChatItemData;
+  active: boolean;
+  onDelete?: (chatId: string) => void;
+}) {
   const { showFeedback } = useFeedback();
   const router = useRouter();
   const [isRenaming, setIsRenaming] = useState(false);
@@ -225,6 +233,7 @@ function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
       });
 
       setMenuOpen(false);
+      onDelete?.(chat.id);
 
       if (active) {
         router.push("/");
@@ -350,6 +359,7 @@ export function SidebarClient({
   const [collapsed, setCollapsed] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
+  const [recentChats, setRecentChats] = useState(initialChats);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 260);
@@ -384,7 +394,7 @@ export function SidebarClient({
     router.push("/search");
   };
 
-  const collapsedRecentChats = initialChats.slice(0, 6);
+  const collapsedRecentChats = recentChats.slice(0, 6);
 
   return (
     <aside
@@ -639,7 +649,7 @@ export function SidebarClient({
             {chatsOpen && (
               <div className="space-y-0.5">
                 {isBooting ? (
-                  Array.from({ length: initialChats.length || 5 }).map(
+                  Array.from({ length: recentChats.length || 5 }).map(
                     (_, index) => (
                       <div
                         key={`chat-skeleton-${index}`}
@@ -647,12 +657,17 @@ export function SidebarClient({
                       />
                     ),
                   )
-                ) : initialChats.length > 0 ? (
-                  initialChats.map((chat) => (
+                ) : recentChats.length > 0 ? (
+                  recentChats.map((chat) => (
                     <ChatItem
                       key={chat.id}
                       chat={chat}
                       active={pathname === `/c/${chat.id}`}
+                      onDelete={(chatId) =>
+                        setRecentChats((current) =>
+                          current.filter((item) => item.id !== chatId),
+                        )
+                      }
                     />
                   ))
                 ) : (
