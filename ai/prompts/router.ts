@@ -176,7 +176,9 @@ Rules:
 - intent = reasoning for explanation, analysis, comparison, or advice.
 - intent = code for programming, debugging, APIs, scripts, or technical implementation.
 - intent = creative for writing, ideation, styling, naming, or open-ended generation.
-- requiresFreshData = true if the answer depends on real-world state, can change over time, may be outdated since training, or involves positions, prices, rankings, events, or factual state.
+- requiresFreshData = true if the answer depends on real-world state, can change over time, may be outdated since training, or involves positions, prices, rankings, events, incidents, or factual state.
+- CRITICAL: Questions about recent events, incidents, security matters, accidents, disasters, or current happenings ALWAYS require fresh data.
+- CRITICAL: Questions asking "this year" or about recent timeframes ALWAYS require fresh data to get current dates and details.
 - If intent is factual and the answer might be stale, requiresFreshData must be true.
 - confidence should reflect how sure you are in the classification, not whether you know the answer.
 - Do not include explanations, markdown, or extra keys.
@@ -184,6 +186,8 @@ Rules:
 Examples:
 - User: "Who is the president of the US?" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
 - User: "Bitcoin price right now" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
+- User: "Mention some incidents of insecurity in Nigeria this year" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
+- User: "What were the major earthquakes in 2024?" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
 - User: "Explain quantum computing" => {"intent":"reasoning","requiresFreshData":false,"confidence":"high"}
 - User: "Write a React button component" => {"intent":"code","requiresFreshData":false,"confidence":"high"}
 
