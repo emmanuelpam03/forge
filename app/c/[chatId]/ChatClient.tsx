@@ -54,7 +54,7 @@ type StreamEvent =
         createdAt: string;
       }>;
     }
-  | { type: "done" };
+  | { type: "done"; messageId?: string };
 
 type ChatClientProps = {
   chatId: string;
@@ -105,7 +105,7 @@ function MessageBubble({
     currentBranchIndex !== -1 && currentBranchIndex < branchOptions.length - 1
       ? branchOptions[currentBranchIndex + 1]
       : null;
-  const hasBranches = branchOptions.length > 0;
+  const hasBranches = branchOptions.length > 1;
   const branchIndex = currentBranchIndex === -1 ? 0 : currentBranchIndex + 1;
 
   return (
@@ -182,7 +182,7 @@ function MessageBubble({
         {message.role === "assistant" &&
         !message.pending &&
         !message.streaming ? (
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 flex items-center gap-2 text-muted-foreground">
             {hasBranches ? (
               <div className="flex items-center gap-1 text-muted-foreground">
                 <button
@@ -213,27 +213,25 @@ function MessageBubble({
                 </button>
               </div>
             ) : null}
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <button
-                className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
-                title="Copy response"
-              >
-                <Copy size={13} />
-              </button>
-              <button
-                onClick={() => onRegenerate?.(message.id)}
-                className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
-                title="Regenerate response"
-              >
-                <RotateCcw size={13} />
-              </button>
-              <button
-                className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
-                title="More options"
-              >
-                <MoreHorizontal size={13} />
-              </button>
-            </div>
+            <button
+              className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+              title="Copy response"
+            >
+              <Copy size={13} />
+            </button>
+            <button
+              onClick={() => onRegenerate?.(message.id)}
+              className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+              title="Regenerate response"
+            >
+              <RotateCcw size={13} />
+            </button>
+            <button
+              className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
+              title="More options"
+            >
+              <MoreHorizontal size={13} />
+            </button>
           </div>
         ) : null}
 
@@ -395,12 +393,13 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let finalAssistantMessage = "";
+      let activeAssistantMessageId = assistantPlaceholderId;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
-            currentMessage.id === assistantPlaceholderId
+            currentMessage.id === activeAssistantMessageId
               ? {
                   ...currentMessage,
                   content: finalAssistantMessage,
@@ -416,7 +415,7 @@ export function ChatClient({
       const applyStatus = (status: string) => {
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
-            currentMessage.id === assistantPlaceholderId
+            currentMessage.id === activeAssistantMessageId
               ? {
                   ...currentMessage,
                   status,
@@ -426,13 +425,23 @@ export function ChatClient({
         );
       };
 
-      const applyDone = (content: string) => {
+      const applyDone = (content: string, persistedMessageId?: string) => {
         const finalContent = (content || finalAssistantMessage || "").trim();
+        const nextAssistantMessageId =
+          persistedMessageId && persistedMessageId.trim().length > 0
+            ? persistedMessageId
+            : activeAssistantMessageId;
+        const previousAssistantMessageId = activeAssistantMessageId;
+        activeAssistantMessageId = nextAssistantMessageId;
 
         if (!finalContent) {
           setError("No response generated. Please try again.");
           setMessages((currentMessages) =>
-            currentMessages.filter((m) => m.id !== assistantPlaceholderId),
+            currentMessages.filter(
+              (m) =>
+                m.id !== assistantPlaceholderId &&
+                m.id !== previousAssistantMessageId,
+            ),
           );
           setEditingId(messageId);
           setEditingContent(newContent);
@@ -441,9 +450,11 @@ export function ChatClient({
 
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
+            currentMessage.id === previousAssistantMessageId ||
             currentMessage.id === assistantPlaceholderId
               ? {
-                  id: assistantPlaceholderId,
+                  ...currentMessage,
+                  id: nextAssistantMessageId,
                   role: "assistant",
                   content: finalContent,
                   pending: false,
@@ -476,7 +487,9 @@ export function ChatClient({
 
             if (event.type === "status") applyStatus(event.message);
             if (event.type === "token") applyChunk(event.content);
-            if (event.type === "done") applyDone(finalAssistantMessage);
+            if (event.type === "done") {
+              applyDone(finalAssistantMessage, event.messageId);
+            }
           } catch (parseError) {
             if (
               parseError instanceof Error &&
@@ -490,7 +503,7 @@ export function ChatClient({
         }
       }
 
-      applyDone(finalAssistantMessage);
+      applyDone(finalAssistantMessage, undefined);
       // Clear editing state on success
       setEditingId(null);
       setEditingContent(null);
@@ -538,7 +551,6 @@ export function ChatClient({
     setError(null);
 
     const assistantPlaceholderId = `local-assistant-${crypto.randomUUID()}`;
-    let activeAssistantMessageId = assistantPlaceholderId;
 
     setMessages((current) =>
       current.map((message) =>
@@ -579,6 +591,7 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let finalAssistantMessage = "";
+      let activeAssistantMessageId = assistantPlaceholderId;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
@@ -842,12 +855,13 @@ export function ChatClient({
         const decoder = new TextDecoder();
         let buffer = "";
         let finalAssistantMessage = "";
+        let activeAssistantMessageId = assistantPlaceholderId;
 
         const applyChunk = (delta: string) => {
           finalAssistantMessage = `${finalAssistantMessage}${delta}`;
           setMessages((currentMessages) =>
             currentMessages.map((currentMessage) =>
-              currentMessage.id === assistantPlaceholderId
+              currentMessage.id === activeAssistantMessageId
                 ? {
                     ...currentMessage,
                     content: finalAssistantMessage,
@@ -863,7 +877,7 @@ export function ChatClient({
         const applyStatus = (status: string) => {
           setMessages((currentMessages) =>
             currentMessages.map((currentMessage) =>
-              currentMessage.id === assistantPlaceholderId
+              currentMessage.id === activeAssistantMessageId
                 ? {
                     ...currentMessage,
                     status,
@@ -873,8 +887,14 @@ export function ChatClient({
           );
         };
 
-        const applyDone = (content: string) => {
+        const applyDone = (content: string, persistedMessageId?: string) => {
           const finalContent = (content || finalAssistantMessage || "").trim();
+          const nextAssistantMessageId =
+            persistedMessageId && persistedMessageId.trim().length > 0
+              ? persistedMessageId
+              : activeAssistantMessageId;
+          const previousAssistantMessageId = activeAssistantMessageId;
+          activeAssistantMessageId = nextAssistantMessageId;
 
           if (!finalContent) {
             setError("No response generated. Please try again.");
@@ -882,7 +902,8 @@ export function ChatClient({
               currentMessages.filter(
                 (currentMessage) =>
                   currentMessage.id !== userMessageId &&
-                  currentMessage.id !== assistantPlaceholderId,
+                  currentMessage.id !== assistantPlaceholderId &&
+                  currentMessage.id !== previousAssistantMessageId,
               ),
             );
             setDraft(message);
@@ -891,9 +912,11 @@ export function ChatClient({
 
           setMessages((currentMessages) =>
             currentMessages.map((currentMessage) =>
+              currentMessage.id === previousAssistantMessageId ||
               currentMessage.id === assistantPlaceholderId
                 ? {
-                    id: assistantPlaceholderId,
+                    ...currentMessage,
+                    id: nextAssistantMessageId,
                     role: "assistant",
                     content: finalContent,
                     pending: false,
@@ -939,7 +962,7 @@ export function ChatClient({
               }
 
               if (event.type === "done") {
-                applyDone(finalAssistantMessage);
+                applyDone(finalAssistantMessage, event.messageId);
               }
             } catch (parseError) {
               if (
@@ -955,7 +978,7 @@ export function ChatClient({
           }
         }
 
-        applyDone(finalAssistantMessage);
+        applyDone(finalAssistantMessage, undefined);
       } catch (sendError) {
         if (sendError instanceof Error && sendError.name === "AbortError") {
           setMessages((currentMessages) =>

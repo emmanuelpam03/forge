@@ -44,7 +44,7 @@ export type StreamEvent =
         createdAt: string;
       }>;
     }
-  | { type: "done" };
+  | { type: "done"; messageId?: string };
 
 function toTextContent(content: unknown): string {
   if (typeof content === "string") {

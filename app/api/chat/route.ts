@@ -82,7 +82,10 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            send({ type: "done" });
+            send({
+              type: "done",
+              messageId: result.assistantMessageId ?? undefined,
+            });
           } catch (error) {
             console.error("Chat stream failed:", error);
             send({

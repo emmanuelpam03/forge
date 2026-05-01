@@ -128,7 +128,10 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            send({ type: "done" });
+            send({
+              type: "done",
+              messageId: result.assistantMessageId ?? undefined,
+            });
           } catch (err) {
             console.error("Edit stream failed:", err);
             send({ type: "status", message: "Failed to generate a response." });

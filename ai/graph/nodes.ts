@@ -273,6 +273,8 @@ export async function generateResponseNode(state: ChatGraphState) {
 
 export async function saveMessagesNode(state: ChatGraphState) {
   const now = new Date();
+  let persistedAssistantMessageId: string | null =
+    state.assistantMessageId ?? null;
   // Avoid duplicating the user message when the database already contains
   // the edited user turn (edit flow). If the last previous message is a
   // user message with identical content, skip creating a new user row.
@@ -314,7 +316,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
       };
 
       if (state.assistantMessageId) {
-        await tx.message.upsert({
+        const assistantMessage = await tx.message.upsert({
           where: { id: state.assistantMessageId },
           create: {
             id: state.assistantMessageId,
@@ -322,10 +324,12 @@ export async function saveMessagesNode(state: ChatGraphState) {
           },
           update: assistantData,
         });
+        persistedAssistantMessageId = assistantMessage.id;
       } else {
-        await tx.message.create({
+        const assistantMessage = await tx.message.create({
           data: assistantData,
         });
+        persistedAssistantMessageId = assistantMessage.id;
       }
 
       // Persist generated title if available (only on first turn)
@@ -367,6 +371,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
 
   return {
     traceId: state.traceId,
+    assistantMessageId: persistedAssistantMessageId,
   };
 }
 
