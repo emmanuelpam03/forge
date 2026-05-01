@@ -71,6 +71,16 @@ export async function POST(request: NextRequest) {
     const runId = crypto.randomUUID();
     const branchId = crypto.randomUUID();
     const encoder = new TextEncoder();
+    const assistantPlaceholder = await prisma.message.create({
+      data: {
+        chatId,
+        role: "assistant",
+        content: "",
+        parentId,
+        branchId,
+        runId,
+      },
+    });
 
     const stream = new ReadableStream({
       start(controller) {
@@ -80,8 +90,43 @@ export async function POST(request: NextRequest) {
           );
         };
 
+        const sendBranchList = async () => {
+          const branches = await prisma.message.findMany({
+            where: { chatId, parentId, role: "assistant" },
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              content: true,
+              parentId: true,
+              branchId: true,
+              createdAt: true,
+            },
+          });
+
+          send({
+            type: "branches",
+            parentId,
+            branches: branches.map((branch) => ({
+              id: branch.id,
+              content: branch.content,
+              parentId: branch.parentId,
+              branchId: branch.branchId,
+              createdAt: branch.createdAt.toISOString(),
+            })),
+          });
+        };
+
         void (async () => {
           let assistantMessage = "";
+          let persistProgress = Promise.resolve();
+
+          send({
+            type: "placeholder",
+            messageId: assistantPlaceholder.id,
+            branchId,
+            parentId,
+          });
+          await sendBranchList();
 
           try {
             const result = await runChatGraphStream(
@@ -98,22 +143,48 @@ export async function POST(request: NextRequest) {
                 classifiedIntent: null,
                 parentMessageId: parentId ?? null,
                 branchId,
+                assistantMessageId: assistantPlaceholder.id,
                 skipUserCreate: true,
               },
               (event) => {
                 if (event.type === "token") {
                   assistantMessage += event.content;
+                  persistProgress = persistProgress
+                    .then(() =>
+                      prisma.message.update({
+                        where: { id: assistantPlaceholder.id },
+                        data: {
+                          content: assistantMessage,
+                          branchId,
+                        },
+                      }),
+                    )
+                    .catch((error) => {
+                      console.error(
+                        "Failed to persist regenerate progress:",
+                        error,
+                      );
+                    });
                 }
 
                 send(event);
               },
             );
 
+            await persistProgress;
+            await sendBranchList();
+
             const finalMessage = (
               result.assistantMessage || assistantMessage
             ).trim();
 
             if (!finalMessage) {
+              await prisma.message
+                .delete({
+                  where: { id: assistantPlaceholder.id },
+                })
+                .catch(() => null);
+
               console.error(
                 JSON.stringify({
                   error: "empty-response-after-regen-stream",
@@ -132,6 +203,11 @@ export async function POST(request: NextRequest) {
             send({ type: "done" });
           } catch (err) {
             console.error("Regenerate stream failed:", err);
+            await prisma.message
+              .delete({
+                where: { id: assistantPlaceholder.id },
+              })
+              .catch(() => null);
             send({ type: "status", message: "Failed to generate a response." });
             send({ type: "done" });
           }

@@ -62,6 +62,7 @@ export type ChatGraphState = {
   userMessage: string;
   parentMessageId?: string | null;
   branchId?: string | null;
+  assistantMessageId?: string | null;
   skipUserCreate?: boolean;
   runId: string;
   previousMessages: ChatMessageSnapshot[];
@@ -221,6 +222,7 @@ export type ChatGraphInput = Pick<
   | "classifiedIntent"
   | "parentMessageId"
   | "branchId"
+  | "assistantMessageId"
   | "skipUserCreate"
 >;
 
@@ -229,6 +231,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   userMessage: input.userMessage,
   parentMessageId: input.parentMessageId ?? null,
   branchId: input.branchId ?? null,
+  assistantMessageId: input.assistantMessageId ?? null,
   skipUserCreate: input.skipUserCreate ?? false,
   runId: input.runId,
   previousMessages: [],

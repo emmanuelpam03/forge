@@ -17,7 +17,7 @@ export function createGeminiModel() {
   return new ChatGoogleGenerativeAI({
     apiKey,
     model: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
-    temperature: 0.4,
+    temperature: 0.6,
     maxRetries: 2,
   });
 }

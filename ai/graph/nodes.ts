@@ -298,22 +298,35 @@ export async function saveMessagesNode(state: ChatGraphState) {
         });
       }
 
-      await tx.message.create({
-        data: {
-          chatId: state.chatId,
-          role: "assistant",
-          content: state.assistantMessage,
-          parentId: state.parentMessageId ?? null,
-          branchId: state.branchId ?? undefined,
-          modelUsed: state.modelUsed || null,
-          provider: state.provider || null,
-          tokensInput: state.inputTokens || null,
-          tokensOutput: state.outputTokens || null,
-          latencyMs: state.latencyMs || null,
-          runId: state.runId || null,
-          traceId: state.traceId || null,
-        },
-      });
+      const assistantData = {
+        chatId: state.chatId,
+        role: "assistant" as const,
+        content: state.assistantMessage,
+        parentId: state.parentMessageId ?? null,
+        branchId: state.branchId ?? undefined,
+        modelUsed: state.modelUsed || null,
+        provider: state.provider || null,
+        tokensInput: state.inputTokens || null,
+        tokensOutput: state.outputTokens || null,
+        latencyMs: state.latencyMs || null,
+        runId: state.runId || null,
+        traceId: state.traceId || null,
+      };
+
+      if (state.assistantMessageId) {
+        await tx.message.upsert({
+          where: { id: state.assistantMessageId },
+          create: {
+            id: state.assistantMessageId,
+            ...assistantData,
+          },
+          update: assistantData,
+        });
+      } else {
+        await tx.message.create({
+          data: assistantData,
+        });
+      }
 
       // Persist generated title if available (only on first turn)
       const chatUpdateData: Record<string, unknown> = {
