@@ -23,11 +23,7 @@ import {
   updateProject,
   deleteProject,
 } from "@/lib/actions/projects";
-
-import {
-  Project as PrismaProject,
-  Chat as PrismaChat,
-} from "@/app/generated/prisma/browser";
+import { deleteChat } from "@/lib/actions/chats";
 
 export type ProjectItemData = {
   id: string;
@@ -190,6 +186,7 @@ function ProjectItem({
 
 function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
   const { showFeedback } = useFeedback();
+  const router = useRouter();
   const [isRenaming, setIsRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState(chat.title);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -207,7 +204,6 @@ function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
       return;
     }
 
-    // Import and use the updateChat action when you implement it
     showFeedback({
       type: "success",
       title: "Chat renamed",
@@ -219,13 +215,29 @@ function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
   };
 
   const handleDelete = async () => {
-    // Import and use the deleteChat action when you implement it
+    const result = await deleteChat(chat.id);
+
+    if (result.success) {
+      showFeedback({
+        type: "success",
+        title: "Chat deleted",
+        description: `Removed \"${chat.title}\"`,
+      });
+
+      setMenuOpen(false);
+
+      if (active) {
+        router.push("/");
+      }
+
+      router.refresh();
+      return;
+    }
+
     showFeedback({
-      type: "success",
-      title: "Chat deleted",
-      description: `Removed \"${chat.title}\"`,
+      type: "error",
+      title: "Failed to delete chat",
     });
-    setMenuOpen(false);
   };
 
   const preview = chat.summary || "No summary yet";
@@ -244,7 +256,7 @@ function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
           onChange={(e) => setNewTitle(e.target.value)}
           onBlur={handleRename}
           onKeyDown={(e) => e.key === "Enter" && handleRename()}
-          className="flex-1 truncate bg-background px-1 py-0 text-[13px] outline-none ring-1 ring-primary/40 rounded"
+          className="flex-1 truncate rounded bg-background px-1 py-0 text-[13px] outline-none ring-1 ring-primary/40"
         />
       </div>
     );
@@ -292,14 +304,14 @@ function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
       </Link>
 
       {menuOpen && (
-        <div className="absolute right-0 top-full mt-1 w-32 rounded-lg border border-border bg-popover shadow-lg z-50">
+        <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-border bg-popover shadow-lg">
           <button
             onClick={(e) => {
               e.preventDefault();
               setIsRenaming(true);
               setMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-foreground hover:bg-accent transition-colors"
+            className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-foreground transition-colors hover:bg-accent"
           >
             <Pencil size={12} />
             Rename
@@ -307,9 +319,9 @@ function ChatItem({ chat, active }: { chat: ChatItemData; active: boolean }) {
           <button
             onClick={(e) => {
               e.preventDefault();
-              handleDelete();
+              void handleDelete();
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-red-500 hover:bg-red-500/10 transition-colors"
+            className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-red-500 transition-colors hover:bg-red-500/10"
           >
             <Trash2 size={12} />
             Delete
