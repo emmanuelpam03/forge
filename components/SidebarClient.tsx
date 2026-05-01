@@ -236,10 +236,10 @@ function ChatItem({
       onDelete?.(chat.id);
 
       if (active) {
-        router.push("/");
+        await router.push("/");
+      } else {
+        router.refresh();
       }
-
-      router.refresh();
       return;
     }
 
