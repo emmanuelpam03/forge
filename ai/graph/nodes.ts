@@ -296,6 +296,8 @@ export async function saveMessagesNode(state: ChatGraphState) {
             chatId: state.chatId,
             role: "user",
             content: state.userMessage,
+            parentId: state.parentMessageId ?? null,
+            branchId: state.branchId ?? undefined,
           },
         });
       }

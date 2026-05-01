@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import prisma from "@/lib/prisma";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
 
@@ -28,6 +29,16 @@ export async function POST(request: NextRequest) {
     const runId = crypto.randomUUID();
     const encoder = new TextEncoder();
 
+    // Get the last assistant message in this chat to establish parentId
+    const lastAssistantMessage = await prisma.message.findFirst({
+      where: {
+        chatId: parsedBody.data.chatId,
+        role: "assistant",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const parentId = lastAssistantMessage?.id ?? null;
+
     const stream = new ReadableStream({
       start(controller) {
         const send = (event: StreamEvent) => {
@@ -48,6 +59,7 @@ export async function POST(request: NextRequest) {
                 runId,
                 forceTool: null,
                 classifiedIntent: null,
+                parentMessageId: parentId,
               },
               (event) => {
                 if (event.type === "token") {

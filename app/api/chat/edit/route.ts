@@ -58,23 +58,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Truncate conversation after this message and update the message content
-    await prisma.$transaction(
-      async (tx) => {
-        await tx.message.deleteMany({
-          where: {
-            chatId,
-            createdAt: { gt: target.createdAt },
-          },
-        });
+    // Get the parent of the original message (assistant message before it)
+    // This ensures the edit branch links back to the same conversation point
+    const parentId = target.parentId ?? null;
 
-        await tx.message.update({
-          where: { id: messageId },
-          data: { content: newContent },
-        });
+    // Create a new user message as a branch variant
+    const branchId = crypto.randomUUID();
+    const newUserMessage = await prisma.message.create({
+      data: {
+        chatId,
+        role: "user",
+        content: newContent,
+        parentId,
+        branchId,
       },
-      { timeout: 15000 },
-    );
+    });
 
     const runId = crypto.randomUUID();
     const encoder = new TextEncoder();
@@ -87,10 +85,39 @@ export async function POST(request: NextRequest) {
           );
         };
 
+        const sendBranchList = async () => {
+          // Fetch all user message variants at the same parent level
+          const branches = await prisma.message.findMany({
+            where: { chatId, parentId, role: "user" },
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              content: true,
+              parentId: true,
+              branchId: true,
+              createdAt: true,
+            },
+          });
+
+          send({
+            type: "branches",
+            parentId,
+            branches: branches.map((branch) => ({
+              id: branch.id,
+              content: branch.content,
+              parentId: branch.parentId,
+              branchId: branch.branchId,
+              createdAt: branch.createdAt.toISOString(),
+            })),
+          });
+        };
+
         void (async () => {
           let assistantMessage = "";
 
           try {
+            await sendBranchList();
+
             const result = await runChatGraphStream(
               {
                 chatId,
@@ -98,6 +125,9 @@ export async function POST(request: NextRequest) {
                 runId,
                 forceTool: null,
                 classifiedIntent: null,
+                parentMessageId: parentId,
+                branchId,
+                skipUserCreate: true,
               },
               (event) => {
                 if (event.type === "token") {
