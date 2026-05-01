@@ -73,6 +73,7 @@ function MessageBubble({
   onCancelEdit,
   onRegenerate,
   onSwitchBranch,
+  onCopyMessage,
 }: {
   message: ChatMessage;
   onStartEdit: (m: ChatMessage) => void;
@@ -86,6 +87,7 @@ function MessageBubble({
     messageId: string,
     branch: ChatMessage["branchOptions"][number],
   ) => void;
+  onCopyMessage?: (content: string) => void;
 }) {
   const isStreamingAssistant =
     message.role === "assistant" && message.streaming;
@@ -214,6 +216,7 @@ function MessageBubble({
               </div>
             ) : null}
             <button
+              onClick={() => onCopyMessage?.(message.content)}
               className="rounded-md p-1.5 transition hover:bg-accent hover:text-foreground"
               title="Copy response"
             >
@@ -319,6 +322,31 @@ export function ChatClient({
   const cancelEdit = () => {
     setEditingId(null);
     setEditingContent(null);
+  };
+
+  const copyMessage = async (content: string) => {
+    const textToCopy = content.trim();
+    if (!textToCopy) {
+      showFeedback({
+        type: "error",
+        title: "Nothing to copy",
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      showFeedback({
+        type: "success",
+        title: "Copied",
+      });
+    } catch {
+      showFeedback({
+        type: "error",
+        title: "Copy failed",
+        description: "Clipboard access was denied.",
+      });
+    }
   };
 
   const switchBranch = (
@@ -1081,6 +1109,9 @@ export function ChatClient({
                 onCancelEdit={cancelEdit}
                 onRegenerate={regenerateMessage}
                 onSwitchBranch={switchBranch}
+                onCopyMessage={(content) => {
+                  void copyMessage(content);
+                }}
               />
             ))
           )}
