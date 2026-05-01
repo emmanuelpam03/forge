@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
                 runId,
                 forceTool: null,
                 classifiedIntent: null,
-                parentMessageId: parentId,
+                parentMessageId: newUserMessage.id,
                 branchId,
                 skipUserCreate: true,
               },

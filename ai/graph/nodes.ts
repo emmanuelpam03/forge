@@ -275,6 +275,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
   const now = new Date();
   let persistedAssistantMessageId: string | null =
     state.assistantMessageId ?? null;
+  let createdUserMessageId: string | null = null;
   // Avoid duplicating the user message when the database already contains
   // the edited user turn (edit flow). If the last previous message is a
   // user message with identical content, skip creating a new user row.
@@ -291,7 +292,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
   await prisma.$transaction(
     async (tx) => {
       if (willCreateUser) {
-        await tx.message.create({
+        const userMessage = await tx.message.create({
           data: {
             chatId: state.chatId,
             role: "user",
@@ -300,13 +301,14 @@ export async function saveMessagesNode(state: ChatGraphState) {
             branchId: state.branchId ?? undefined,
           },
         });
+        createdUserMessageId = userMessage.id;
       }
 
       const assistantData = {
         chatId: state.chatId,
         role: "assistant" as const,
         content: state.assistantMessage,
-        parentId: state.parentMessageId ?? null,
+        parentId: createdUserMessageId ?? state.parentMessageId ?? null,
         branchId: state.branchId ?? undefined,
         modelUsed: state.modelUsed || null,
         provider: state.provider || null,

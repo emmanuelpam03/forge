@@ -21,11 +21,31 @@ export default async function ChatPage({
   const assistantMessages = chat.messages.filter(
     (message) => message.role === "assistant",
   );
+
+  const effectiveAssistantParentIds = new Map<string, string | null>();
+  let lastUserMessageId: string | null = null;
+
+  for (const message of chat.messages) {
+    if (message.role === "user") {
+      lastUserMessageId = message.id;
+      continue;
+    }
+
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    effectiveAssistantParentIds.set(
+      message.id,
+      message.parentId ?? lastUserMessageId,
+    );
+  }
+
   const parentIds = Array.from(
     new Set(
-      assistantMessages
-        .map((message) => message.parentId)
-        .filter((parentId): parentId is string => !!parentId),
+      Array.from(effectiveAssistantParentIds.values()).filter(
+        (parentId): parentId is string => !!parentId,
+      ),
     ),
   );
 
@@ -42,11 +62,12 @@ export default async function ChatPage({
     (typeof assistantMessages)[number]
   >();
   for (const message of assistantMessages) {
-    if (!message.parentId) {
+    const effectiveParentId = effectiveAssistantParentIds.get(message.id);
+    if (!effectiveParentId) {
       continue;
     }
 
-    latestAssistantByParentId.set(message.parentId, message);
+    latestAssistantByParentId.set(effectiveParentId, message);
   }
 
   const initialMessages = chat.messages
@@ -64,7 +85,12 @@ export default async function ChatPage({
         ];
       }
 
-      if (!message.parentId) {
+      const effectiveParentId =
+        message.role === "assistant"
+          ? (effectiveAssistantParentIds.get(message.id) ?? message.parentId)
+          : null;
+
+      if (!effectiveParentId) {
         return [
           {
             id: message.id,
@@ -76,19 +102,19 @@ export default async function ChatPage({
         ];
       }
 
-      const latestBranch = latestAssistantByParentId.get(message.parentId);
+      const latestBranch = latestAssistantByParentId.get(effectiveParentId);
       if (!latestBranch || latestBranch.id !== message.id) {
         return [];
       }
 
-      const branchOptions = branchesByParentId[message.parentId] ?? [];
+      const branchOptions = branchesByParentId[effectiveParentId] ?? [];
 
       return [
         {
           id: message.id,
           role: message.role,
           content: message.content,
-          parentId: message.parentId,
+          parentId: effectiveParentId,
           branchId: message.branchId,
           branchOptions: branchOptions.map((branch) => ({
             id: branch.id,
