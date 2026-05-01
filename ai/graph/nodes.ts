@@ -289,82 +289,81 @@ export async function saveMessagesNode(state: ChatGraphState) {
   // Honor explicit skip flag for flows that already reference an existing user turn
   const willCreateUser = shouldCreateUser && !state.skipUserCreate;
 
-  await prisma.$transaction(
-    async (tx) => {
-      if (willCreateUser) {
-        const userMessage = await tx.message.create({
-          data: {
-            chatId: state.chatId,
-            role: "user",
-            content: state.userMessage,
-            parentId: state.parentMessageId ?? null,
-            branchId: state.branchId ?? undefined,
-          },
-        });
-        createdUserMessageId = userMessage.id;
-      }
-
-      const assistantData = {
+  if (willCreateUser) {
+    const userMessage = await prisma.message.create({
+      data: {
         chatId: state.chatId,
-        role: "assistant" as const,
-        content: state.assistantMessage,
-        parentId: createdUserMessageId ?? state.parentMessageId ?? null,
+        role: "user",
+        content: state.userMessage,
+        parentId: state.parentMessageId ?? null,
         branchId: state.branchId ?? undefined,
+      },
+    });
+    createdUserMessageId = userMessage.id;
+  }
+
+  const assistantData = {
+    chatId: state.chatId,
+    role: "assistant" as const,
+    content: state.assistantMessage,
+    parentId: createdUserMessageId ?? state.parentMessageId ?? null,
+    branchId: state.branchId ?? undefined,
+    modelUsed: state.modelUsed || null,
+    provider: state.provider || null,
+    tokensInput: state.inputTokens || null,
+    tokensOutput: state.outputTokens || null,
+    latencyMs: state.latencyMs || null,
+    runId: state.runId || null,
+    traceId: state.traceId || null,
+  };
+
+  if (state.assistantMessageId) {
+    const assistantMessage = await prisma.message.upsert({
+      where: { id: state.assistantMessageId },
+      create: {
+        id: state.assistantMessageId,
+        ...assistantData,
+      },
+      update: assistantData,
+    });
+    persistedAssistantMessageId = assistantMessage.id;
+  } else {
+    const assistantMessage = await prisma.message.create({
+      data: assistantData,
+    });
+    persistedAssistantMessageId = assistantMessage.id;
+  }
+
+  // Persist generated title if available (only on first turn)
+  const chatUpdateData: Record<string, unknown> = {
+    lastMessageAt: now,
+  };
+  if (state.generatedTitle && state.previousMessages.length === 0) {
+    chatUpdateData.title = state.generatedTitle;
+  }
+
+  await prisma.chat.update({
+    where: { id: state.chatId },
+    data: chatUpdateData,
+  });
+
+  await prisma.chatRunAnalytics
+    .create({
+      data: {
+        chatId: state.chatId,
         modelUsed: state.modelUsed || null,
         provider: state.provider || null,
+        latencyMs: state.latencyMs || null,
         tokensInput: state.inputTokens || null,
         tokensOutput: state.outputTokens || null,
-        latencyMs: state.latencyMs || null,
         runId: state.runId || null,
         traceId: state.traceId || null,
-      };
-
-      if (state.assistantMessageId) {
-        const assistantMessage = await tx.message.upsert({
-          where: { id: state.assistantMessageId },
-          create: {
-            id: state.assistantMessageId,
-            ...assistantData,
-          },
-          update: assistantData,
-        });
-        persistedAssistantMessageId = assistantMessage.id;
-      } else {
-        const assistantMessage = await tx.message.create({
-          data: assistantData,
-        });
-        persistedAssistantMessageId = assistantMessage.id;
-      }
-
-      // Persist generated title if available (only on first turn)
-      const chatUpdateData: Record<string, unknown> = {
-        lastMessageAt: now,
-      };
-      if (state.generatedTitle && state.previousMessages.length === 0) {
-        chatUpdateData.title = state.generatedTitle;
-      }
-
-      await tx.chat.update({
-        where: { id: state.chatId },
-        data: chatUpdateData,
-      });
-
-      await tx.chatRunAnalytics.create({
-        data: {
-          chatId: state.chatId,
-          modelUsed: state.modelUsed || null,
-          provider: state.provider || null,
-          latencyMs: state.latencyMs || null,
-          tokensInput: state.inputTokens || null,
-          tokensOutput: state.outputTokens || null,
-          runId: state.runId || null,
-          traceId: state.traceId || null,
-          status: "completed",
-        },
-      });
-    },
-    { timeout: 15000 },
-  );
+        status: "completed",
+      },
+    })
+    .catch((error) => {
+      console.warn(`Failed to save chat analytics for ${state.chatId}:`, error);
+    });
 
   // Maintain rolling chat summary in background so stream completion is not delayed.
   void maintainChatSummary(state.chatId).catch((err) => {
