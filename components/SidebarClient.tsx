@@ -49,6 +49,7 @@ function ProjectItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(project.name);
   const [menuOpen, setMenuOpen] = useState(false);
+  const router = useRouter();
 
   const handleRename = async () => {
     const trimmed = newName.trim();
@@ -101,7 +102,7 @@ function ProjectItem({
 
   if (isRenaming) {
     return (
-      <div className="flex items-center gap-2 rounded-lg px-2.5 py-[7px]">
+      <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.75">
         <Folder size={12} className="shrink-0 text-muted-foreground" />
         <input
           autoFocus
@@ -120,7 +121,7 @@ function ProjectItem({
     <div className="relative">
       <Link
         href={`/p/${project.id}`}
-        className={`group flex items-center justify-between rounded-lg px-2.5 py-[7px] text-[13px] transition-all duration-150 ${
+        className={`group flex items-center justify-between rounded-lg px-2.5 py-1.75 text-[13px] transition-all duration-150 ${
           active
             ? "bg-primary/10 text-foreground ring-1 ring-primary/20"
             : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -128,7 +129,7 @@ function ProjectItem({
       >
         <span className="flex min-w-0 items-center gap-2">
           <span
-            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md transition-colors ${
+            className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md transition-colors ${
               active
                 ? "text-primary"
                 : "text-muted-foreground group-hover:text-foreground"
@@ -141,16 +142,18 @@ function ProjectItem({
           </span>
         </span>
 
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setMenuOpen(!menuOpen);
-          }}
-          className="rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
-        >
-          <MoreHorizontal size={13} />
-        </button>
+        <span className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuOpen(!menuOpen);
+            }}
+            className="rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent"
+          >
+            <MoreHorizontal size={13} />
+          </button>
+        </span>
       </Link>
 
       {menuOpen && (
@@ -549,20 +552,13 @@ export function SidebarClient({
           <div className="mt-auto border-t border-sidebar-border p-2.5">
             <div className="flex flex-col gap-2">
               <ModeToggle />
-              <div className="group relative">
-                <Link
-                  href="/settings"
-                  className="flex items-center justify-center rounded-xl border border-border bg-card py-2 text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-                  title="Settings"
-                  aria-label="Settings"
-                >
-                  <Settings size={14} />
-                </Link>
-
-                <span className="pointer-events-none absolute right-full top-1/2 mr-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100">
-                  Settings
-                </span>
-              </div>
+              <Link
+                href="/settings"
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Settings size={13} />
+                Settings
+              </Link>
             </div>
           </div>
         </>
@@ -617,7 +613,10 @@ export function SidebarClient({
                     <ProjectItem
                       key={project.id}
                       project={project}
-                      active={pathname === `/p/${project.id}`}
+                      active={
+                        pathname?.startsWith(`/projects/${project.id}`) ||
+                        pathname === `/p/${project.id}`
+                      }
                     />
                   ))
                 ) : (
