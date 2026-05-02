@@ -1,5 +1,19 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment
+
+Set environment values in `.env` before running in production.
+
+Required:
+
+- `GOOGLE_API_KEY`
+
+Optional:
+
+- `GEMINI_MODEL`
+- `TAVILY_API_KEY`
+- `TAVILY_API_BASE_URL`
+
 ## Getting Started
 
 First, run the development server:

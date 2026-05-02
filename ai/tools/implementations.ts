@@ -400,6 +400,9 @@ export async function webSearchToolAsync(
   }
 
   const apiKey = process.env.TAVILY_API_KEY?.trim();
+  const tavilyBaseUrl =
+    process.env.TAVILY_API_BASE_URL?.trim().replace(/\/+$/, "") ||
+    "https://api.tavily.com";
   if (!apiKey) {
     return {
       success: false,
@@ -415,7 +418,7 @@ export async function webSearchToolAsync(
     // Use advanced search depth for current information queries
     const searchDepth = isCurrentInfoQuery(query) ? "advanced" : "basic";
 
-    const response = await fetch("https://api.tavily.com/search", {
+    const response = await fetch(`${tavilyBaseUrl}/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
