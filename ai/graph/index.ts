@@ -116,9 +116,9 @@ export async function runChatGraphStream(
   let assistantMessage = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let hasEmittedWritingStatus = false;
 
   try {
-    onEvent?.({ type: "status", message: "Writing response..." });
     const stream = await model.stream(messages as BaseMessage[]);
 
     for await (const chunk of stream as AsyncIterable<unknown>) {
@@ -127,6 +127,11 @@ export async function runChatGraphStream(
       );
       if (!text) {
         continue;
+      }
+
+      if (!hasEmittedWritingStatus) {
+        onEvent?.({ type: "status", message: "Writing response..." });
+        hasEmittedWritingStatus = true;
       }
 
       assistantMessage += text;
