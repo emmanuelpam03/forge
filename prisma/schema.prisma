@@ -77,6 +77,7 @@ model Project {
 
   chats     Chat[]
   documents Document[]
+  tasks     Task[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -100,6 +101,7 @@ model Chat {
 
   messages  Message[]
   analytics ChatRunAnalytics[]
+  tasks     Task[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -125,6 +127,8 @@ model Message {
   children Message[] @relation("MessageParent")
   branchId String @default(uuid())
 
+  sourceTasks Task[] @relation("TaskSourceMessage")
+
   // AI Metadata (LangGraph / LangChain useful)
   modelUsed    String?
   provider     String?
@@ -143,6 +147,45 @@ model Message {
   @@index([runId])
   @@index([parentId])
   @@index([branchId])
+}
+
+model Task {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  chatId String?
+  chat   Chat? @relation(fields: [chatId], references: [id], onDelete: SetNull)
+
+  sourceMessageId String?
+  sourceMessage   Message? @relation("TaskSourceMessage", fields: [sourceMessageId], references: [id], onDelete: SetNull)
+
+  type        TaskType
+  status      TaskStatus @default(pending_approval)
+  action      String
+  description String   @db.Text
+
+  scheduleSpec  String?
+  conditionText String? @db.Text
+  oneTimeAt     DateTime?
+
+  approvedAt DateTime?
+  executedAt DateTime?
+  canceledAt DateTime?
+  lastError  String?   @db.Text
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([chatId])
+  @@index([status])
+  @@index([type])
+  @@index([oneTimeAt])
+  @@map("task")
 }
 
 model Preference {
@@ -217,4 +260,21 @@ enum MessageRole {
   assistant
   system
   tool
+}
+
+enum TaskType {
+  scheduled
+  conditional
+  one_time
+}
+
+enum TaskStatus {
+  pending_approval
+  approved
+  queued
+  running
+  completed
+  canceled
+  rejected
+  failed
 }

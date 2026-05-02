@@ -122,6 +122,7 @@ export default async function ChatPage({
   return (
     <ChatClient
       chatId={chat.id}
+      projectId={chat.projectId}
       title={chat.title}
       initialMessage={initialMessage}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server-to-client shape is simplified here

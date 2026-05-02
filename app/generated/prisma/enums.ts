@@ -17,3 +17,26 @@ export const MessageRole = {
 } as const
 
 export type MessageRole = (typeof MessageRole)[keyof typeof MessageRole]
+
+
+export const TaskType = {
+  scheduled: 'scheduled',
+  conditional: 'conditional',
+  one_time: 'one_time'
+} as const
+
+export type TaskType = (typeof TaskType)[keyof typeof TaskType]
+
+
+export const TaskStatus = {
+  pending_approval: 'pending_approval',
+  approved: 'approved',
+  queued: 'queued',
+  running: 'running',
+  completed: 'completed',
+  canceled: 'canceled',
+  rejected: 'rejected',
+  failed: 'failed'
+} as const
+
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus]

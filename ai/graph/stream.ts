@@ -2,6 +2,19 @@ export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "token"; content: string }
   | {
+      type: "suggestion";
+      suggestion: {
+        id: string;
+        type: "suggestion";
+        action: string;
+        description: string;
+        taskType: "scheduled" | "conditional" | "one-time";
+        scheduleSpec?: string | null;
+        conditionText?: string | null;
+        oneTimeAt?: string | null;
+      };
+    }
+  | {
       type: "placeholder";
       messageId: string;
       branchId: string;

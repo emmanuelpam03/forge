@@ -58,6 +58,7 @@ export const ModelName = {
   Project: 'Project',
   Chat: 'Chat',
   Message: 'Message',
+  Task: 'Task',
   Preference: 'Preference',
   MemorySummary: 'MemorySummary',
   ChatRunAnalytics: 'ChatRunAnalytics',
@@ -186,6 +187,30 @@ export const MessageScalarFieldEnum = {
 export type MessageScalarFieldEnum = (typeof MessageScalarFieldEnum)[keyof typeof MessageScalarFieldEnum]
 
 
+export const TaskScalarFieldEnum = {
+  id: 'id',
+  projectId: 'projectId',
+  chatId: 'chatId',
+  sourceMessageId: 'sourceMessageId',
+  type: 'type',
+  status: 'status',
+  action: 'action',
+  description: 'description',
+  scheduleSpec: 'scheduleSpec',
+  conditionText: 'conditionText',
+  oneTimeAt: 'oneTimeAt',
+  approvedAt: 'approvedAt',
+  executedAt: 'executedAt',
+  canceledAt: 'canceledAt',
+  lastError: 'lastError',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TaskScalarFieldEnum = (typeof TaskScalarFieldEnum)[keyof typeof TaskScalarFieldEnum]
+
+
 export const PreferenceScalarFieldEnum = {
   id: 'id',
   key: 'key',
@@ -249,6 +274,14 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -263,4 +296,13 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 

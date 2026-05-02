@@ -25,6 +25,7 @@ import {
 } from "@/ai/graph/classification";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
+import type { TaskSuggestion } from "@/types/tasks";
 
 let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
 
@@ -41,12 +42,27 @@ function emitStatus(
   (onEvent ?? graphStreamEventEmitter)?.({ type: "status", message });
 }
 
+function emitSuggestion(suggestion: NonNullable<ChatGraphState["suggestion"]>) {
+  graphStreamEventEmitter?.({
+    type: "suggestion",
+    suggestion,
+  });
+}
+
 function getToolStatusMessage(toolName: string): string {
   if (toolName === "webSearch") return "Searching...";
   if (toolName === "calculator") return "Calculating...";
   if (toolName === "summarizeText") return "Summarizing...";
   if (toolName === "projectContextLookup") return "Loading context...";
   return "Working...";
+}
+
+function toTaskTypeValue(taskType: string): TaskSuggestion["taskType"] {
+  if (taskType === "scheduled" || taskType === "conditional") {
+    return taskType;
+  }
+
+  return "one-time";
 }
 
 function toTextContent(content: unknown): string {
@@ -802,6 +818,121 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
       toolContext: "",
       synthesisNote: "",
     };
+  }
+}
+
+export async function suggestTaskNode(state: ChatGraphState) {
+  try {
+    const model = createGeminiModel();
+    const sanitizedMessage = sanitizeUserInput(state.userMessage);
+
+    const contextSummary = [
+      state.intent ? `Intent: ${state.intent}` : "",
+      state.memorySummary ? "Memory summary available: yes" : "",
+      state.toolPlan?.toolsNeeded?.length
+        ? `Tools used: ${state.toolPlan.toolsNeeded.join(", ")}`
+        : "",
+      state.synthesisNote ? `Evidence note: ${state.synthesisNote}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const prompt = `You are Forge's safe task suggester.
+
+Decide whether the user request should become a task suggestion.
+Only suggest actions that are useful, concrete, and safe to defer for explicit approval.
+Never imply that the action will run automatically.
+If the request is not task-worthy, return null.
+
+Return JSON ONLY with one of these shapes:
+null
+
+or
+{
+  "type": "suggestion",
+  "action": "track_stock",
+  "description": "Track Nvidia stock daily",
+  "taskType": "scheduled|conditional|one-time",
+  "scheduleSpec": "daily at 8:00 AM",
+  "conditionText": "if NVDA falls below 100",
+  "oneTimeAt": "2026-05-03T09:00:00.000Z"
+}
+
+Rules:
+- action must be a short snake_case verb phrase.
+- description must be user-facing and concise.
+- taskType must match the actual task shape.
+- Include only the relevant optional field for the chosen taskType.
+- Use ISO 8601 for oneTimeAt when a time is obvious; otherwise omit it.
+- Do not include markdown or any extra keys.
+
+Context:
+${contextSummary || "No extra context."}
+
+User request:
+${sanitizedMessage}`;
+
+    const response = await model.invoke([new HumanMessage(prompt)]);
+    const responseText = toTextContent(response.content).trim();
+
+    if (!responseText || responseText === "null") {
+      return { suggestion: null };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      console.warn("Failed to parse task suggestion JSON, defaulting to none");
+      return { suggestion: null };
+    }
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      (parsed as { type?: string }).type !== "suggestion"
+    ) {
+      return { suggestion: null };
+    }
+
+    const candidate = parsed as Partial<TaskSuggestion> & {
+      type?: string;
+      taskType?: string;
+    };
+
+    if (
+      typeof candidate.action !== "string" ||
+      typeof candidate.description !== "string"
+    ) {
+      return { suggestion: null };
+    }
+
+    const suggestion: TaskSuggestion = {
+      id: crypto.randomUUID(),
+      type: "suggestion",
+      action: candidate.action.trim(),
+      description: candidate.description.trim(),
+      taskType: toTaskTypeValue(candidate.taskType ?? "one-time"),
+      scheduleSpec:
+        typeof candidate.scheduleSpec === "string"
+          ? candidate.scheduleSpec.trim() || null
+          : null,
+      conditionText:
+        typeof candidate.conditionText === "string"
+          ? candidate.conditionText.trim() || null
+          : null,
+      oneTimeAt:
+        typeof candidate.oneTimeAt === "string"
+          ? candidate.oneTimeAt.trim() || null
+          : null,
+    };
+
+    emitSuggestion(suggestion);
+
+    return { suggestion };
+  } catch (error) {
+    console.error("Task suggestion generation failed:", error);
+    return { suggestion: null };
   }
 }
 

@@ -1,6 +1,7 @@
 import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
+import type { TaskSuggestion } from "@/types/tasks";
 
 export type ClassificationIntent =
   | "factual"
@@ -87,6 +88,7 @@ export type ChatGraphState = {
   executionMode: "none" | "single" | "multi-parallel" | "multi-sequential";
   evidenceBundles: EvidenceBundle[];
   synthesisNote: string;
+  suggestion: TaskSuggestion | null;
   classifiedIntent: ClassifiedIntent | null;
   /**
    * When set, forces the graph to execute a specific tool (e.g. "webSearch").
@@ -199,6 +201,10 @@ export const chatGraphState = Annotation.Root({
     default: () => "",
     reducer: lastValue,
   }),
+  suggestion: Annotation<TaskSuggestion | null>({
+    default: () => null,
+    reducer: lastValue,
+  }),
   classifiedIntent: Annotation<{
     intent: ClassificationIntent;
     requiresFreshData: boolean;
@@ -256,6 +262,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   executionMode: "none",
   evidenceBundles: [],
   synthesisNote: "",
+  suggestion: null,
   classifiedIntent: input.classifiedIntent ?? null,
   forceTool: input.forceTool ?? null,
 });

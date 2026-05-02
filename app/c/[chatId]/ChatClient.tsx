@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
 import { ReasoningTimeline } from "@/components/ReasoningTimeline";
+import { TaskSuggestionCard } from "@/components/task-suggestion-card";
 import { useFeedback } from "@/components/feedback-provider";
 import { type StreamEvent } from "@/ai/graph/stream";
+import type { TaskSuggestion } from "@/types/tasks";
 
 type BranchOption = {
   id: string;
@@ -40,8 +42,14 @@ type ChatMessage = {
   error?: string;
 };
 
+type SuggestionState = TaskSuggestion & {
+  status: "pending" | "approved" | "rejected" | "canceled";
+  taskId?: string | null;
+};
+
 type ChatClientProps = {
   chatId: string;
+  projectId: string | null;
   title: string;
   initialMessages: ChatMessage[];
   initialMessage?: string;
@@ -253,12 +261,14 @@ function MessageBubble({
 
 export function ChatClient({
   chatId,
+  projectId,
   title,
   initialMessages,
   initialMessage,
 }: ChatClientProps) {
   const { showFeedback } = useFeedback();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [suggestions, setSuggestions] = useState<SuggestionState[]>([]);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string | null>(null);
@@ -271,6 +281,7 @@ export function ChatClient({
   const hasAutoSentRef = useRef(false);
 
   const hasMessages = messages.length > 0;
+  const hasSuggestions = suggestions.length > 0;
 
   const updateAssistantMessage = useCallback(
     (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
@@ -374,6 +385,166 @@ export function ChatClient({
       });
     }
   };
+
+  const upsertSuggestion = useCallback((suggestion: TaskSuggestion) => {
+    setSuggestions((currentSuggestions) => {
+      const existingSuggestion = currentSuggestions.find(
+        (item) =>
+          item.action === suggestion.action &&
+          item.description === suggestion.description &&
+          item.taskType === suggestion.taskType &&
+          item.scheduleSpec === suggestion.scheduleSpec &&
+          item.conditionText === suggestion.conditionText &&
+          item.oneTimeAt === suggestion.oneTimeAt,
+      );
+
+      if (!existingSuggestion) {
+        return [
+          ...currentSuggestions,
+          {
+            ...suggestion,
+            status: "pending",
+            taskId: null,
+          },
+        ];
+      }
+
+      return currentSuggestions.map((item) =>
+        item === existingSuggestion || item.id === suggestion.id
+          ? {
+              ...item,
+              ...suggestion,
+              status: item.status,
+              taskId: item.taskId,
+            }
+          : item,
+      );
+    });
+  }, []);
+
+  const acceptSuggestion = useCallback(
+    async (suggestion: SuggestionState) => {
+      if (!projectId) {
+        showFeedback({
+          type: "error",
+          title: "Project required",
+          description: "Attach this chat to a project before creating tasks.",
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            chatId,
+            action: suggestion.action,
+            description: suggestion.description,
+            type: suggestion.taskType,
+            scheduleSpec: suggestion.scheduleSpec ?? null,
+            conditionText: suggestion.conditionText ?? null,
+            oneTimeAt: suggestion.oneTimeAt ?? null,
+            status: "approved",
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(payload?.error ?? "Failed to create task.");
+        }
+
+        const payload = (await response.json()) as {
+          task?: { id: string };
+        };
+
+        setSuggestions((current) =>
+          current.map((item) =>
+            item.id === suggestion.id
+              ? {
+                  ...item,
+                  status: "approved",
+                  taskId: payload.task?.id ?? item.taskId ?? null,
+                }
+              : item,
+          ),
+        );
+
+        showFeedback({
+          type: "success",
+          title: "Task created",
+          description: suggestion.description,
+        });
+      } catch (error) {
+        showFeedback({
+          type: "error",
+          title: "Task creation failed",
+          description:
+            error instanceof Error ? error.message : "Failed to create task.",
+        });
+      }
+    },
+    [chatId, projectId, showFeedback],
+  );
+
+  const rejectSuggestion = useCallback((suggestionId: string) => {
+    setSuggestions((current) =>
+      current.map((item) =>
+        item.id === suggestionId ? { ...item, status: "rejected" } : item,
+      ),
+    );
+  }, []);
+
+  const cancelTask = useCallback(
+    async (suggestion: SuggestionState) => {
+      if (!suggestion.taskId) {
+        setSuggestions((current) =>
+          current.map((item) =>
+            item.id === suggestion.id ? { ...item, status: "canceled" } : item,
+          ),
+        );
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/tasks/${suggestion.taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "canceled" }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(payload?.error ?? "Failed to cancel task.");
+        }
+
+        setSuggestions((current) =>
+          current.map((item) =>
+            item.id === suggestion.id ? { ...item, status: "canceled" } : item,
+          ),
+        );
+
+        showFeedback({
+          type: "success",
+          title: "Task canceled",
+          description: suggestion.description,
+        });
+      } catch (error) {
+        showFeedback({
+          type: "error",
+          title: "Cancel failed",
+          description:
+            error instanceof Error ? error.message : "Failed to cancel task.",
+        });
+      }
+    },
+    [showFeedback],
+  );
 
   const switchBranch = (messageId: string, branch: BranchOption) => {
     setMessages((currentMessages) =>
@@ -971,6 +1142,10 @@ export function ChatClient({
                 : frame;
               const event = JSON.parse(payloadText) as StreamEvent;
 
+              if (event.type === "suggestion") {
+                upsertSuggestion(event.suggestion);
+              }
+
               if (event.type === "status") {
                 applyStatus(event.message);
               }
@@ -1045,6 +1220,7 @@ export function ChatClient({
       isSending,
       showFeedback,
       updateAssistantMessage,
+      upsertSuggestion,
     ],
   );
 
@@ -1083,7 +1259,34 @@ export function ChatClient({
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          {!hasMessages ? (
+          {hasSuggestions ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                  Suggestions
+                </p>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Review before execution
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {suggestions.map((suggestion) => (
+                  <TaskSuggestionCard
+                    key={suggestion.id}
+                    suggestion={suggestion}
+                    projectReady={!!projectId}
+                    status={suggestion.status}
+                    isSubmitting={isSending}
+                    onAccept={() => void acceptSuggestion(suggestion)}
+                    onReject={() => rejectSuggestion(suggestion.id)}
+                    onCancel={() => void cancelTask(suggestion)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {!hasMessages && !hasSuggestions ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageSquare size={32} className="mb-3 text-muted-foreground" />
               <p className="text-[14px] font-medium text-foreground">

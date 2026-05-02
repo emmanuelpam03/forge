@@ -299,6 +299,7 @@ export type MessageWhereInput = {
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
   parent?: Prisma.XOR<Prisma.MessageNullableScalarRelationFilter, Prisma.MessageWhereInput> | null
   children?: Prisma.MessageListRelationFilter
+  sourceTasks?: Prisma.TaskListRelationFilter
 }
 
 export type MessageOrderByWithRelationInput = {
@@ -319,6 +320,7 @@ export type MessageOrderByWithRelationInput = {
   chat?: Prisma.ChatOrderByWithRelationInput
   parent?: Prisma.MessageOrderByWithRelationInput
   children?: Prisma.MessageOrderByRelationAggregateInput
+  sourceTasks?: Prisma.TaskOrderByRelationAggregateInput
 }
 
 export type MessageWhereUniqueInput = Prisma.AtLeast<{
@@ -342,6 +344,7 @@ export type MessageWhereUniqueInput = Prisma.AtLeast<{
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
   parent?: Prisma.XOR<Prisma.MessageNullableScalarRelationFilter, Prisma.MessageWhereInput> | null
   children?: Prisma.MessageListRelationFilter
+  sourceTasks?: Prisma.TaskListRelationFilter
 }, "id">
 
 export type MessageOrderByWithAggregationInput = {
@@ -402,6 +405,7 @@ export type MessageCreateInput = {
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
   children?: Prisma.MessageCreateNestedManyWithoutParentInput
+  sourceTasks?: Prisma.TaskCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageUncheckedCreateInput = {
@@ -420,6 +424,7 @@ export type MessageUncheckedCreateInput = {
   traceId?: string | null
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
+  sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageUpdateInput = {
@@ -438,6 +443,7 @@ export type MessageUpdateInput = {
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
   children?: Prisma.MessageUpdateManyWithoutParentNestedInput
+  sourceTasks?: Prisma.TaskUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUncheckedUpdateInput = {
@@ -456,6 +462,7 @@ export type MessageUncheckedUpdateInput = {
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
+  sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageCreateManyInput = {
@@ -697,6 +704,22 @@ export type MessageUncheckedUpdateManyWithoutParentNestedInput = {
   deleteMany?: Prisma.MessageScalarWhereInput | Prisma.MessageScalarWhereInput[]
 }
 
+export type MessageCreateNestedOneWithoutSourceTasksInput = {
+  create?: Prisma.XOR<Prisma.MessageCreateWithoutSourceTasksInput, Prisma.MessageUncheckedCreateWithoutSourceTasksInput>
+  connectOrCreate?: Prisma.MessageCreateOrConnectWithoutSourceTasksInput
+  connect?: Prisma.MessageWhereUniqueInput
+}
+
+export type MessageUpdateOneWithoutSourceTasksNestedInput = {
+  create?: Prisma.XOR<Prisma.MessageCreateWithoutSourceTasksInput, Prisma.MessageUncheckedCreateWithoutSourceTasksInput>
+  connectOrCreate?: Prisma.MessageCreateOrConnectWithoutSourceTasksInput
+  upsert?: Prisma.MessageUpsertWithoutSourceTasksInput
+  disconnect?: Prisma.MessageWhereInput | boolean
+  delete?: Prisma.MessageWhereInput | boolean
+  connect?: Prisma.MessageWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MessageUpdateToOneWithWhereWithoutSourceTasksInput, Prisma.MessageUpdateWithoutSourceTasksInput>, Prisma.MessageUncheckedUpdateWithoutSourceTasksInput>
+}
+
 export type MessageCreateWithoutChatInput = {
   id?: string
   role: $Enums.MessageRole
@@ -712,6 +735,7 @@ export type MessageCreateWithoutChatInput = {
   createdAt?: Date | string
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
   children?: Prisma.MessageCreateNestedManyWithoutParentInput
+  sourceTasks?: Prisma.TaskCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageUncheckedCreateWithoutChatInput = {
@@ -729,6 +753,7 @@ export type MessageUncheckedCreateWithoutChatInput = {
   traceId?: string | null
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
+  sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageCreateOrConnectWithoutChatInput = {
@@ -792,6 +817,7 @@ export type MessageCreateWithoutChildrenInput = {
   createdAt?: Date | string
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
+  sourceTasks?: Prisma.TaskCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageUncheckedCreateWithoutChildrenInput = {
@@ -809,6 +835,7 @@ export type MessageUncheckedCreateWithoutChildrenInput = {
   runId?: string | null
   traceId?: string | null
   createdAt?: Date | string
+  sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageCreateOrConnectWithoutChildrenInput = {
@@ -831,6 +858,7 @@ export type MessageCreateWithoutParentInput = {
   createdAt?: Date | string
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   children?: Prisma.MessageCreateNestedManyWithoutParentInput
+  sourceTasks?: Prisma.TaskCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageUncheckedCreateWithoutParentInput = {
@@ -848,6 +876,7 @@ export type MessageUncheckedCreateWithoutParentInput = {
   traceId?: string | null
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
+  sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
 }
 
 export type MessageCreateOrConnectWithoutParentInput = {
@@ -886,6 +915,7 @@ export type MessageUpdateWithoutChildrenInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
+  sourceTasks?: Prisma.TaskUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUncheckedUpdateWithoutChildrenInput = {
@@ -903,6 +933,7 @@ export type MessageUncheckedUpdateWithoutChildrenInput = {
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUpsertWithWhereUniqueWithoutParentInput = {
@@ -919,6 +950,94 @@ export type MessageUpdateWithWhereUniqueWithoutParentInput = {
 export type MessageUpdateManyWithWhereWithoutParentInput = {
   where: Prisma.MessageScalarWhereInput
   data: Prisma.XOR<Prisma.MessageUpdateManyMutationInput, Prisma.MessageUncheckedUpdateManyWithoutParentInput>
+}
+
+export type MessageCreateWithoutSourceTasksInput = {
+  id?: string
+  role: $Enums.MessageRole
+  content: string
+  branchId?: string
+  modelUsed?: string | null
+  provider?: string | null
+  tokensInput?: number | null
+  tokensOutput?: number | null
+  latencyMs?: number | null
+  runId?: string | null
+  traceId?: string | null
+  createdAt?: Date | string
+  chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
+  parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
+  children?: Prisma.MessageCreateNestedManyWithoutParentInput
+}
+
+export type MessageUncheckedCreateWithoutSourceTasksInput = {
+  id?: string
+  chatId: string
+  role: $Enums.MessageRole
+  content: string
+  parentId?: string | null
+  branchId?: string
+  modelUsed?: string | null
+  provider?: string | null
+  tokensInput?: number | null
+  tokensOutput?: number | null
+  latencyMs?: number | null
+  runId?: string | null
+  traceId?: string | null
+  createdAt?: Date | string
+  children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
+}
+
+export type MessageCreateOrConnectWithoutSourceTasksInput = {
+  where: Prisma.MessageWhereUniqueInput
+  create: Prisma.XOR<Prisma.MessageCreateWithoutSourceTasksInput, Prisma.MessageUncheckedCreateWithoutSourceTasksInput>
+}
+
+export type MessageUpsertWithoutSourceTasksInput = {
+  update: Prisma.XOR<Prisma.MessageUpdateWithoutSourceTasksInput, Prisma.MessageUncheckedUpdateWithoutSourceTasksInput>
+  create: Prisma.XOR<Prisma.MessageCreateWithoutSourceTasksInput, Prisma.MessageUncheckedCreateWithoutSourceTasksInput>
+  where?: Prisma.MessageWhereInput
+}
+
+export type MessageUpdateToOneWithWhereWithoutSourceTasksInput = {
+  where?: Prisma.MessageWhereInput
+  data: Prisma.XOR<Prisma.MessageUpdateWithoutSourceTasksInput, Prisma.MessageUncheckedUpdateWithoutSourceTasksInput>
+}
+
+export type MessageUpdateWithoutSourceTasksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  branchId?: Prisma.StringFieldUpdateOperationsInput | string
+  modelUsed?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tokensInput?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  tokensOutput?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
+  parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
+  children?: Prisma.MessageUpdateManyWithoutParentNestedInput
+}
+
+export type MessageUncheckedUpdateWithoutSourceTasksInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  chatId?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumMessageRoleFieldUpdateOperationsInput | $Enums.MessageRole
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  parentId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  branchId?: Prisma.StringFieldUpdateOperationsInput | string
+  modelUsed?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tokensInput?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  tokensOutput?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
 }
 
 export type MessageCreateManyChatInput = {
@@ -952,6 +1071,7 @@ export type MessageUpdateWithoutChatInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
   children?: Prisma.MessageUpdateManyWithoutParentNestedInput
+  sourceTasks?: Prisma.TaskUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUncheckedUpdateWithoutChatInput = {
@@ -969,6 +1089,7 @@ export type MessageUncheckedUpdateWithoutChatInput = {
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
+  sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUncheckedUpdateManyWithoutChatInput = {
@@ -1018,6 +1139,7 @@ export type MessageUpdateWithoutParentInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   children?: Prisma.MessageUpdateManyWithoutParentNestedInput
+  sourceTasks?: Prisma.TaskUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUncheckedUpdateWithoutParentInput = {
@@ -1035,6 +1157,7 @@ export type MessageUncheckedUpdateWithoutParentInput = {
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
+  sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
 }
 
 export type MessageUncheckedUpdateManyWithoutParentInput = {
@@ -1060,10 +1183,12 @@ export type MessageUncheckedUpdateManyWithoutParentInput = {
 
 export type MessageCountOutputType = {
   children: number
+  sourceTasks: number
 }
 
 export type MessageCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   children?: boolean | MessageCountOutputTypeCountChildrenArgs
+  sourceTasks?: boolean | MessageCountOutputTypeCountSourceTasksArgs
 }
 
 /**
@@ -1081,6 +1206,13 @@ export type MessageCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Exte
  */
 export type MessageCountOutputTypeCountChildrenArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.MessageWhereInput
+}
+
+/**
+ * MessageCountOutputType without action
+ */
+export type MessageCountOutputTypeCountSourceTasksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TaskWhereInput
 }
 
 
@@ -1102,6 +1234,7 @@ export type MessageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
   parent?: boolean | Prisma.Message$parentArgs<ExtArgs>
   children?: boolean | Prisma.Message$childrenArgs<ExtArgs>
+  sourceTasks?: boolean | Prisma.Message$sourceTasksArgs<ExtArgs>
   _count?: boolean | Prisma.MessageCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["message"]>
 
@@ -1165,6 +1298,7 @@ export type MessageInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
   parent?: boolean | Prisma.Message$parentArgs<ExtArgs>
   children?: boolean | Prisma.Message$childrenArgs<ExtArgs>
+  sourceTasks?: boolean | Prisma.Message$sourceTasksArgs<ExtArgs>
   _count?: boolean | Prisma.MessageCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type MessageIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1182,6 +1316,7 @@ export type $MessagePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     chat: Prisma.$ChatPayload<ExtArgs>
     parent: Prisma.$MessagePayload<ExtArgs> | null
     children: Prisma.$MessagePayload<ExtArgs>[]
+    sourceTasks: Prisma.$TaskPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1595,6 +1730,7 @@ export interface Prisma__MessageClient<T, Null = never, ExtArgs extends runtime.
   chat<T extends Prisma.ChatDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ChatDefaultArgs<ExtArgs>>): Prisma.Prisma__ChatClient<runtime.Types.Result.GetResult<Prisma.$ChatPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   parent<T extends Prisma.Message$parentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Message$parentArgs<ExtArgs>>): Prisma.Prisma__MessageClient<runtime.Types.Result.GetResult<Prisma.$MessagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   children<T extends Prisma.Message$childrenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Message$childrenArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  sourceTasks<T extends Prisma.Message$sourceTasksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Message$sourceTasksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2079,6 +2215,30 @@ export type Message$childrenArgs<ExtArgs extends runtime.Types.Extensions.Intern
   take?: number
   skip?: number
   distinct?: Prisma.MessageScalarFieldEnum | Prisma.MessageScalarFieldEnum[]
+}
+
+/**
+ * Message.sourceTasks
+ */
+export type Message$sourceTasksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Task
+   */
+  select?: Prisma.TaskSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Task
+   */
+  omit?: Prisma.TaskOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TaskInclude<ExtArgs> | null
+  where?: Prisma.TaskWhereInput
+  orderBy?: Prisma.TaskOrderByWithRelationInput | Prisma.TaskOrderByWithRelationInput[]
+  cursor?: Prisma.TaskWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TaskScalarFieldEnum | Prisma.TaskScalarFieldEnum[]
 }
 
 /**

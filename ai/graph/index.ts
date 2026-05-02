@@ -18,6 +18,7 @@ import {
   toolRouterNode,
   toolRouterNodeImpl,
   synthesizeEvidenceNode,
+  suggestTaskNode,
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
@@ -72,6 +73,7 @@ async function runGraphPreResponse(
   Object.assign(state, await planTaskNode(state));
   Object.assign(state, await toolRouterNodeImpl(state));
   Object.assign(state, await synthesizeEvidenceNode(state));
+  Object.assign(state, await suggestTaskNode(state));
 
   // Clear the run-scoped emitter to avoid cross-run leakage.
   setGraphStreamEventEmitter(undefined);
@@ -85,6 +87,7 @@ const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.planTask, planTaskNode)
   .addNode(CHAT_GRAPH_NODES.toolRouter, toolRouterNode)
   .addNode(CHAT_GRAPH_NODES.synthesizeEvidence, synthesizeEvidenceNode)
+  .addNode(CHAT_GRAPH_NODES.suggestTask, suggestTaskNode)
   .addNode(CHAT_GRAPH_NODES.generateResponse, generateResponseNode)
   .addNode(CHAT_GRAPH_NODES.saveMessages, saveMessagesNode)
   .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode)
