@@ -20,31 +20,12 @@ import {
   synthesizeEvidenceNode,
   generateTitleNode,
   extractMemoryNode,
+  setGraphStreamEventEmitter,
 } from "@/ai/graph/nodes";
 import { createGeminiModel } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
-
-export type StreamEvent =
-  | { type: "status"; message: string }
-  | { type: "token"; content: string }
-  | {
-      type: "placeholder";
-      messageId: string;
-      branchId: string;
-      parentId: string | null;
-    }
-  | {
-      type: "branches";
-      parentId: string | null;
-      branches: Array<{
-        id: string;
-        content: string;
-        parentId: string | null;
-        branchId: string | null;
-        createdAt: string;
-      }>;
-    }
-  | { type: "done"; messageId?: string };
+import type { StreamEvent } from "./stream";
+export type { StreamEvent } from "./stream";
 
 function toTextContent(content: unknown): string {
   if (typeof content === "string") {
@@ -82,11 +63,18 @@ async function runGraphPreResponse(
 ) {
   const state = createChatGraphSeed(input);
 
+  // Register a run-scoped emitter so nodes can call `emitStatus` without
+  // changing their LangGraph-compatible signatures.
+  setGraphStreamEventEmitter(onEvent);
+
   Object.assign(state, await loadContextNode(state));
   Object.assign(state, await classifyIntentNode(state));
   Object.assign(state, await planTaskNode(state));
-  Object.assign(state, await toolRouterNodeImpl(state, onEvent));
+  Object.assign(state, await toolRouterNodeImpl(state));
   Object.assign(state, await synthesizeEvidenceNode(state));
+
+  // Clear the run-scoped emitter to avoid cross-run leakage.
+  setGraphStreamEventEmitter(undefined);
 
   return state;
 }
@@ -119,7 +107,6 @@ export async function runChatGraphStream(
   input: ChatGraphInput,
   onEvent?: (event: StreamEvent) => void,
 ) {
-  onEvent?.({ type: "status", message: "Analyzing your question..." });
   const state = await runGraphPreResponse(input, onEvent);
 
   const model = createGeminiModel();
@@ -131,7 +118,7 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
-    onEvent?.({ type: "status", message: "Generating response..." });
+    onEvent?.({ type: "status", message: "Writing response..." });
     const stream = await model.stream(messages as BaseMessage[]);
 
     for await (const chunk of stream as AsyncIterable<unknown>) {

@@ -50,11 +50,12 @@ async function createUser() {
       emailVerified: user.emailVerified,
       image: user.image ?? "(none)",
     });
-  } catch (error: any) {
-    if (error?.code === "P2002") {
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    if (err?.code === "P2002") {
       console.error("\n❌ A user with that email already exists.");
     } else {
-      console.error("\n❌ Error creating user:", error?.message ?? error);
+      console.error("\n❌ Error creating user:", err?.message ?? String(error));
     }
     process.exit(1);
   } finally {

@@ -1,4 +1,4 @@
-import { MessageSquare, Plus, Search } from "lucide-react";
+import { MessageSquare, Search } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProjectById } from "@/lib/actions/projects";

@@ -495,14 +495,7 @@ export type SummarizeInput = {
 };
 
 export function summarizeTextTool(input: SummarizeInput): ToolResult {
-  const {
-    text,
-    maxSentences = 3,
-    format,
-    audience,
-    purpose,
-    preserveFacts = true,
-  } = input;
+  const { text, maxSentences = 3, format, preserveFacts = true } = input;
 
   if (!text || text.trim().length === 0) {
     return {

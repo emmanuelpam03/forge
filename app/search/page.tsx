@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, MessageSquare, Folder, X } from "lucide-react";
@@ -13,10 +13,11 @@ export default function SearchPage() {
   const router = useRouter();
 
   const [query, setQuery] = useState("");
-  const [projects, setProjects] = useState<any[]>([]);
-  const [recentChats, setRecentChats] = useState<any[]>([]);
-  const [filteredChats, setFilteredChats] = useState(recentChats);
-  const [filteredProjects, setFilteredProjects] = useState(projects);
+  type Project = { id: string; name: string; href?: string };
+  type ChatPreview = { id: string; title: string; preview: string };
+
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [recentChats, setRecentChats] = useState<ChatPreview[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,10 +29,10 @@ export default function SearchPage() {
       ]);
       setProjects(fetchedProjects);
       setRecentChats(
-        fetchedChats.map((chat) => ({
+        fetchedChats.map((chat: { id: string; title: string }) => ({
           id: chat.id,
           title: chat.title,
-          preview: chat.messages[0]?.content || "",
+          preview: "",
         })),
       );
       setIsLoading(false);
@@ -39,38 +40,20 @@ export default function SearchPage() {
     loadData();
   }, []);
 
+  // Keep searching indicator but derive filtered results via useMemo
   useEffect(() => {
-    const searchTerm = query.trim().toLowerCase();
-
+    const searchTerm = query.trim();
+    // When searchTerm is empty we don't start the searching flow.
     if (!searchTerm) {
-      setFilteredChats(recentChats);
-      setFilteredProjects(projects);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSearching(false);
       return;
     }
 
     setIsSearching(true);
-
-    const timer = window.setTimeout(() => {
-      setFilteredChats(
-        recentChats.filter(
-          (chat) =>
-            chat.title.toLowerCase().includes(searchTerm) ||
-            chat.preview.toLowerCase().includes(searchTerm),
-        ),
-      );
-
-      setFilteredProjects(
-        projects.filter((project) =>
-          project.name.toLowerCase().includes(searchTerm),
-        ),
-      );
-
-      setIsSearching(false);
-    }, 160);
-
+    const timer = window.setTimeout(() => setIsSearching(false), 160);
     return () => window.clearTimeout(timer);
-  }, [query, recentChats, projects]);
+  }, [query]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -82,6 +65,24 @@ export default function SearchPage() {
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [router]);
+
+  const filteredChats = useMemo(() => {
+    const searchTerm = query.trim().toLowerCase();
+    if (!searchTerm) return recentChats;
+    return recentChats.filter(
+      (chat) =>
+        chat.title.toLowerCase().includes(searchTerm) ||
+        chat.preview.toLowerCase().includes(searchTerm),
+    );
+  }, [query, recentChats]);
+
+  const filteredProjects = useMemo(() => {
+    const searchTerm = query.trim().toLowerCase();
+    if (!searchTerm) return projects;
+    return projects.filter((project) =>
+      project.name.toLowerCase().includes(searchTerm),
+    );
+  }, [query, projects]);
 
   const hasResults = filteredChats.length > 0 || filteredProjects.length > 0;
   const totalResults = filteredChats.length + filteredProjects.length;
@@ -109,7 +110,7 @@ export default function SearchPage() {
       showFeedback({
         type: "error",
         title: "No matches found",
-        description: `No chats or projects match \"${term}\"`,
+        description: `No chats or projects match "${term}"`,
       });
       return;
     }
@@ -176,7 +177,7 @@ export default function SearchPage() {
               <div className="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
                 <Search size={32} className="text-muted-foreground/40" />
                 <p className="text-[14px] text-muted-foreground">
-                  No results found for "{query}"
+                  No results found for &quot;{query}&quot;
                 </p>
               </div>
             ) : !hasResults ? (
@@ -231,7 +232,7 @@ export default function SearchPage() {
                       {filteredProjects.map((project) => (
                         <Link
                           key={project.id}
-                          href={project.href}
+                          href={project.href ?? `/p/${project.id}`}
                           className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-accent transition-colors group"
                         >
                           <Folder

@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import type { ToolPlan, ChatGraphState } from "@/ai/graph/state";
+import type { ToolPlan } from "@/ai/graph/state";
 
 /**
  * Unit tests for tool routing logic.
@@ -17,7 +18,8 @@ describe("Tool Routing Unit Tests", () => {
         followUpNeeded: false,
       };
 
-      const executionMode = toolPlan.toolsNeeded.length === 0 ? "none" : "single";
+      const executionMode =
+        toolPlan.toolsNeeded.length === 0 ? "none" : "single";
 
       assert.strictEqual(executionMode, "none");
     });
@@ -103,7 +105,6 @@ describe("Tool Routing Unit Tests", () => {
     });
 
     it("should execute forced tool deterministically", () => {
-      const forcedToolName = "webSearch";
       const userMessage = "What is the capital of France?";
 
       // Simulate forced tool execution
@@ -117,14 +118,13 @@ describe("Tool Routing Unit Tests", () => {
     });
 
     it("should handle forced tool failure gracefully", () => {
-      const forcedToolName = "webSearch";
       let forcedToolFailed = false;
       let fallbackToNormalPlanning = false;
 
       try {
         // Simulate tool error
         throw new Error("Tool execution failed");
-      } catch (err) {
+      } catch {
         forcedToolFailed = true;
         fallbackToNormalPlanning = !forcedToolFailed;
       }
@@ -145,7 +145,8 @@ describe("Tool Routing Unit Tests", () => {
       // Logic from shouldForceWebSearchFromClassification
       const shouldForceWebSearch =
         classification.intent === "factual" &&
-        (classification.requiresFreshData || classification.confidence !== "high");
+        (classification.requiresFreshData ||
+          (classification.confidence as any) !== "high");
 
       assert.strictEqual(shouldForceWebSearch, true);
     });
@@ -159,7 +160,8 @@ describe("Tool Routing Unit Tests", () => {
 
       const shouldForceWebSearch =
         classification.intent === "factual" &&
-        (classification.requiresFreshData || classification.confidence !== "high");
+        (classification.requiresFreshData ||
+          (classification.confidence as any) !== "high");
 
       assert.strictEqual(shouldForceWebSearch, true);
     });
@@ -173,7 +175,8 @@ describe("Tool Routing Unit Tests", () => {
 
       const shouldForceWebSearch =
         classification.intent === "factual" &&
-        (classification.requiresFreshData || classification.confidence !== "high");
+        (classification.requiresFreshData ||
+          (classification.confidence as any) !== "high");
 
       assert.strictEqual(shouldForceWebSearch, false);
     });
@@ -186,9 +189,9 @@ describe("Tool Routing Unit Tests", () => {
       };
 
       const shouldForceWebSearch =
-        reasoningClassification.intent === "factual" &&
+        (reasoningClassification.intent as any) === "factual" &&
         (reasoningClassification.requiresFreshData ||
-          reasoningClassification.confidence !== "high");
+          (reasoningClassification.confidence as any) !== "high");
 
       assert.strictEqual(shouldForceWebSearch, false);
     });
@@ -231,7 +234,10 @@ describe("Tool Routing Unit Tests", () => {
 
       const parsed = JSON.parse(jsonResponse);
 
-      assert.deepStrictEqual(parsed.toolsNeeded, ["webSearch", "summarizeText"]);
+      assert.deepStrictEqual(parsed.toolsNeeded, [
+        "webSearch",
+        "summarizeText",
+      ]);
       assert.strictEqual(parsed.sequential, true);
       assert.strictEqual(parsed.followUpNeeded, false);
     });
@@ -284,10 +290,7 @@ describe("Tool Routing Unit Tests", () => {
       const parsed = JSON.parse(planWithFollowUp);
 
       assert.strictEqual(parsed.followUpNeeded, true);
-      assert.strictEqual(
-        parsed.followUpQuestion,
-        "What is your budget range?"
-      );
+      assert.strictEqual(parsed.followUpQuestion, "What is your budget range?");
     });
   });
 
@@ -349,7 +352,7 @@ describe("Tool Routing Unit Tests", () => {
       const requestedTools = ["webSearch", "calculator"];
 
       const validTools = requestedTools.filter((tool) =>
-        availableTools.includes(tool)
+        availableTools.includes(tool),
       );
 
       assert.deepStrictEqual(validTools, ["webSearch", "calculator"]);
@@ -359,7 +362,7 @@ describe("Tool Routing Unit Tests", () => {
       const requestedTools = ["webSearch", "unknownTool"];
 
       const validTools = requestedTools.filter((tool) =>
-        availableTools.includes(tool)
+        availableTools.includes(tool),
       );
 
       assert.deepStrictEqual(validTools, ["webSearch"]);
@@ -368,8 +371,7 @@ describe("Tool Routing Unit Tests", () => {
     it("should handle empty tool requests", () => {
       const requestedTools: string[] = [];
 
-      const executionMode =
-        requestedTools.length === 0 ? "none" : "single";
+      const executionMode = requestedTools.length === 0 ? "none" : "single";
 
       assert.strictEqual(executionMode, "none");
     });
@@ -383,10 +385,10 @@ describe("Tool Routing Unit Tests", () => {
       };
 
       // When classifiedIntent is null/undefined, shouldForceWebSearch is false
-      const shouldForceWebSearch = state.classifiedIntent
-        ? state.classifiedIntent.intent === "factual" &&
-          (state.classifiedIntent.requiresFreshData ||
-            state.classifiedIntent.confidence !== "high")
+      const ci = (state.classifiedIntent as any) || null;
+      const shouldForceWebSearch = ci
+        ? ci.intent === "factual" &&
+          (ci.requiresFreshData || (ci.confidence as any) !== "high")
         : false;
 
       assert.strictEqual(shouldForceWebSearch, false);

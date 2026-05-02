@@ -13,7 +13,17 @@ import {
   Square,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
+import { ReasoningTimeline } from "@/components/ReasoningTimeline";
 import { useFeedback } from "@/components/feedback-provider";
+import { type StreamEvent } from "@/ai/graph/stream";
+
+type BranchOption = {
+  id: string;
+  content: string;
+  parentId: string | null;
+  branchId: string | null;
+  createdAt: string;
+};
 
 type ChatMessage = {
   id: string;
@@ -21,40 +31,14 @@ type ChatMessage = {
   content: string;
   parentId?: string | null;
   branchId?: string | null;
-  branchOptions?: Array<{
-    id: string;
-    content: string;
-    parentId: string | null;
-    branchId: string | null;
-    createdAt: string;
-  }>;
+  branchOptions?: BranchOption[];
   pending?: boolean;
   streaming?: boolean;
   status?: string;
+  reasoningSteps?: string[];
+  reasoningExpanded?: boolean;
   error?: string;
 };
-
-type StreamEvent =
-  | { type: "status"; message: string }
-  | { type: "token"; content: string }
-  | {
-      type: "placeholder";
-      messageId: string;
-      branchId: string;
-      parentId: string | null;
-    }
-  | {
-      type: "branches";
-      parentId: string | null;
-      branches: Array<{
-        id: string;
-        content: string;
-        parentId: string | null;
-        branchId: string | null;
-        createdAt: string;
-      }>;
-    }
-  | { type: "done"; messageId?: string };
 
 type ChatClientProps = {
   chatId: string;
@@ -73,6 +57,7 @@ function MessageBubble({
   onCancelEdit,
   onRegenerate,
   onSwitchBranch,
+  onToggleReasoning,
   onCopyMessage,
 }: {
   message: ChatMessage;
@@ -83,17 +68,17 @@ function MessageBubble({
   onSaveEdit: (id: string, newContent: string) => void;
   onCancelEdit: () => void;
   onRegenerate?: (assistantMessageId: string) => void;
-  onSwitchBranch?: (
-    messageId: string,
-    branch: ChatMessage["branchOptions"][number],
-  ) => void;
+  onSwitchBranch?: (messageId: string, branch: BranchOption) => void;
+  onToggleReasoning?: (messageId: string, expanded: boolean) => void;
   onCopyMessage?: (content: string) => void;
 }) {
   const isStreamingAssistant =
     message.role === "assistant" && message.streaming;
   const showThinkingOnly =
     message.role === "assistant" && message.pending && !message.content;
-  const showStatus = message.role === "assistant" && message.status;
+  const reasoningSteps = message.reasoningSteps ?? [];
+  const showReasoning =
+    message.role === "assistant" && reasoningSteps.length > 0;
 
   const isUser = message.role === "user";
   const branchOptions = message.branchOptions ?? [];
@@ -144,23 +129,23 @@ function MessageBubble({
               </button>
             </div>
           </div>
-        ) : showThinkingOnly ? (
-          <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
-            <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-            <span>{message.status ?? "Thinking..."}</span>
-          </div>
         ) : (
           <div className="space-y-2">
-            {showStatus && message.content ? (
-              <p
-                className={`text-[11px] uppercase tracking-[0.18em] text-muted-foreground ${
-                  message.streaming ? "opacity-70" : ""
-                }`}
-              >
-                {message.status}
-              </p>
+            {showReasoning ? (
+              <ReasoningTimeline
+                steps={reasoningSteps}
+                expanded={message.reasoningExpanded ?? true}
+                onExpandedChange={(expanded) => {
+                  onToggleReasoning?.(message.id, expanded);
+                }}
+              />
             ) : null}
-            {message.error ? (
+            {showThinkingOnly ? (
+              <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
+                <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                <span>{message.status ?? "Thinking..."}</span>
+              </div>
+            ) : message.error ? (
               <p className="text-[14px] leading-7 text-red-400">
                 {message.error}
               </p>
@@ -284,6 +269,44 @@ export function ChatClient({
 
   const hasMessages = messages.length > 0;
 
+  const updateAssistantMessage = useCallback(
+    (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
+      setMessages((currentMessages) =>
+        currentMessages.map((currentMessage) =>
+          currentMessage.id === messageId
+            ? updater(currentMessage)
+            : currentMessage,
+        ),
+      );
+    },
+    [],
+  );
+
+  const appendReasoningStep = useCallback(
+    (messageId: string, step: string) => {
+      updateAssistantMessage(messageId, (currentMessage) => {
+        const reasoningSteps = currentMessage.reasoningSteps ?? [];
+        // Avoid duplicate consecutive steps
+        if (reasoningSteps[reasoningSteps.length - 1] === step) {
+          return currentMessage;
+        }
+
+        const MAX_REASONING_STEPS = 50;
+        const newSteps = [...reasoningSteps, step].slice(
+          Math.max(0, reasoningSteps.length + 1 - MAX_REASONING_STEPS),
+        );
+
+        return {
+          ...currentMessage,
+          reasoningSteps: newSteps,
+          reasoningExpanded: currentMessage.reasoningExpanded ?? true,
+          status: step,
+        };
+      });
+    },
+    [updateAssistantMessage],
+  );
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isSending]);
@@ -349,10 +372,7 @@ export function ChatClient({
     }
   };
 
-  const switchBranch = (
-    messageId: string,
-    branch: ChatMessage["branchOptions"][number],
-  ) => {
+  const switchBranch = (messageId: string, branch: BranchOption) => {
     setMessages((currentMessages) =>
       currentMessages.map((currentMessage) =>
         currentMessage.id === messageId
@@ -399,6 +419,7 @@ export function ChatClient({
     ]);
 
     abortControllerRef.current = new AbortController();
+    let activeAssistantMessageId = assistantPlaceholderId;
 
     try {
       const response = await fetch("/api/chat/edit", {
@@ -421,36 +442,19 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let finalAssistantMessage = "";
-      let activeAssistantMessageId = assistantPlaceholderId;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
-        setMessages((currentMessages) =>
-          currentMessages.map((currentMessage) =>
-            currentMessage.id === activeAssistantMessageId
-              ? {
-                  ...currentMessage,
-                  content: finalAssistantMessage,
-                  pending: false,
-                  streaming: true,
-                  status: currentMessage.status,
-                }
-              : currentMessage,
-          ),
-        );
+        updateAssistantMessage(activeAssistantMessageId, (currentMessage) => ({
+          ...currentMessage,
+          content: finalAssistantMessage,
+          pending: false,
+          streaming: true,
+        }));
       };
 
       const applyStatus = (status: string) => {
-        setMessages((currentMessages) =>
-          currentMessages.map((currentMessage) =>
-            currentMessage.id === activeAssistantMessageId
-              ? {
-                  ...currentMessage,
-                  status,
-                }
-              : currentMessage,
-          ),
-        );
+        appendReasoningStep(activeAssistantMessageId, status);
       };
 
       const applyDone = (content: string, persistedMessageId?: string) => {
@@ -597,6 +601,7 @@ export function ChatClient({
     );
 
     abortControllerRef.current = new AbortController();
+    let activeAssistantMessageId = assistantPlaceholderId;
 
     try {
       const response = await fetch("/api/chat/regenerate", {
@@ -619,36 +624,19 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let finalAssistantMessage = "";
-      let activeAssistantMessageId = assistantPlaceholderId;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
-        setMessages((currentMessages) =>
-          currentMessages.map((currentMessage) =>
-            currentMessage.id === activeAssistantMessageId
-              ? {
-                  ...currentMessage,
-                  content: finalAssistantMessage,
-                  pending: false,
-                  streaming: true,
-                  status: currentMessage.status,
-                }
-              : currentMessage,
-          ),
-        );
+        updateAssistantMessage(activeAssistantMessageId, (currentMessage) => ({
+          ...currentMessage,
+          content: finalAssistantMessage,
+          pending: false,
+          streaming: true,
+        }));
       };
 
       const applyStatus = (status: string) => {
-        setMessages((currentMessages) =>
-          currentMessages.map((currentMessage) =>
-            currentMessage.id === activeAssistantMessageId
-              ? {
-                  ...currentMessage,
-                  status,
-                }
-              : currentMessage,
-          ),
-        );
+        appendReasoningStep(activeAssistantMessageId, status);
       };
 
       const applyPlaceholder = (
@@ -887,32 +875,19 @@ export function ChatClient({
 
         const applyChunk = (delta: string) => {
           finalAssistantMessage = `${finalAssistantMessage}${delta}`;
-          setMessages((currentMessages) =>
-            currentMessages.map((currentMessage) =>
-              currentMessage.id === activeAssistantMessageId
-                ? {
-                    ...currentMessage,
-                    content: finalAssistantMessage,
-                    pending: false,
-                    streaming: true,
-                    status: currentMessage.status,
-                  }
-                : currentMessage,
-            ),
+          updateAssistantMessage(
+            activeAssistantMessageId,
+            (currentMessage) => ({
+              ...currentMessage,
+              content: finalAssistantMessage,
+              pending: false,
+              streaming: true,
+            }),
           );
         };
 
         const applyStatus = (status: string) => {
-          setMessages((currentMessages) =>
-            currentMessages.map((currentMessage) =>
-              currentMessage.id === activeAssistantMessageId
-                ? {
-                    ...currentMessage,
-                    status,
-                  }
-                : currentMessage,
-            ),
-          );
+          appendReasoningStep(activeAssistantMessageId, status);
         };
 
         const applyDone = (content: string, persistedMessageId?: string) => {
@@ -1048,7 +1023,14 @@ export function ChatClient({
         setIsSending(false);
       }
     },
-    [chatId, draft, isSending, showFeedback],
+    [
+      appendReasoningStep,
+      chatId,
+      draft,
+      isSending,
+      showFeedback,
+      updateAssistantMessage,
+    ],
   );
 
   useEffect(() => {

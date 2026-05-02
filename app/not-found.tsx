@@ -28,8 +28,8 @@ export default function NotFound() {
 
         {/* Description */}
         <p className="mb-8 text-muted-foreground">
-          The page you're looking for doesn't exist. It may have been moved or
-          deleted.
+          The page you&apos;re looking for doesn&apos;t exist. It may have been
+          moved or deleted.
         </p>
 
         {/* Divider */}

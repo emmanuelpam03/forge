@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, CircleHelp, MoonStar, Sun, Type } from "lucide-react";
+import { ArrowLeft, MoonStar, Sun, Type } from "lucide-react";
 import { useTheme } from "next-themes";
 import SettingsShell from "../../../components/SettingsShell";
 
@@ -29,6 +29,7 @@ export default function AppearanceSettingsPage() {
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

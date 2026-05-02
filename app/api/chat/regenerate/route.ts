@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
         void (async () => {
           let assistantMessage = "";
-          let persistProgress = Promise.resolve();
+          let persistProgress: Promise<unknown> = Promise.resolve();
 
           send({
             type: "placeholder",

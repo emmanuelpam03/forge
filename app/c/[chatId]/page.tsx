@@ -70,69 +70,62 @@ export default async function ChatPage({
     latestAssistantByParentId.set(effectiveParentId, message);
   }
 
-  const initialMessages = chat.messages
-    .filter(
-      (message) => message.role === "user" || message.role === "assistant",
-    )
-    .flatMap((message) => {
-      if (message.role === "user") {
-        return [
-          {
-            id: message.id,
-            role: message.role,
-            content: message.content,
-          },
-        ];
-      }
+  const initialMessages: Array<Record<string, unknown>> = [];
+  for (const message of chat.messages) {
+    if (message.role === "user") {
+      initialMessages.push({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+      });
+      continue;
+    }
 
-      const effectiveParentId =
-        message.role === "assistant"
-          ? (effectiveAssistantParentIds.get(message.id) ?? message.parentId)
-          : null;
+    if (message.role !== "assistant") continue;
 
-      if (!effectiveParentId) {
-        return [
-          {
-            id: message.id,
-            role: message.role,
-            content: message.content,
-            parentId: message.parentId,
-            branchId: message.branchId,
-          },
-        ];
-      }
+    const effectiveParentId =
+      effectiveAssistantParentIds.get(message.id) ?? message.parentId;
 
-      const latestBranch = latestAssistantByParentId.get(effectiveParentId);
-      if (!latestBranch || latestBranch.id !== message.id) {
-        return [];
-      }
+    if (!effectiveParentId) {
+      initialMessages.push({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        parentId: message.parentId,
+        branchId: message.branchId,
+      });
+      continue;
+    }
 
-      const branchOptions = branchesByParentId[effectiveParentId] ?? [];
+    const latestBranch = latestAssistantByParentId.get(effectiveParentId);
+    if (!latestBranch || latestBranch.id !== message.id) {
+      continue;
+    }
 
-      return [
-        {
-          id: message.id,
-          role: message.role,
-          content: message.content,
-          parentId: effectiveParentId,
-          branchId: message.branchId,
-          branchOptions: branchOptions.map((branch) => ({
-            id: branch.id,
-            content: branch.content,
-            parentId: branch.parentId,
-            branchId: branch.branchId,
-            createdAt: branch.createdAt.toISOString(),
-          })),
-        },
-      ];
+    const branchOptions = branchesByParentId[effectiveParentId] ?? [];
+    initialMessages.push({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      parentId: effectiveParentId,
+      branchId: message.branchId,
+      branchOptions: branchOptions.map((branch) => ({
+        id: branch.id,
+        content: branch.content,
+        parentId: branch.parentId,
+        branchId: branch.branchId,
+        createdAt: branch.createdAt.toISOString(),
+      })),
     });
+  }
 
   return (
     <ChatClient
       chatId={chat.id}
       title={chat.title}
       initialMessage={initialMessage}
-      initialMessages={initialMessages}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server-to-client shape is simplified here
+      initialMessages={initialMessages as any}
     />
   );
 }

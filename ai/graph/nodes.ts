@@ -24,13 +24,21 @@ import {
   shouldForceWebSearchFromClassification,
 } from "@/ai/graph/classification";
 import type { ChatGraphState } from "@/ai/graph/state";
-import type { StreamEvent } from "@/ai/graph/index";
+import type { StreamEvent } from "@/ai/graph/stream";
+
+let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
+
+export function setGraphStreamEventEmitter(
+  onEvent?: (event: StreamEvent) => void,
+) {
+  graphStreamEventEmitter = onEvent;
+}
 
 function emitStatus(
   onEvent: ((event: StreamEvent) => void) | undefined,
   message: string,
 ) {
-  onEvent?.({ type: "status", message });
+  (onEvent ?? graphStreamEventEmitter)?.({ type: "status", message });
 }
 
 function getToolStatusMessage(toolName: string): string {
@@ -192,6 +200,7 @@ async function executeWebSearchTool(
 }
 
 export async function loadContextNode(state: ChatGraphState) {
+  emitStatus(undefined, "Loading context...");
   const selectedContext = await loadContextForChat(
     state.chatId,
     state.parentMessageId ?? null,
@@ -525,6 +534,8 @@ export async function toolRouterNodeImpl(
   onEvent?: (event: StreamEvent) => void,
 ) {
   try {
+    emitStatus(onEvent, "Using tools...");
+
     // If no tools needed, return early
     if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
       if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
@@ -757,6 +768,8 @@ export async function toolRouterNode(state: ChatGraphState) {
  */
 export async function synthesizeEvidenceNode(state: ChatGraphState) {
   try {
+    emitStatus(undefined, "Analyzing...");
+
     if (state.evidenceBundles.length === 0) {
       return {
         toolContext: "",
@@ -799,6 +812,8 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
  */
 export async function classifyIntentNode(state: ChatGraphState) {
   try {
+    emitStatus(undefined, "Understanding request...");
+
     if (state.classifiedIntent) {
       console.info(
         JSON.stringify({

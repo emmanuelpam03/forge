@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,29 +10,13 @@ type MessageRendererProps = {
   isStreaming?: boolean;
 };
 
-function useCopyState() {
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!copiedCode) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setCopiedCode(null);
-    }, 2000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [copiedCode]);
-
-  return { copiedCode, setCopiedCode };
-}
+// Copy state helper removed — currently unused. Reintroduce when enabling copy UI.
 
 export function MessageRenderer({
   content,
   isStreaming,
 }: MessageRendererProps) {
-  const { copiedCode, setCopiedCode } = useCopyState();
+  // copy helper not used currently
 
   const components = useMemo<Components>(
     () => ({
@@ -68,12 +52,15 @@ export function MessageRenderer({
       ),
       p: ({ children }) => {
         const childArray = React.Children.toArray(children);
-        const hasBlockChild = childArray.some((child) =>
-          React.isValidElement(child) &&
-          (child.type === "pre" || child.type === "div" || child.type === CodeBlock),
+        const hasBlockChild = childArray.some(
+          (child) =>
+            React.isValidElement(child) &&
+            (child.type === "pre" ||
+              child.type === "div" ||
+              child.type === CodeBlock),
         );
 
-        const Wrapper: any = hasBlockChild ? "div" : "p";
+        const Wrapper: React.ElementType = hasBlockChild ? "div" : "p";
 
         return (
           <Wrapper className="mb-4 leading-7 text-foreground/90 last:mb-0">
@@ -162,7 +149,7 @@ export function MessageRenderer({
         <strong className="font-semibold text-foreground">{children}</strong>
       ),
     }),
-    [copiedCode, setCopiedCode],
+    [],
   );
 
   return (

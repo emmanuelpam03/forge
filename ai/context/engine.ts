@@ -1,6 +1,7 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@/app/generated/prisma/client";
 import type {
   ChatMessageSnapshot,
   MemorySummarySnapshot,
@@ -58,7 +59,7 @@ async function loadRecentTurns(
 ): Promise<ChatMessageSnapshot[]> {
   // If cutoffMessageId is provided, load its createdAt and limit results to messages
   // created at or before that timestamp.
-  let whereClause: any = { chatId };
+  let whereClause: Prisma.MessageWhereInput = { chatId };
 
   if (cutoffMessageId) {
     const cutoffMsg = await prisma.message.findUnique({

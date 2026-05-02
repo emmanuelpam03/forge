@@ -7,32 +7,29 @@ import assert from "node:assert";
  */
 
 describe("Streaming Integration Tests", () => {
-  describe("NDJSON chunk parsing", () => {
-    it("should parse chunk event correctly", () => {
-      const chunkEvent = JSON.stringify({
-        type: "chunk",
+  describe("NDJSON event parsing", () => {
+    it("should parse token event correctly", () => {
+      const tokenEvent = JSON.stringify({
+        type: "token",
         content: "Hello, ",
-        timestamp: "2025-01-01T00:00:00Z",
       });
 
-      const parsed = JSON.parse(chunkEvent);
+      const parsed = JSON.parse(tokenEvent);
 
-      assert.strictEqual(parsed.type, "chunk");
+      assert.strictEqual(parsed.type, "token");
       assert.strictEqual(parsed.content, "Hello, ");
-      assert(parsed.timestamp);
     });
 
     it("should parse status event correctly", () => {
       const statusEvent = JSON.stringify({
         type: "status",
-        state: "processing",
-        message: "Retrieving context...",
+        message: "Loading context...",
       });
 
       const parsed = JSON.parse(statusEvent);
 
       assert.strictEqual(parsed.type, "status");
-      assert.strictEqual(parsed.state, "processing");
+      assert.strictEqual(parsed.message, "Loading context...");
     });
 
     it("should parse done event correctly", () => {
@@ -63,17 +60,18 @@ describe("Streaming Integration Tests", () => {
   });
 
   describe("NDJSON stream sequence", () => {
-    it("should sequence chunks in order", () => {
+    it("should sequence reasoning statuses and tokens in order", () => {
       const events = [
-        JSON.stringify({ type: "status", state: "thinking" }),
-        JSON.stringify({ type: "chunk", content: "The " }),
-        JSON.stringify({ type: "chunk", content: "answer " }),
-        JSON.stringify({ type: "chunk", content: "is " }),
-        JSON.stringify({ type: "chunk", content: "42." }),
+        JSON.stringify({ type: "status", message: "Loading context..." }),
+        JSON.stringify({ type: "status", message: "Understanding request..." }),
+        JSON.stringify({ type: "status", message: "Writing response..." }),
+        JSON.stringify({ type: "token", content: "The " }),
+        JSON.stringify({ type: "token", content: "answer " }),
+        JSON.stringify({ type: "token", content: "is " }),
+        JSON.stringify({ type: "token", content: "42." }),
         JSON.stringify({
           type: "done",
           messageId: "msg_1",
-          finishReason: "stop",
         }),
       ];
 
@@ -83,7 +81,7 @@ describe("Streaming Integration Tests", () => {
       events.forEach((eventLine) => {
         const event = JSON.parse(eventLine);
 
-        if (event.type === "chunk") {
+        if (event.type === "token") {
           content += event.content;
         } else if (event.type === "done") {
           isDone = true;
@@ -99,78 +97,56 @@ describe("Streaming Integration Tests", () => {
         JSON.stringify({
           type: "done",
           messageId: "msg_empty",
-          finishReason: "empty_response",
-          fallbackMessage: "I was unable to generate a response.",
         }),
       ];
 
       let content = "";
-      let fallback = "";
 
       events.forEach((eventLine) => {
         const event = JSON.parse(eventLine);
 
-        if (event.type === "done" && event.fallbackMessage) {
-          fallback = event.fallbackMessage;
+        if (event.type === "done") {
+          content = event.messageId;
         }
       });
 
-      assert.strictEqual(fallback, "I was unable to generate a response.");
+      assert.strictEqual(content, "msg_empty");
     });
 
     it("should handle error with graceful fallback", () => {
       const events = [
-        JSON.stringify({ type: "status", state: "planning" }),
-        JSON.stringify({ type: "chunk", content: "I'll help " }),
-        JSON.stringify({
-          type: "error",
-          error: "Tool execution failed",
-          code: "TOOL_TIMEOUT",
-        }),
         JSON.stringify({
           type: "done",
           messageId: "msg_error",
-          finishReason: "error",
-          fallbackMessage:
-            "I encountered an error and couldn't complete the request.",
         }),
       ];
 
-      let hadError = false;
-      let fallback = "";
+      let isDone = false;
 
       events.forEach((eventLine) => {
         const event = JSON.parse(eventLine);
 
-        if (event.type === "error") {
-          hadError = true;
-        }
-
-        if (event.type === "done" && event.fallbackMessage) {
-          fallback = event.fallbackMessage;
+        if (event.type === "done") {
+          isDone = true;
         }
       });
 
-      assert.strictEqual(hadError, true);
-      assert.strictEqual(
-        fallback,
-        "I encountered an error and couldn't complete the request.",
-      );
+      assert.strictEqual(isDone, true);
     });
   });
 
   describe("NDJSON stream validation", () => {
     it("should validate only valid event types", () => {
-      const validTypes = ["chunk", "status", "done", "error"];
+      const validTypes = ["token", "status", "done", "placeholder", "branches"];
 
       const testEvent = (type: string): boolean => {
         return validTypes.includes(type);
       };
 
-      assert.strictEqual(testEvent("chunk"), true);
+      assert.strictEqual(testEvent("token"), true);
       assert.strictEqual(testEvent("status"), true);
       assert.strictEqual(testEvent("done"), true);
-      assert.strictEqual(testEvent("error"), true);
+      assert.strictEqual(testEvent("placeholder"), true);
       assert.strictEqual(testEvent("invalid"), false);
     });
 
@@ -188,15 +164,15 @@ describe("Streaming Integration Tests", () => {
       assert.strictEqual(parseError, true);
     });
 
-    it("should handle chunk events without content field", () => {
+    it("should handle token events without content field", () => {
       const eventWithoutContent = JSON.stringify({
-        type: "chunk",
+        type: "token",
         // no content field
       });
 
       const event = JSON.parse(eventWithoutContent);
 
-      assert.strictEqual(event.type, "chunk");
+      assert.strictEqual(event.type, "token");
       assert.strictEqual(event.content, undefined);
     });
   });
@@ -204,16 +180,16 @@ describe("Streaming Integration Tests", () => {
   describe("First-turn streaming behavior", () => {
     it("should stream immediately without precomputation", () => {
       // Simulates the flow: homepage navigates -> ChatClient receives initialMessage -> stream starts
-      const initialMessage = "What is the capital of France?";
       const streamSequence = [
-        JSON.stringify({ type: "status", state: "classifying" }),
-        JSON.stringify({ type: "chunk", content: "The capital " }),
-        JSON.stringify({ type: "chunk", content: "of France " }),
-        JSON.stringify({ type: "chunk", content: "is Paris." }),
+        JSON.stringify({ type: "status", message: "Loading context..." }),
+        JSON.stringify({ type: "status", message: "Understanding request..." }),
+        JSON.stringify({ type: "status", message: "Writing response..." }),
+        JSON.stringify({ type: "token", content: "The capital " }),
+        JSON.stringify({ type: "token", content: "of France " }),
+        JSON.stringify({ type: "token", content: "is Paris." }),
         JSON.stringify({
           type: "done",
           messageId: "first_msg",
-          finishReason: "stop",
         }),
       ];
 
@@ -225,7 +201,7 @@ describe("Streaming Integration Tests", () => {
 
       streamSequence.forEach((line) => {
         const event = JSON.parse(line);
-        if (event.type === "chunk") {
+        if (event.type === "token") {
           renderedContent += event.content;
         }
       });
