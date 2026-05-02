@@ -84,10 +84,36 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       start(controller) {
-        const send = (event: StreamEvent) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-          );
+        let controllerClosed = false;
+
+        const safeClose = () => {
+          if (controllerClosed) {
+            return;
+          }
+
+          controllerClosed = true;
+          try {
+            controller.close();
+          } catch {
+            // No-op: the stream may already be closed/cancelled.
+          }
+        };
+
+        const send = (event: StreamEvent): boolean => {
+          if (controllerClosed) {
+            return false;
+          }
+
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+            );
+            return true;
+          } catch (error) {
+            controllerClosed = true;
+            console.warn("Regenerate SSE send skipped after close:", error);
+            return false;
+          }
         };
 
         const sendBranchList = async () => {
@@ -212,10 +238,10 @@ export async function POST(request: NextRequest) {
             send({ type: "done" });
           }
 
-          controller.close();
+          safeClose();
         })().catch((error) => {
           console.error("Regenerate stream failed:", error);
-          controller.close();
+          safeClose();
         });
       },
     });

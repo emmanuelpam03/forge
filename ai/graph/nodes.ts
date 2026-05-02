@@ -65,6 +65,63 @@ function toTaskTypeValue(taskType: string): TaskSuggestion["taskType"] {
   return "one-time";
 }
 
+function inferTaskSuggestionFromMessage(
+  message: string,
+): Omit<TaskSuggestion, "id"> | null {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const hasActionIntent =
+    /\b(remind me|set (a )?reminder|track|monitor|notify me|alert me|follow up|schedule|check)\b/i.test(
+      trimmed,
+    );
+
+  if (!hasActionIntent) {
+    return null;
+  }
+
+  const action = /\b(remind me|set (a )?reminder)\b/i.test(trimmed)
+    ? "set_reminder"
+    : /\b(track)\b/i.test(trimmed)
+      ? "track_item"
+      : /\b(monitor|check)\b/i.test(trimmed)
+        ? "monitor_item"
+        : /\b(notify me|alert me)\b/i.test(trimmed)
+          ? "notify_user"
+          : /\b(follow up)\b/i.test(trimmed)
+            ? "follow_up"
+            : "schedule_task";
+
+  const conditionalMatch = trimmed.match(/\b(if|when)\b(.+)/i);
+  const scheduleMatch = trimmed.match(
+    /\b(every\s+[^,.!?]+|daily|weekly|monthly|each\s+[^,.!?]+)\b/i,
+  );
+
+  const taskType: TaskSuggestion["taskType"] = conditionalMatch
+    ? "conditional"
+    : scheduleMatch
+      ? "scheduled"
+      : "one-time";
+
+  const description = trimmed.slice(0, 160);
+
+  return {
+    type: "suggestion",
+    action,
+    description,
+    taskType,
+    scheduleSpec:
+      taskType === "scheduled" ? (scheduleMatch?.[0] ?? null) : null,
+    conditionText:
+      taskType === "conditional"
+        ? `${conditionalMatch?.[1]}${conditionalMatch?.[2]}`.trim() || null
+        : null,
+    oneTimeAt: null,
+  };
+}
+
 function toTextContent(content: unknown): string {
   if (typeof content === "string") {
     return content;
@@ -89,6 +146,41 @@ function toTextContent(content: unknown): string {
   }
 
   return "";
+}
+
+function parseJsonFromModelText(text: string): unknown | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Continue with tolerant extraction below.
+  }
+
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fencedMatch?.[1]) {
+    try {
+      return JSON.parse(fencedMatch[1].trim());
+    } catch {
+      // Continue with object-slice extraction below.
+    }
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const jsonSlice = trimmed.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(jsonSlice);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 function getUsageCounts(message: AIMessage) {
@@ -482,15 +574,27 @@ User request: ${sanitizedMessage}`;
     ]);
     const responseText = toTextContent(response.content);
 
-    let parsedPlan;
-    try {
-      parsedPlan = JSON.parse(responseText);
-    } catch {
+    const parsedPlanRaw = parseJsonFromModelText(responseText);
+    let parsedPlan: {
+      toolsNeeded?: unknown;
+      sequential?: unknown;
+      followUpNeeded?: unknown;
+      followUpQuestion?: unknown;
+    };
+
+    if (!parsedPlanRaw || typeof parsedPlanRaw !== "object") {
       console.warn("Failed to parse tool plan JSON, defaulting to no tools");
       parsedPlan = {
         toolsNeeded: [],
         sequential: false,
         followUpNeeded: false,
+      };
+    } else {
+      parsedPlan = parsedPlanRaw as {
+        toolsNeeded?: unknown;
+        sequential?: unknown;
+        followUpNeeded?: unknown;
+        followUpQuestion?: unknown;
       };
     }
 
@@ -825,6 +929,8 @@ export async function suggestTaskNode(state: ChatGraphState) {
   try {
     const model = createGeminiModel();
     const sanitizedMessage = sanitizeUserInput(state.userMessage);
+    const heuristicSuggestion =
+      inferTaskSuggestionFromMessage(sanitizedMessage);
 
     const contextSummary = [
       state.intent ? `Intent: ${state.intent}` : "",
@@ -876,22 +982,42 @@ ${sanitizedMessage}`;
     const responseText = toTextContent(response.content).trim();
 
     if (!responseText || responseText === "null") {
-      return { suggestion: null };
+      if (!heuristicSuggestion) {
+        return { suggestion: null };
+      }
+
+      const suggestion: TaskSuggestion = {
+        id: crypto.randomUUID(),
+        ...heuristicSuggestion,
+      };
+      emitSuggestion(suggestion);
+      return { suggestion };
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(responseText);
-    } catch {
+    const parsedRaw = parseJsonFromModelText(responseText);
+    const parsed =
+      parsedRaw &&
+      typeof parsedRaw === "object" &&
+      "suggestion" in parsedRaw &&
+      (parsedRaw as { suggestion?: unknown }).suggestion
+        ? (parsedRaw as { suggestion?: unknown }).suggestion
+        : parsedRaw;
+
+    if (!parsed) {
       console.warn("Failed to parse task suggestion JSON, defaulting to none");
-      return { suggestion: null };
+      if (!heuristicSuggestion) {
+        return { suggestion: null };
+      }
+
+      const suggestion: TaskSuggestion = {
+        id: crypto.randomUUID(),
+        ...heuristicSuggestion,
+      };
+      emitSuggestion(suggestion);
+      return { suggestion };
     }
 
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      (parsed as { type?: string }).type !== "suggestion"
-    ) {
+    if (!parsed || typeof parsed !== "object") {
       return { suggestion: null };
     }
 
@@ -904,7 +1030,16 @@ ${sanitizedMessage}`;
       typeof candidate.action !== "string" ||
       typeof candidate.description !== "string"
     ) {
-      return { suggestion: null };
+      if (!heuristicSuggestion) {
+        return { suggestion: null };
+      }
+
+      const suggestion: TaskSuggestion = {
+        id: crypto.randomUUID(),
+        ...heuristicSuggestion,
+      };
+      emitSuggestion(suggestion);
+      return { suggestion };
     }
 
     const suggestion: TaskSuggestion = {

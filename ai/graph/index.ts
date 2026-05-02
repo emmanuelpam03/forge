@@ -1,7 +1,7 @@
 import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
-import { type BaseMessage } from "@langchain/core/messages";
+import { type AIMessage, type BaseMessage } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
 import {
   createChatGraphSeed,
@@ -56,6 +56,58 @@ function toTextContent(content: unknown): string {
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+function chunkTextForStreaming(text: string): string[] {
+  if (!text) {
+    return [];
+  }
+
+  const wordChunks = text.match(/\S+\s*/g) ?? [text];
+  const chunks: string[] = [];
+
+  for (const chunk of wordChunks) {
+    if (chunk.length <= 80) {
+      chunks.push(chunk);
+      continue;
+    }
+
+    for (let i = 0; i < chunk.length; i += 80) {
+      chunks.push(chunk.slice(i, i + 80));
+    }
+  }
+
+  return chunks;
+}
+
+function getChunkDelayMs(chunk: string, chunkCount: number): number {
+  if (!chunk) {
+    return 0;
+  }
+
+  // Speed up longer responses so incremental rendering feels responsive.
+  const speedMultiplier =
+    chunkCount > 260
+      ? 0.3
+      : chunkCount > 180
+        ? 0.45
+        : chunkCount > 110
+          ? 0.7
+          : 1;
+
+  if (/\n/.test(chunk)) {
+    return Math.round(18 * speedMultiplier);
+  }
+
+  if (/[.!?]["')\]]?\s*$/.test(chunk)) {
+    return Math.round(14 * speedMultiplier);
+  }
+
+  if (/[,:;]["')\]]?\s*$/.test(chunk)) {
+    return Math.round(10 * speedMultiplier);
+  }
+
+  return Math.round(6 * speedMultiplier);
 }
 
 async function runGraphPreResponse(
@@ -119,26 +171,32 @@ export async function runChatGraphStream(
   let assistantMessage = "";
   let inputTokens = 0;
   let outputTokens = 0;
-  let hasEmittedWritingStatus = false;
 
   try {
-    const stream = await model.stream(messages as BaseMessage[]);
+    onEvent?.({ type: "status", message: "Writing response..." });
 
-    for await (const chunk of stream as AsyncIterable<unknown>) {
-      const text = toTextContent(
-        (chunk as { content?: unknown })?.content ?? chunk,
-      );
-      if (!text) {
-        continue;
+    const response = (await model.invoke(
+      messages as BaseMessage[],
+    )) as AIMessage;
+    assistantMessage = toTextContent(response.content).trim();
+
+    if (assistantMessage) {
+      const chunks = chunkTextForStreaming(assistantMessage);
+      let cumulativeDelayMs = 0;
+      const maxCumulativeDelayMs = 900;
+
+      for (let i = 0; i < chunks.length; i += 1) {
+        onEvent?.({ type: "token", content: chunks[i] });
+
+        // Tiny pacing delay gives a smoother typing feel without high latency.
+        const delayMs = getChunkDelayMs(chunks[i], chunks.length);
+        if (delayMs <= 0 || cumulativeDelayMs >= maxCumulativeDelayMs) {
+          continue;
+        }
+
+        cumulativeDelayMs += delayMs;
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
       }
-
-      if (!hasEmittedWritingStatus) {
-        onEvent?.({ type: "status", message: "Writing response..." });
-        hasEmittedWritingStatus = true;
-      }
-
-      assistantMessage += text;
-      onEvent?.({ type: "token", content: text });
     }
   } catch (error) {
     throw error;
