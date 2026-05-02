@@ -78,7 +78,10 @@ function MessageBubble({
     message.role === "assistant" && message.pending && !message.content;
   const reasoningSteps = message.reasoningSteps ?? [];
   const showReasoning =
-    message.role === "assistant" && reasoningSteps.length > 0;
+    message.role === "assistant" &&
+    reasoningSteps.length > 0 &&
+    (showThinkingOnly || isStreamingAssistant);
+  const showLegacyThinking = showThinkingOnly && !showReasoning;
 
   const isUser = message.role === "user";
   const branchOptions = message.branchOptions ?? [];
@@ -134,13 +137,13 @@ function MessageBubble({
             {showReasoning ? (
               <ReasoningTimeline
                 steps={reasoningSteps}
-                expanded={message.reasoningExpanded ?? true}
+                expanded={message.reasoningExpanded ?? false}
                 onExpandedChange={(expanded) => {
                   onToggleReasoning?.(message.id, expanded);
                 }}
               />
             ) : null}
-            {showThinkingOnly ? (
+            {showLegacyThinking ? (
               <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
                 <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
                 <span>{message.status ?? "Thinking..."}</span>
@@ -299,7 +302,7 @@ export function ChatClient({
         return {
           ...currentMessage,
           reasoningSteps: newSteps,
-          reasoningExpanded: currentMessage.reasoningExpanded ?? true,
+          reasoningExpanded: currentMessage.reasoningExpanded ?? false,
           status: step,
         };
       });
@@ -388,6 +391,16 @@ export function ChatClient({
       ),
     );
   };
+
+  const toggleReasoning = useCallback(
+    (messageId: string, expanded: boolean) => {
+      updateAssistantMessage(messageId, (currentMessage) => ({
+        ...currentMessage,
+        reasoningExpanded: expanded,
+      }));
+    },
+    [updateAssistantMessage],
+  );
 
   const saveEdit = async (messageId: string, newContent: string) => {
     if (!newContent || isSending) return;
@@ -594,6 +607,8 @@ export function ChatClient({
               pending: true,
               streaming: false,
               status: undefined,
+              reasoningSteps: [],
+              reasoningExpanded: false,
               error: undefined,
             }
           : message,
@@ -1091,6 +1106,7 @@ export function ChatClient({
                 onCancelEdit={cancelEdit}
                 onRegenerate={regenerateMessage}
                 onSwitchBranch={switchBranch}
+                onToggleReasoning={toggleReasoning}
                 onCopyMessage={(content) => {
                   void copyMessage(content);
                 }}

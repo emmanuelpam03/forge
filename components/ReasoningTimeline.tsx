@@ -12,7 +12,7 @@ export type ReasoningTimelineProps = {
 
 export function ReasoningTimeline({
   steps,
-  expanded = true,
+  expanded = false,
   onExpandedChange,
   maxPreview = 3,
 }: ReasoningTimelineProps) {
