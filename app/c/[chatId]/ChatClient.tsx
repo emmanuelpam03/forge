@@ -812,6 +812,7 @@ export function ChatClient({
       setEditingContent(null);
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
+        // Preserve accumulated content when stopped; just mark as not streaming
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
             currentMessage.id === assistantPlaceholderId
@@ -820,7 +821,6 @@ export function ChatClient({
                   pending: false,
                   streaming: false,
                   status: undefined,
-                  error: "Stopped",
                 }
               : currentMessage,
           ),
@@ -1076,6 +1076,7 @@ export function ChatClient({
       }
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
+        // Preserve accumulated content when stopped; just mark as not streaming
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
             currentMessage.id === activeAssistantMessageId
@@ -1084,7 +1085,6 @@ export function ChatClient({
                   pending: false,
                   streaming: false,
                   status: undefined,
-                  error: "Stopped",
                 }
               : currentMessage,
           ),
@@ -1351,6 +1351,7 @@ export function ChatClient({
         }
       } catch (sendError) {
         if (sendError instanceof Error && sendError.name === "AbortError") {
+          // Preserve accumulated content when stopped; just mark as not streaming
           setMessages((currentMessages) =>
             currentMessages.map((currentMessage) =>
               currentMessage.id === assistantPlaceholderId
@@ -1359,7 +1360,6 @@ export function ChatClient({
                     pending: false,
                     streaming: false,
                     status: undefined,
-                    error: "Stopped",
                   }
                 : currentMessage,
             ),

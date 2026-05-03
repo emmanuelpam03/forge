@@ -3,6 +3,7 @@ import "server-only";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
 import type { BaseMessage } from "@langchain/core/messages";
+import { SystemMessage } from "@langchain/core/messages";
 import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
 import { assertLangSmithConfig } from "@/lib/langsmith";
 
@@ -46,14 +47,27 @@ export function createGeminiModel() {
       model: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
     });
 
-    // Convert LangChain messages to native format
-    const contents: Content[] = messages.map((msg: BaseMessage) => ({
+    // Extract system message and filter it out from contents
+    let systemInstruction = "";
+    const userMessages: BaseMessage[] = [];
+
+    for (const msg of messages) {
+      if (msg instanceof SystemMessage) {
+        systemInstruction = msg.content as string;
+      } else {
+        userMessages.push(msg);
+      }
+    }
+
+    // Convert LangChain messages to native format (excluding system messages)
+    const contents: Content[] = userMessages.map((msg: BaseMessage) => ({
       role: msg._getType() === "ai" ? "model" : "user",
       parts: [{ text: msg.content as string }],
     }));
 
     // Use native streaming with generateContentStream
     const stream = nativeModel.generateContentStream({
+      systemInstruction,
       contents,
       generationConfig: {
         temperature: 0.6,
