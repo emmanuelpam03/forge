@@ -59,15 +59,53 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+function toStreamChunkText(chunk: unknown): string {
+  if (typeof chunk === "string") {
+    return chunk;
+  }
+
+  if (chunk && typeof chunk === "object") {
+    const textValue = (chunk as { text?: unknown }).text;
+    if (typeof textValue === "string") {
+      return textValue;
+    }
+
+    const contentValue = (chunk as { content?: unknown }).content;
+    const contentText = toTextContent(contentValue);
+    if (contentText) {
+      return contentText;
+    }
+
+    if (contentValue && typeof contentValue === "object") {
+      const contentBlocks = contentValue as {
+        text?: unknown;
+        content?: unknown;
+      };
+      const nestedText = toTextContent(
+        contentBlocks.text ?? contentBlocks.content,
+      );
+      if (nestedText) {
+        return nestedText;
+      }
+    }
+  }
+
+  return "";
+}
+
 type StreamableGeminiModel = {
   stream(messages: BaseMessage[]): Promise<AsyncIterable<unknown>>;
+};
+
+type GraphStateWithDiagnostics = ReturnType<typeof createChatGraphSeed> & {
+  __preResponseMs?: number;
 };
 
 async function runGraphPreResponse(
   input: ChatGraphInput,
   onEvent?: (event: StreamEvent) => void,
 ) {
-  const state = createChatGraphSeed(input);
+  const state = createChatGraphSeed(input) as GraphStateWithDiagnostics;
   const _preResponseStart = Date.now();
 
   // Register a run-scoped emitter so nodes can call `emitStatus` without
@@ -90,7 +128,7 @@ async function runGraphPreResponse(
   setGraphStreamEventEmitter(undefined);
 
   // annotate duration for diagnostics
-  (state as any).__preResponseMs = Date.now() - _preResponseStart;
+  state.__preResponseMs = Date.now() - _preResponseStart;
 
   return state;
 }
@@ -132,7 +170,7 @@ export async function runChatGraphStream(
   console.info("PRE-RESPONSE_MS", {
     chatId: hashIdentifierForLogging(input.chatId),
     runId: hashIdentifierForLogging(input.runId),
-    preResponseMs: (state as any).__preResponseMs ?? null,
+    preResponseMs: state.__preResponseMs ?? null,
   });
   console.info("MODEL STREAM START", {
     chatId: hashIdentifierForLogging(input.chatId),
@@ -175,7 +213,11 @@ export async function runChatGraphStream(
         onEvent?.({ type: "first_token", ttftMs: firstTokenAt - startedAt });
       }
 
-      const chunkText = String(token ?? "");
+      const chunkText = toStreamChunkText(token);
+      if (!chunkText) {
+        continue;
+      }
+
       assistantMessage += chunkText;
       onEvent?.({ type: "token", content: chunkText });
     }

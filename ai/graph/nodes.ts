@@ -193,6 +193,31 @@ function toTextContent(content: unknown): string {
   return "";
 }
 
+function toChunkText(chunk: unknown): string {
+  if (typeof chunk === "string") {
+    return chunk;
+  }
+
+  if (chunk && typeof chunk === "object") {
+    const chunkContent = (chunk as { content?: unknown }).content;
+    const textFromContent = toTextContent(chunkContent);
+    if (textFromContent) {
+      return textFromContent;
+    }
+
+    const chunkText = (chunk as { text?: unknown }).text;
+    if (typeof chunkText === "string") {
+      return chunkText;
+    }
+
+    if (chunkText && typeof chunkText === "object") {
+      return toTextContent(chunkText);
+    }
+  }
+
+  return String(chunk ?? "").replace(/^\[object\s[\w$]+\]$/, "");
+}
+
 function estimateTokens(text: string): number {
   return Math.ceil((text?.length ?? 0) / 4);
 }
@@ -411,7 +436,10 @@ export async function generateResponseNode(state: ChatGraphState) {
         });
       }
 
-      const chunkText = String(token ?? "");
+      const chunkText = toChunkText(token);
+      if (!chunkText) {
+        continue;
+      }
       assistantMessage += chunkText;
 
       // Forward the token to any registered stream listener for this run.
