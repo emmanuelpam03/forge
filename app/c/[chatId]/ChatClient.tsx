@@ -924,7 +924,10 @@ export function ChatClient({
             }
 
             if (event.type === "status") applyStatus(event.message);
-            if (event.type === "token") applyChunk(event.content);
+            if (event.type === "token") {
+              await new Promise<void>((resolve) => setTimeout(resolve, 12));
+              applyChunk(event.content);
+            }
             if (event.type === "done") applyDone(finalAssistantMessage);
           } catch (parseError) {
             if (
@@ -941,8 +944,6 @@ export function ChatClient({
           }
         }
       }
-
-      applyDone(finalAssistantMessage);
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
         setMessages((currentMessages) =>
@@ -1058,6 +1059,7 @@ export function ChatClient({
         let buffer = "";
         let finalAssistantMessage = "";
         let activeAssistantMessageId = assistantPlaceholderId;
+        let hasReceivedDone = false;
 
         const applyChunk = (delta: string) => {
           finalAssistantMessage = `${finalAssistantMessage}${delta}`;
@@ -1151,10 +1153,12 @@ export function ChatClient({
               }
 
               if (event.type === "token") {
+                await new Promise<void>((resolve) => setTimeout(resolve, 12));
                 applyChunk(event.content);
               }
 
               if (event.type === "done") {
+                hasReceivedDone = true;
                 applyDone(finalAssistantMessage, event.messageId);
               }
             } catch (parseError) {
@@ -1171,7 +1175,9 @@ export function ChatClient({
           }
         }
 
-        applyDone(finalAssistantMessage, undefined);
+        if (!hasReceivedDone) {
+          applyDone(finalAssistantMessage, undefined);
+        }
       } catch (sendError) {
         if (sendError instanceof Error && sendError.name === "AbortError") {
           setMessages((currentMessages) =>
