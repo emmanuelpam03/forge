@@ -730,7 +730,7 @@ export async function planTaskNode(state: ChatGraphState) {
     // Sanitize user input to prevent prompt injection
     const sanitizedMessage = sanitizeUserInput(state.userMessage);
 
-    const systemPrompt = `You are a tool planner for Forge. Analyze the user request and decide which tools would improve the answer.
+    const systemPrompt = `You are a tool planner for Forge. Analyze the user request and decide if tools are NECESSARY.
 
 Available tools:
 - calculator: For arithmetic, percentages, conversions, risk calculations
@@ -747,10 +747,27 @@ Return a JSON object with:
   "followUpQuestion": "What is X?" if followUpNeeded is true
 }
 
-Rules:
-- Use tools proactively. Do not wait for explicit user requests like "search for", "calculate", etc.
-- If uncertain, default to no tools.
-- For independent tools (time + news), set sequential to false.
+SELECTIVE TOOL USAGE RULES:
+
+USE tools for:
+✓ Current events, news, or real-time data (webSearch required)
+✓ Changing facts like prices, rankings, or live information (webSearch required)
+✓ Calculations involving numbers (percentages, risk, estimates, conversions)
+✓ Current time, timezone, or scheduling questions (currentDateTime required)
+✓ Project-specific history or prior decisions (projectContextLookup required)
+
+DO NOT use tools for:
+✗ Definitions ("what is X?", "explain Y")
+✗ Historical facts or past events (training data sufficient)
+✗ Conceptual questions or reasoning
+✗ General knowledge from training data
+✗ Code examples or syntax questions
+✗ Creative tasks or brainstorming
+✗ Summarizing content the user already provided (only if external source)
+
+Decision: If the answer comes from general knowledge or definitions, toolsNeeded = [].
+If uncertain about urgency/freshness, default to NO tools.
+Only use tools if information is time-sensitive, external, or involves calculation.
 `;
 
     const userPrompt = `User intent: ${state.intent}
@@ -843,11 +860,11 @@ export async function toolRouterNodeImpl(
   onEvent?: (event: StreamEvent) => void,
 ) {
   try {
-    emitStatus(onEvent, "Using tools...");
-
-    // If no tools needed, return early
+    // If no tools needed, return early without emitting "Using tools..." status
     if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
       if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
+        // Forced web search happens - emit status for it
+        emitStatus(onEvent, "Using tools...");
         const tools = createForgeTools({ chatId: state.chatId });
         return executeWebSearchTool(
           state,
@@ -858,11 +875,15 @@ export async function toolRouterNodeImpl(
         );
       }
 
+      // No tools needed and no forced search - return clean
       return {
         toolsUsed: [],
         evidenceBundles: [],
       };
     }
+
+    // Tools are planned - emit status that we're using them
+    emitStatus(onEvent, "Using tools...");
 
     const tools = createForgeTools({ chatId: state.chatId });
     const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
