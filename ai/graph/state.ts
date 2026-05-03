@@ -89,7 +89,10 @@ export type ChatGraphState = {
   evidenceBundles: EvidenceBundle[];
   synthesisNote: string;
   suggestion: TaskSuggestion | null;
+  suggestions: TaskSuggestion[];
+  suggestionResponse: string;
   classifiedIntent: ClassifiedIntent | null;
+  preResponsePromise?: Promise<void>;
   /**
    * When set, forces the graph to execute a specific tool (e.g. "webSearch").
    */
@@ -205,6 +208,14 @@ export const chatGraphState = Annotation.Root({
     default: () => null,
     reducer: lastValue,
   }),
+  suggestions: Annotation<TaskSuggestion[]>({
+    default: () => [],
+    reducer: lastValue,
+  }),
+  suggestionResponse: Annotation<string>({
+    default: () => "",
+    reducer: lastValue,
+  }),
   classifiedIntent: Annotation<{
     intent: ClassificationIntent;
     requiresFreshData: boolean;
@@ -263,6 +274,8 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   evidenceBundles: [],
   synthesisNote: "",
   suggestion: null,
+  suggestions: [],
+  suggestionResponse: "",
   classifiedIntent: input.classifiedIntent ?? null,
   forceTool: input.forceTool ?? null,
 });

@@ -1,6 +1,7 @@
 export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "token"; content: string }
+  | { type: "first_token"; ttftMs?: number }
   | {
       type: "suggestion";
       suggestion: {
@@ -13,6 +14,19 @@ export type StreamEvent =
         conditionText?: string | null;
         oneTimeAt?: string | null;
       };
+    }
+  | {
+      type: "suggestions";
+      suggestions: Array<{
+        id: string;
+        type: "suggestion";
+        action: string;
+        description: string;
+        taskType: "scheduled" | "conditional" | "one-time";
+        scheduleSpec?: string | null;
+        conditionText?: string | null;
+        oneTimeAt?: string | null;
+      }>;
     }
   | {
       type: "placeholder";

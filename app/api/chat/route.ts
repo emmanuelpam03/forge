@@ -26,15 +26,29 @@ export async function POST(request: NextRequest) {
     }
 
     const runId = crypto.randomUUID();
+    const assistantMessageId = crypto.randomUUID();
     const encoder = new TextEncoder();
 
     const requestStartedAt = Date.now();
     let firstTokenAt: number | null = null;
     let placeholderSentAt: number | null = null;
+    const debugStream = process.env.DEBUG_STREAM === "1";
 
     const stream = new ReadableStream({
       start(controller) {
         const send = (event: StreamEvent) => {
+          if (debugStream) {
+            console.info(
+              JSON.stringify({
+                event: "stream_forward",
+                type: event.type,
+                chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+                runId: hashIdentifierForLogging(runId),
+                timestamp: Date.now() - requestStartedAt,
+              }),
+            );
+          }
+
           try {
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
@@ -71,6 +85,7 @@ export async function POST(request: NextRequest) {
                 chatId: parsedBody.data.chatId,
                 userMessage: parsedBody.data.message,
                 runId,
+                assistantMessageId,
                 forceTool: null,
                 classifiedIntent: null,
               },
@@ -129,10 +144,25 @@ export async function POST(request: NextRequest) {
               });
             }
 
+            console.info("GRAPH COMPLETE", {
+              chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+              runId: hashIdentifierForLogging(runId),
+              messageId: hashIdentifierForLogging(
+                finalPersistedMessageId ?? assistantMessageId,
+              ),
+            });
+
             send({
               type: "done",
-              messageId: finalPersistedMessageId,
+              messageId: finalPersistedMessageId ?? assistantMessageId,
             });
+
+            console.info("STREAM CLOSED", {
+              chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+              runId: hashIdentifierForLogging(runId),
+              totalMs: Date.now() - requestStartedAt,
+            });
+            controller.close();
           } catch (error) {
             console.error("Chat stream failed:", error);
 
@@ -146,17 +176,15 @@ export async function POST(request: NextRequest) {
 
             send({ type: "status", message: "Failed to generate a response." });
             send({ type: "done" });
+
+            console.info("STREAM CLOSED", {
+              chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+              runId: hashIdentifierForLogging(runId),
+              totalMs: Date.now() - requestStartedAt,
+            });
+            controller.close();
           } finally {
-            try {
-              console.info("STREAM CLOSED", {
-                chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-                runId: hashIdentifierForLogging(runId),
-                totalMs: Date.now() - requestStartedAt,
-              });
-              controller.close();
-            } catch (e) {
-              console.error("Failed to close stream controller:", e);
-            }
+            // Stream closure is handled immediately after the terminal event.
           }
         })().catch((error) => {
           console.error("Chat stream failed:", error);

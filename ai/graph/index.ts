@@ -59,6 +59,10 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
+type StreamableGeminiModel = {
+  stream(messages: BaseMessage[]): Promise<AsyncIterable<unknown>>;
+};
+
 async function runGraphPreResponse(
   input: ChatGraphInput,
   onEvent?: (event: StreamEvent) => void,
@@ -77,11 +81,11 @@ async function runGraphPreResponse(
   Object.assign(state, contextResult);
   Object.assign(state, classificationResult);
   Object.assign(state, await planTaskNode(state));
-  Object.assign(state, await toolRouterNodeImpl(state));
+  Object.assign(state, await toolRouterNodeImpl(state, onEvent));
   Object.assign(state, await synthesizeEvidenceNode(state));
   Object.assign(state, await suggestTaskNode(state));
 
-  // Clear the run-scoped emitter to avoid cross-run leakage.
+  // Clear the run-scoped emitter after all pre-response events are done.
   setGraphStreamEventEmitter(undefined);
 
   return state;
@@ -128,16 +132,14 @@ export async function runChatGraphStream(
 
   try {
     onEvent?.({ type: "status", message: "Writing response..." });
-
     let firstTokenAt: number | null = null;
 
     // Prefer streaming tokens from the model. The model wrapper exposes
     // an async iterator `stream(messages)` that yields token strings.
     // This will reduce TTFT when the provider supports streaming.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tokenStream = (model as any).stream(
-      messages as BaseMessage[],
-    ) as AsyncIterable<string>;
+    const tokenStream = await (
+      model as unknown as StreamableGeminiModel
+    ).stream(messages as BaseMessage[]);
 
     for await (const token of tokenStream) {
       if (firstTokenAt === null) {
@@ -155,6 +157,8 @@ export async function runChatGraphStream(
             ttftMs: firstTokenAt - startedAt,
           }),
         );
+        // Notify listeners that the first token is available
+        onEvent?.({ type: "first_token", ttftMs: firstTokenAt - startedAt });
       }
 
       const chunkText = String(token ?? "");
@@ -176,6 +180,19 @@ export async function runChatGraphStream(
         runId: hashIdentifierForLogging(input.runId),
         durationMs: endedAt - startedAt,
         ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+      }),
+    );
+    console.info("GRAPH COMPLETE", {
+      chatId: hashIdentifierForLogging(input.chatId),
+      runId: hashIdentifierForLogging(input.runId),
+      durationMs: endedAt - startedAt,
+    });
+    console.info(
+      JSON.stringify({
+        event: "graph_complete",
+        chatId: hashIdentifierForLogging(input.chatId),
+        runId: hashIdentifierForLogging(input.runId),
+        durationMs: endedAt - startedAt,
       }),
     );
   } catch (error) {
@@ -206,17 +223,16 @@ export async function runChatGraphStream(
     latencyMs: Date.now() - startedAt,
   });
 
-  // Post-stream step 1: Save messages to database
-  try {
-    const saveResult = await saveMessagesNode(state);
-    Object.assign(state, saveResult);
-  } catch (error) {
-    console.error(`Failed to save messages for chat ${input.chatId}:`, error);
-    // Continue - don't block title generation or memory extraction
-  }
-
-  // Run post-processing in background so the stream can complete immediately.
+  // Run persistence and post-processing in the background so the stream can
+  // complete immediately after the model finishes.
   void (async () => {
+    try {
+      const saveResult = await saveMessagesNode(state);
+      Object.assign(state, saveResult);
+    } catch (error) {
+      console.error(`Failed to save messages for chat ${input.chatId}:`, error);
+    }
+
     // Post-stream step 2: Generate and persist chat title
     try {
       const titleResult = await generateTitleNode(state);

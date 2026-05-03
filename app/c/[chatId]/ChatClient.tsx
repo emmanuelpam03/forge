@@ -282,6 +282,7 @@ export function ChatClient({
 
   const hasMessages = messages.length > 0;
   const hasSuggestions = suggestions.length > 0;
+  const showSuggestionsPanel = hasSuggestions && !isSending;
 
   const updateAssistantMessage = useCallback(
     (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
@@ -421,6 +422,48 @@ export function ChatClient({
       );
     });
   }, []);
+
+  const upsertSuggestions = useCallback(
+    (nextSuggestions: TaskSuggestion[]) => {
+      nextSuggestions.forEach((suggestion) => {
+        upsertSuggestion(suggestion);
+      });
+    },
+    [upsertSuggestion],
+  );
+
+  const clearAssistantStreamingState = useCallback((messageId: string) => {
+    setMessages((currentMessages) =>
+      currentMessages.map((currentMessage) =>
+        currentMessage.id === messageId
+          ? {
+              ...currentMessage,
+              pending: false,
+              streaming: false,
+              status: undefined,
+              reasoningSteps: [],
+              reasoningExpanded: false,
+            }
+          : currentMessage,
+      ),
+    );
+  }, []);
+
+  const finalizeStreamState = useCallback(
+    (messageId: string, source: string) => {
+      console.info("STREAM END DETECTED", {
+        chatId,
+        source,
+      });
+      clearAssistantStreamingState(messageId);
+      setIsSending(false);
+      console.info("STATE RESET", {
+        chatId,
+        source,
+      });
+    },
+    [chatId, clearAssistantStreamingState],
+  );
 
   const acceptSuggestion = useCallback(
     async (suggestion: SuggestionState) => {
@@ -672,6 +715,7 @@ export function ChatClient({
           );
           setEditingId(messageId);
           setEditingContent(newContent);
+          finalizeStreamState(previousAssistantMessageId, "edit");
           return;
         }
 
@@ -687,10 +731,13 @@ export function ChatClient({
                   pending: false,
                   streaming: false,
                   status: undefined,
+                  reasoningSteps: [],
+                  reasoningExpanded: false,
                 }
               : currentMessage,
           ),
         );
+        finalizeStreamState(nextAssistantMessageId, "edit");
       };
 
       while (true) {
@@ -713,6 +760,24 @@ export function ChatClient({
             const event = JSON.parse(payloadText) as StreamEvent;
 
             if (event.type === "status") applyStatus(event.message);
+            if (event.type === "suggestions") {
+              upsertSuggestions(event.suggestions);
+            }
+            if (event.type === "first_token") {
+              console.info("FIRST TOKEN EVENT", {
+                chatId,
+                source: "edit",
+              });
+              updateAssistantMessage(
+                assistantPlaceholderId,
+                (currentMessage) => ({
+                  ...currentMessage,
+                  pending: false,
+                  streaming: true,
+                  status: undefined,
+                }),
+              );
+            }
             if (event.type === "token") applyChunk(event.content);
             if (event.type === "done") {
               hasReceivedDone = true;
@@ -908,6 +973,7 @@ export function ChatClient({
             ),
           );
           activeAssistantMessageId = assistantPlaceholderId;
+          finalizeStreamState(assistantPlaceholderId, "regenerate");
           return;
         }
 
@@ -922,10 +988,13 @@ export function ChatClient({
                   pending: false,
                   streaming: false,
                   status: undefined,
+                  reasoningSteps: [],
+                  reasoningExpanded: false,
                 }
               : currentMessage,
           ),
         );
+        finalizeStreamState(activeAssistantMessageId, "regenerate");
       };
 
       while (true) {
@@ -956,8 +1025,22 @@ export function ChatClient({
             }
 
             if (event.type === "status") applyStatus(event.message);
+            if (event.type === "suggestions") {
+              upsertSuggestions(event.suggestions);
+            }
+            if (event.type === "first_token") {
+              // Clear placeholder/thinking state immediately when first token arrives
+              updateAssistantMessage(
+                activeAssistantMessageId,
+                (currentMessage) => ({
+                  ...currentMessage,
+                  pending: false,
+                  streaming: true,
+                  status: undefined,
+                }),
+              );
+            }
             if (event.type === "token") {
-              await new Promise<void>((resolve) => setTimeout(resolve, 12));
               applyChunk(event.content);
             }
             if (event.type === "done") {
@@ -1155,6 +1238,7 @@ export function ChatClient({
               ),
             );
             setDraft(message);
+            finalizeStreamState(previousAssistantMessageId, "send");
             return;
           }
 
@@ -1170,10 +1254,13 @@ export function ChatClient({
                     pending: false,
                     streaming: false,
                     status: undefined,
+                    reasoningSteps: [],
+                    reasoningExpanded: false,
                   }
                 : currentMessage,
             ),
           );
+          finalizeStreamState(nextAssistantMessageId, "send");
         };
 
         while (true) {
@@ -1205,12 +1292,31 @@ export function ChatClient({
                 upsertSuggestion(event.suggestion);
               }
 
+              if (event.type === "suggestions") {
+                upsertSuggestions(event.suggestions);
+              }
+
               if (event.type === "status") {
                 applyStatus(event.message);
               }
 
+              if (event.type === "first_token") {
+                console.info("FIRST TOKEN EVENT", {
+                  chatId,
+                  source: "send",
+                });
+                updateAssistantMessage(
+                  assistantPlaceholderId,
+                  (currentMessage) => ({
+                    ...currentMessage,
+                    pending: false,
+                    streaming: true,
+                    status: undefined,
+                  }),
+                );
+              }
+
               if (event.type === "token") {
-                await new Promise<void>((resolve) => setTimeout(resolve, 12));
                 applyChunk(event.content);
               }
 
@@ -1330,7 +1436,7 @@ export function ChatClient({
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          {hasSuggestions ? (
+          {showSuggestionsPanel ? (
             <div className="space-y-3">
               <div>
                 <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
