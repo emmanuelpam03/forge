@@ -59,46 +59,22 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-function toStreamChunkText(chunk: unknown): string {
-  if (typeof chunk === "string") {
-    return chunk;
-  }
-
-  if (chunk && typeof chunk === "object") {
-    const textValue = (chunk as { text?: unknown }).text;
-    if (typeof textValue === "string") {
-      return textValue;
-    }
-
-    const contentValue = (chunk as { content?: unknown }).content;
-    const contentText = toTextContent(contentValue);
-    if (contentText) {
-      return contentText;
-    }
-
-    if (contentValue && typeof contentValue === "object") {
-      const contentBlocks = contentValue as {
-        text?: unknown;
-        content?: unknown;
-      };
-      const nestedText = toTextContent(
-        contentBlocks.text ?? contentBlocks.content,
-      );
-      if (nestedText) {
-        return nestedText;
-      }
-    }
-  }
-
-  return "";
-}
-
-type StreamableGeminiModel = {
-  stream(messages: BaseMessage[]): Promise<AsyncIterable<unknown>>;
-};
-
 type GraphStateWithDiagnostics = ReturnType<typeof createChatGraphSeed> & {
   __preResponseMs?: number;
+};
+
+type GeminiModelWithNativeStream = {
+  nativeStream(messages: BaseMessage[]): Promise<{
+    stream: AsyncIterable<{
+      candidates?: Array<{
+        content?: {
+          parts?: Array<{
+            text?: string;
+          }>;
+        };
+      }>;
+    }>;
+  }>;
 };
 
 async function runGraphPreResponse(
@@ -186,14 +162,33 @@ export async function runChatGraphStream(
     onEvent?.({ type: "status", message: "Writing response..." });
     let firstTokenAt: number | null = null;
 
-    // Prefer streaming tokens from the model. The model wrapper exposes
-    // an async iterator `stream(messages)` that yields token strings.
-    // This will reduce TTFT when the provider supports streaming.
-    const tokenStream = await (
-      model as unknown as StreamableGeminiModel
-    ).stream(messages as BaseMessage[]);
+    // Use native Google Generative AI streaming for true token streaming
+    const streamCallStart = Date.now();
+    const nativeStream = await (
+      model as unknown as GeminiModelWithNativeStream
+    ).nativeStream(messages as BaseMessage[]);
+    const streamCallEnd = Date.now();
+    console.info("NATIVE_STREAM_CREATED", {
+      chatId: hashIdentifierForLogging(input.chatId),
+      runId: hashIdentifierForLogging(input.runId),
+      streamSetupTimeMs: streamCallEnd - streamCallStart,
+      timestamp: streamCallEnd - startedAt,
+    });
 
-    for await (const token of tokenStream) {
+    // Iterate through the async stream
+    for await (const chunk of nativeStream.stream) {
+      const tokenArrivalTime = Date.now() - startedAt;
+
+      // Extract text from the chunk
+      let chunkText = "";
+      if (chunk?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        chunkText = chunk.candidates[0].content.parts[0].text;
+      }
+
+      if (!chunkText) {
+        continue;
+      }
+
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
         console.info("FIRST TOKEN SENT", {
@@ -213,13 +208,22 @@ export async function runChatGraphStream(
         onEvent?.({ type: "first_token", ttftMs: firstTokenAt - startedAt });
       }
 
-      const chunkText = toStreamChunkText(token);
-      if (!chunkText) {
-        continue;
+      // Log batch size to see if tokens are arriving in groups
+      if (chunkText.length > 1) {
+        console.info("TOKEN_BATCH", {
+          chatId: hashIdentifierForLogging(input.chatId),
+          runId: hashIdentifierForLogging(input.runId),
+          batchSize: chunkText.length,
+          content: chunkText.substring(0, 50),
+          timestamp: tokenArrivalTime,
+        });
       }
 
-      assistantMessage += chunkText;
-      onEvent?.({ type: "token", content: chunkText });
+      // Split tokens character-by-character for smooth streaming
+      for (const char of chunkText) {
+        assistantMessage += char;
+        onEvent?.({ type: "token", content: char });
+      }
     }
 
     const endedAt = Date.now();
