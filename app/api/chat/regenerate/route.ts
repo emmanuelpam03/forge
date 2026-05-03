@@ -226,7 +226,11 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            send({ type: "done" });
+            send({
+              type: "done",
+              response: finalMessage,
+              suggestions: result.suggestions ?? [],
+            });
           } catch (err) {
             console.error("Regenerate stream failed:", err);
             await prisma.message
@@ -235,7 +239,10 @@ export async function POST(request: NextRequest) {
               })
               .catch(() => null);
             send({ type: "status", message: "Failed to generate a response." });
-            send({ type: "done" });
+            send({
+              type: "done",
+              suggestions: [],
+            });
           }
 
           safeClose();

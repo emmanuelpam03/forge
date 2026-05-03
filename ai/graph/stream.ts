@@ -1,3 +1,5 @@
+import type { TaskSuggestion } from "@/types/tasks";
+
 export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "token"; content: string }
@@ -45,4 +47,9 @@ export type StreamEvent =
         createdAt: string;
       }>;
     }
-  | { type: "done"; messageId?: string };
+  | {
+      type: "done";
+      messageId?: string;
+      response?: string;
+      suggestions?: TaskSuggestion[];
+    };

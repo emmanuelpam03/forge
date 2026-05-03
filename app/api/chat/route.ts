@@ -155,6 +155,8 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               messageId: finalPersistedMessageId ?? assistantMessageId,
+              response: finalMessage,
+              suggestions: result.suggestions ?? [],
             });
 
             console.info("STREAM CLOSED", {

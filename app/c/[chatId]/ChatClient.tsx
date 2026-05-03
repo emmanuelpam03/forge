@@ -432,6 +432,54 @@ export function ChatClient({
     [upsertSuggestion],
   );
 
+  const replaceSuggestionsFromPacket = useCallback(
+    (nextSuggestions: TaskSuggestion[]) => {
+      setSuggestions((currentSuggestions) => {
+        const currentByKey = new Map(
+          currentSuggestions.map((item) => [
+            [
+              item.action,
+              item.description,
+              item.taskType,
+              item.scheduleSpec ?? "",
+              item.conditionText ?? "",
+              item.oneTimeAt ?? "",
+            ].join("|"),
+            item,
+          ]),
+        );
+
+        return nextSuggestions.map((suggestion) => {
+          const existingKey = [
+            suggestion.action,
+            suggestion.description,
+            suggestion.taskType,
+            suggestion.scheduleSpec ?? "",
+            suggestion.conditionText ?? "",
+            suggestion.oneTimeAt ?? "",
+          ].join("|");
+          const existingSuggestion = currentByKey.get(existingKey);
+
+          if (existingSuggestion) {
+            return {
+              ...existingSuggestion,
+              ...suggestion,
+              status: existingSuggestion.status,
+              taskId: existingSuggestion.taskId,
+            };
+          }
+
+          return {
+            ...suggestion,
+            status: "pending",
+            taskId: null,
+          };
+        });
+      });
+    },
+    [],
+  );
+
   const clearAssistantStreamingState = useCallback((messageId: string) => {
     setMessages((currentMessages) =>
       currentMessages.map((currentMessage) =>
@@ -761,7 +809,7 @@ export function ChatClient({
 
             if (event.type === "status") applyStatus(event.message);
             if (event.type === "suggestions") {
-              upsertSuggestions(event.suggestions);
+              // Suggestions are applied from the terminal packet.erminal packet.
             }
             if (event.type === "first_token") {
               console.info("FIRST TOKEN EVENT", {
@@ -785,7 +833,11 @@ export function ChatClient({
                 chatId,
                 source: "edit",
               });
-              applyDone(finalAssistantMessage, event.messageId);
+              replaceSuggestionsFromPacket(event.suggestions ?? []);
+              applyDone(
+                event.response ?? finalAssistantMessage,
+                event.messageId,
+              );
             }
           } catch (parseError) {
             if (
@@ -1052,7 +1104,8 @@ export function ChatClient({
                   chatId,
                   source: "regenerate",
                 });
-                applyDone(finalAssistantMessage);
+                replaceSuggestionsFromPacket(event.suggestions ?? []);
+                applyDone(event.response ?? finalAssistantMessage);
               }
             }
           } catch (parseError) {
@@ -1297,7 +1350,7 @@ export function ChatClient({
               }
 
               if (event.type === "suggestions") {
-                upsertSuggestions(event.suggestions);
+                // Suggestions are applied from the terminal packet.
               }
 
               if (event.type === "status") {
@@ -1330,7 +1383,11 @@ export function ChatClient({
                   chatId,
                   source: "send",
                 });
-                applyDone(finalAssistantMessage, event.messageId);
+                replaceSuggestionsFromPacket(event.suggestions ?? []);
+                applyDone(
+                  event.response ?? finalAssistantMessage,
+                  event.messageId,
+                );
               }
             } catch (parseError) {
               if (

@@ -335,6 +335,23 @@ Apply this standard to all factual requests, not just news. Your goal is to prov
 ==================================================
 
 Every response should save time, reduce confusion, improve decisions, or create momentum.
+
+==================================================
+17. STRICT OUTPUT CONTRACT
+==================================================
+
+Do not output your reasoning, planning, or internal steps.
+Return only the final answer in valid JSON with exactly these top-level keys:
+{
+	"response": "final user-facing answer",
+	"suggestions": []
+}
+
+Rules:
+- No extra text before or after the JSON.
+- No markdown outside the response field.
+- No internal instructions, analysis, or chain-of-thought.
+- Keep suggestions as structured JSON entries only.
 `;
 
 export const SUMMARIZATION_POLICY = `
@@ -419,6 +436,8 @@ Rules:
 - Return only valid JSON. No markdown, no code fences, no extra keys.
 - response must be a plain string.
 - suggestions must be an array. Use [] when no suggestion is appropriate.
+- suggestions must be an array of suggestion objects, even if empty.
+- Do not include any reasoning, planning, or explanatory text outside the JSON.
 - Each suggestion must include action, description, and taskType.
 - Include only the optional fields that actually apply.
 - Use ISO 8601 for oneTimeAt when a time is obvious; otherwise omit it.

@@ -26,6 +26,7 @@ import {
 } from "@/ai/graph/nodes";
 import { createGeminiModel } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
+import { parseStructuredAssistantOutput } from "@/ai/graph/structured-output";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
 
@@ -161,6 +162,7 @@ export async function runChatGraphStream(
   try {
     onEvent?.({ type: "status", message: "Writing response..." });
     let firstTokenAt: number | null = null;
+    let rawAssistantOutput = "";
 
     // Use native Google Generative AI streaming for true token streaming
     const streamCallStart = Date.now();
@@ -175,7 +177,8 @@ export async function runChatGraphStream(
       timestamp: streamCallEnd - startedAt,
     });
 
-    // Iterate through the async stream
+    // Collect the raw model output so we can parse and sanitize it before
+    // anything is forwarded to the UI.
     for await (const chunk of nativeStream.stream) {
       const tokenArrivalTime = Date.now() - startedAt;
 
@@ -191,21 +194,6 @@ export async function runChatGraphStream(
 
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
-        console.info("FIRST TOKEN SENT", {
-          chatId: hashIdentifierForLogging(input.chatId),
-          runId: hashIdentifierForLogging(input.runId),
-          ttftMs: firstTokenAt - startedAt,
-        });
-        console.info(
-          JSON.stringify({
-            event: "first_token",
-            chatId: hashIdentifierForLogging(input.chatId),
-            runId: hashIdentifierForLogging(input.runId),
-            ttftMs: firstTokenAt - startedAt,
-          }),
-        );
-        // Notify listeners that the first token is available
-        onEvent?.({ type: "first_token", ttftMs: firstTokenAt - startedAt });
       }
 
       // Log batch size to see if tokens are arriving in groups
@@ -219,11 +207,39 @@ export async function runChatGraphStream(
         });
       }
 
-      // Split tokens character-by-character for smooth streaming
-      for (const char of chunkText) {
-        assistantMessage += char;
-        onEvent?.({ type: "token", content: char });
-      }
+      rawAssistantOutput += chunkText;
+    }
+
+    const parsedOutput = parseStructuredAssistantOutput(rawAssistantOutput);
+    assistantMessage = parsedOutput.response;
+
+    if (!assistantMessage) {
+      assistantMessage =
+        "I encountered an issue generating a response. Please try again or rephrase your question.";
+    }
+
+    const responseStartAt = Date.now();
+    console.info("FIRST TOKEN SENT", {
+      chatId: hashIdentifierForLogging(input.chatId),
+      runId: hashIdentifierForLogging(input.runId),
+      ttftMs: firstTokenAt ? responseStartAt - startedAt : null,
+    });
+    console.info(
+      JSON.stringify({
+        event: "first_token",
+        chatId: hashIdentifierForLogging(input.chatId),
+        runId: hashIdentifierForLogging(input.runId),
+        ttftMs: firstTokenAt ? responseStartAt - startedAt : null,
+      }),
+    );
+    onEvent?.({
+      type: "first_token",
+      ttftMs: firstTokenAt ? responseStartAt - startedAt : undefined,
+    });
+
+    // Emit only the cleaned response text after JSON parsing succeeds.
+    for (const char of assistantMessage) {
+      onEvent?.({ type: "token", content: char });
     }
 
     const endedAt = Date.now();

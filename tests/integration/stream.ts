@@ -36,13 +36,24 @@ describe("Streaming Integration Tests", () => {
       const doneEvent = JSON.stringify({
         type: "done",
         messageId: "msg_123",
-        finishReason: "stop",
+        response: "Final answer",
+        suggestions: [
+          {
+            id: "suggestion_1",
+            type: "suggestion",
+            action: "track_stock",
+            description: "Track Nvidia stock daily",
+            taskType: "scheduled",
+            scheduleSpec: "daily at 8:00 AM",
+          },
+        ],
       });
 
       const parsed = JSON.parse(doneEvent);
 
       assert.strictEqual(parsed.type, "done");
-      assert.strictEqual(parsed.finishReason, "stop");
+      assert.strictEqual(parsed.response, "Final answer");
+      assert.strictEqual(parsed.suggestions.length, 1);
     });
 
     it("should parse error event correctly", () => {

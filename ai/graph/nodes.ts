@@ -24,6 +24,7 @@ import {
   parseClassificationText,
   shouldForceWebSearchFromClassification,
 } from "@/ai/graph/classification";
+import { parseStructuredAssistantOutput as parseStructuredAssistantOutputCore } from "@/ai/graph/structured-output";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -255,6 +256,84 @@ function parseJsonFromModelText(text: string): unknown | null {
   }
 
   return null;
+}
+
+function cleanFallbackAssistantText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed
+    .replace(/```(?:json)?/gi, "")
+    .replace(/```/g, "")
+    .replace(
+      /^\s*(?:reasoning|planning|analysis|thoughts?|constraint check|refining|internal instructions?)\s*:\s*.*$/gim,
+      "",
+    )
+    .replace(/^\s*(?:system|assistant|user)\s*:\s*/gim, "")
+    .replace(/^\s*[-*>#]+\s*/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeTaskSuggestions(
+  parsedEnvelope: {
+    suggestions?: unknown;
+    suggestion?: unknown;
+  } | null,
+): TaskSuggestion[] {
+  const parsedSuggestions = Array.isArray(parsedEnvelope?.suggestions)
+    ? parsedEnvelope.suggestions
+    : parsedEnvelope?.suggestion
+      ? [parsedEnvelope.suggestion]
+      : [];
+
+  return parsedSuggestions
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      return buildTaskSuggestion(
+        item as Partial<TaskSuggestion> & {
+          type?: string;
+          taskType?: string;
+        },
+      );
+    })
+    .filter((item): item is TaskSuggestion => item !== null);
+}
+
+export function parseStructuredAssistantOutput(text: string): {
+  response: string;
+  suggestions: TaskSuggestion[];
+  parsedJson: boolean;
+  rawText: string;
+} {
+  const parsedRaw = parseJsonFromModelText(text);
+  const parsedEnvelope =
+    parsedRaw && typeof parsedRaw === "object"
+      ? (parsedRaw as {
+          response?: unknown;
+          suggestions?: unknown;
+          suggestion?: unknown;
+        })
+      : null;
+
+  const responseText =
+    typeof parsedEnvelope?.response === "string"
+      ? parsedEnvelope.response.trim()
+      : "";
+
+  const cleanedResponse = responseText || cleanFallbackAssistantText(text);
+
+  return {
+    response: cleanedResponse,
+    suggestions: normalizeTaskSuggestions(parsedEnvelope),
+    parsedJson: parsedEnvelope !== null,
+    rawText: text,
+  };
 }
 
 function getUsageCounts(message: AIMessage) {
@@ -1090,41 +1169,8 @@ ${sanitizedMessage}`;
     const response = await model.invoke([new HumanMessage(prompt)]);
     const responseText = toTextContent(response.content).trim();
 
-    const parsedRaw = parseJsonFromModelText(responseText);
-    const parsedEnvelope =
-      parsedRaw && typeof parsedRaw === "object"
-        ? (parsedRaw as {
-            response?: unknown;
-            suggestions?: unknown;
-            suggestion?: unknown;
-          })
-        : null;
-
-    const parsedSuggestions = Array.isArray(parsedEnvelope?.suggestions)
-      ? parsedEnvelope?.suggestions
-      : parsedEnvelope?.suggestion
-        ? [parsedEnvelope.suggestion]
-        : [];
-
-    const normalizedSuggestions = parsedSuggestions
-      .map((item) => {
-        if (!item || typeof item !== "object") {
-          return null;
-        }
-
-        return buildTaskSuggestion(
-          item as Partial<TaskSuggestion> & {
-            type?: string;
-            taskType?: string;
-          },
-        );
-      })
-      .filter((item): item is TaskSuggestion => item !== null);
-
-    const responseTextValue =
-      typeof parsedEnvelope?.response === "string"
-        ? parsedEnvelope.response.trim()
-        : "";
+    const parsedOutput = parseStructuredAssistantOutputCore(responseText);
+    const normalizedSuggestions = parsedOutput.suggestions;
 
     let suggestions = normalizedSuggestions;
     if (suggestions.length === 0 && heuristicSuggestion) {
@@ -1140,7 +1186,7 @@ ${sanitizedMessage}`;
       return {
         suggestion: null,
         suggestions: [],
-        suggestionResponse: responseTextValue,
+        suggestionResponse: parsedOutput.response,
       };
     }
 
@@ -1149,7 +1195,7 @@ ${sanitizedMessage}`;
     return {
       suggestion: suggestions[0] ?? null,
       suggestions,
-      suggestionResponse: responseTextValue,
+      suggestionResponse: parsedOutput.response,
     };
   } catch (error) {
     console.error("Task suggestion generation failed:", error);
