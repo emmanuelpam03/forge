@@ -68,6 +68,7 @@ async function runGraphPreResponse(
   onEvent?: (event: StreamEvent) => void,
 ) {
   const state = createChatGraphSeed(input);
+  const _preResponseStart = Date.now();
 
   // Register a run-scoped emitter so nodes can call `emitStatus` without
   // changing their LangGraph-compatible signatures.
@@ -87,6 +88,9 @@ async function runGraphPreResponse(
 
   // Clear the run-scoped emitter after all pre-response events are done.
   setGraphStreamEventEmitter(undefined);
+
+  // annotate duration for diagnostics
+  (state as any).__preResponseMs = Date.now() - _preResponseStart;
 
   return state;
 }
@@ -125,6 +129,16 @@ export async function runChatGraphStream(
   const model = createGeminiModel();
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
+  console.info("PRE-RESPONSE_MS", {
+    chatId: hashIdentifierForLogging(input.chatId),
+    runId: hashIdentifierForLogging(input.runId),
+    preResponseMs: (state as any).__preResponseMs ?? null,
+  });
+  console.info("MODEL STREAM START", {
+    chatId: hashIdentifierForLogging(input.chatId),
+    runId: hashIdentifierForLogging(input.runId),
+    timestamp: Date.now(),
+  });
 
   let assistantMessage = "";
   let inputTokens = 0;

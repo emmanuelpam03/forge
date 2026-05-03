@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
             );
 
             send({ type: "status", message: "Thinking..." });
+            // UX mitigation — clear client "Thinking..." state immediately
+            send({ type: "first_token", ttftMs: 0 });
 
             // Graph handles classification, tool routing, and streaming tokens
             const result = await runChatGraphStream(

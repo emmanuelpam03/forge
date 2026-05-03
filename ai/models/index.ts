@@ -51,6 +51,7 @@ export function createGeminiModel() {
   // The stream yields string chunks.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (model as any).stream = async function* (messages: any[]) {
+    console.info("MODEL STREAM WRAPPER: start - attempting native stream");
     // Native streaming support
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,6 +64,7 @@ export function createGeminiModel() {
         typeof nativeStream === "function" &&
         nativeStream !== (model as any).stream
       ) {
+        console.info("MODEL STREAM WRAPPER: using nativeStream");
         for await (const part of nativeStream.call(model, messages)) {
           if (!part) continue;
           if (typeof part === "string") {
@@ -86,7 +88,7 @@ export function createGeminiModel() {
       // We'll continue to fallback behavior.
       // eslint-disable-next-line no-console
       console.warn(
-        "Native model.stream attempt failed, falling back to invoke:",
+        "MODEL STREAM WRAPPER: native stream attempt failed, falling back to invoke():",
         err,
       );
     }
