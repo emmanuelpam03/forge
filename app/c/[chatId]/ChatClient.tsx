@@ -1024,11 +1024,10 @@ export function ChatClient({
               applyBranchList(event);
             }
 
-            if (event.type === "status") applyStatus(event.message);
             if (event.type === "suggestions") {
               upsertSuggestions(event.suggestions);
             }
-            if (event.type === "first_token") {
+            if (event.type === "first_token" && !hasReceivedDone) {
               // Clear placeholder/thinking state immediately when first token arrives
               updateAssistantMessage(
                 activeAssistantMessageId,
@@ -1040,16 +1039,21 @@ export function ChatClient({
                 }),
               );
             }
-            if (event.type === "token") {
+            if (event.type === "token" && !hasReceivedDone) {
               applyChunk(event.content);
             }
+            if (event.type === "status" && !hasReceivedDone) {
+              applyStatus(event.message);
+            }
             if (event.type === "done") {
-              hasReceivedDone = true;
-              console.info("STREAM ENDED", {
-                chatId,
-                source: "regenerate",
-              });
-              applyDone(finalAssistantMessage);
+              if (!hasReceivedDone) {
+                hasReceivedDone = true;
+                console.info("STREAM ENDED", {
+                  chatId,
+                  source: "regenerate",
+                });
+                applyDone(finalAssistantMessage);
+              }
             }
           } catch (parseError) {
             if (
