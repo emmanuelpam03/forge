@@ -599,6 +599,7 @@ export function ChatClient({
         content: "",
         pending: true,
         streaming: false,
+        status: "Thinking...",
       },
     ]);
 
@@ -626,14 +627,24 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let finalAssistantMessage = "";
+      let hasReceivedDone = false;
+      let hasLoggedFirstToken = false;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+        if (!hasLoggedFirstToken) {
+          hasLoggedFirstToken = true;
+          console.info("FIRST TOKEN RECEIVED", {
+            chatId,
+            source: "edit",
+          });
+        }
         updateAssistantMessage(activeAssistantMessageId, (currentMessage) => ({
           ...currentMessage,
           content: finalAssistantMessage,
           pending: false,
           streaming: true,
+          status: undefined,
         }));
       };
 
@@ -704,6 +715,11 @@ export function ChatClient({
             if (event.type === "status") applyStatus(event.message);
             if (event.type === "token") applyChunk(event.content);
             if (event.type === "done") {
+              hasReceivedDone = true;
+              console.info("STREAM ENDED", {
+                chatId,
+                source: "edit",
+              });
               applyDone(finalAssistantMessage, event.messageId);
             }
           } catch (parseError) {
@@ -719,7 +735,13 @@ export function ChatClient({
         }
       }
 
-      applyDone(finalAssistantMessage, undefined);
+      if (!hasReceivedDone) {
+        console.info("STREAM ENDED", {
+          chatId,
+          source: "edit",
+        });
+        applyDone(finalAssistantMessage, undefined);
+      }
       // Clear editing state on success
       setEditingId(null);
       setEditingContent(null);
@@ -777,7 +799,7 @@ export function ChatClient({
               content: "",
               pending: true,
               streaming: false,
-              status: undefined,
+              status: "Thinking...",
               reasoningSteps: [],
               reasoningExpanded: false,
               error: undefined,
@@ -810,14 +832,24 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let finalAssistantMessage = "";
+      let hasReceivedDone = false;
+      let hasLoggedFirstToken = false;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+        if (!hasLoggedFirstToken) {
+          hasLoggedFirstToken = true;
+          console.info("FIRST TOKEN RECEIVED", {
+            chatId,
+            source: "regenerate",
+          });
+        }
         updateAssistantMessage(activeAssistantMessageId, (currentMessage) => ({
           ...currentMessage,
           content: finalAssistantMessage,
           pending: false,
           streaming: true,
+          status: undefined,
         }));
       };
 
@@ -928,7 +960,14 @@ export function ChatClient({
               await new Promise<void>((resolve) => setTimeout(resolve, 12));
               applyChunk(event.content);
             }
-            if (event.type === "done") applyDone(finalAssistantMessage);
+            if (event.type === "done") {
+              hasReceivedDone = true;
+              console.info("STREAM ENDED", {
+                chatId,
+                source: "regenerate",
+              });
+              applyDone(finalAssistantMessage);
+            }
           } catch (parseError) {
             if (
               parseError instanceof Error &&
@@ -943,6 +982,14 @@ export function ChatClient({
             );
           }
         }
+      }
+
+      if (!hasReceivedDone) {
+        console.info("STREAM ENDED", {
+          chatId,
+          source: "regenerate",
+        });
+        applyDone(finalAssistantMessage);
       }
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
@@ -1024,6 +1071,7 @@ export function ChatClient({
           content: "",
           pending: true,
           streaming: false,
+          status: "Thinking...",
         },
       ]);
 
@@ -1060,9 +1108,17 @@ export function ChatClient({
         let finalAssistantMessage = "";
         let activeAssistantMessageId = assistantPlaceholderId;
         let hasReceivedDone = false;
+        let hasLoggedFirstToken = false;
 
         const applyChunk = (delta: string) => {
           finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+          if (!hasLoggedFirstToken) {
+            hasLoggedFirstToken = true;
+            console.info("FIRST TOKEN RECEIVED", {
+              chatId,
+              source: "send",
+            });
+          }
           updateAssistantMessage(
             activeAssistantMessageId,
             (currentMessage) => ({
@@ -1070,6 +1126,7 @@ export function ChatClient({
               content: finalAssistantMessage,
               pending: false,
               streaming: true,
+              status: undefined,
             }),
           );
         };
@@ -1159,6 +1216,10 @@ export function ChatClient({
 
               if (event.type === "done") {
                 hasReceivedDone = true;
+                console.info("STREAM ENDED", {
+                  chatId,
+                  source: "send",
+                });
                 applyDone(finalAssistantMessage, event.messageId);
               }
             } catch (parseError) {
@@ -1176,6 +1237,10 @@ export function ChatClient({
         }
 
         if (!hasReceivedDone) {
+          console.info("STREAM ENDED", {
+            chatId,
+            source: "send",
+          });
           applyDone(finalAssistantMessage, undefined);
         }
       } catch (sendError) {

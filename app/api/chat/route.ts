@@ -79,6 +79,11 @@ export async function POST(request: NextRequest) {
                 if (event.type === "token") {
                   if (firstTokenAt === null) {
                     firstTokenAt = Date.now();
+                    console.info("FIRST TOKEN SENT", {
+                      chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+                      runId: hashIdentifierForLogging(runId),
+                      ttftMs: firstTokenAt - requestStartedAt,
+                    });
                     console.info(
                       JSON.stringify({
                         event: "first_token_forwarded",
@@ -143,6 +148,11 @@ export async function POST(request: NextRequest) {
             send({ type: "done" });
           } finally {
             try {
+              console.info("STREAM CLOSED", {
+                chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+                runId: hashIdentifierForLogging(runId),
+                totalMs: Date.now() - requestStartedAt,
+              });
               controller.close();
             } catch (e) {
               console.error("Failed to close stream controller:", e);

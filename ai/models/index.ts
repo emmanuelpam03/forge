@@ -41,6 +41,10 @@ export function createGeminiModel() {
     maxRetries: 2,
   });
 
+  // Preserve the provider-native stream implementation before overriding.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nativeModelStream = (model as any).stream;
+
   // Attach a `stream` async iterator to the model instance.
   // If the underlying model implementation already exposes a `stream` method, prefer it.
   // Otherwise, fall back to invoking and chunking the final text.
@@ -51,7 +55,10 @@ export function createGeminiModel() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const nativeStream =
-        (model as any).stream ?? (model as any).streamFromProvider;
+        (typeof nativeModelStream === "function"
+          ? nativeModelStream
+          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (model as any).streamFromProvider) ?? null;
       if (
         typeof nativeStream === "function" &&
         nativeStream !== (model as any).stream

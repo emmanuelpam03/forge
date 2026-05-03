@@ -127,9 +127,7 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
-    // Notify client we're starting work; keep message brief — frontend should
-    // show a 'Thinking...' indicator until the first token arrives.
-    onEvent?.({ type: "status", message: "Thinking..." });
+    onEvent?.({ type: "status", message: "Writing response..." });
 
     let firstTokenAt: number | null = null;
 
@@ -144,6 +142,11 @@ export async function runChatGraphStream(
     for await (const token of tokenStream) {
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
+        console.info("FIRST TOKEN SENT", {
+          chatId: hashIdentifierForLogging(input.chatId),
+          runId: hashIdentifierForLogging(input.runId),
+          ttftMs: firstTokenAt - startedAt,
+        });
         console.info(
           JSON.stringify({
             event: "first_token",
@@ -160,6 +163,12 @@ export async function runChatGraphStream(
     }
 
     const endedAt = Date.now();
+    console.info("STREAM CLOSED", {
+      chatId: hashIdentifierForLogging(input.chatId),
+      runId: hashIdentifierForLogging(input.runId),
+      durationMs: endedAt - startedAt,
+      ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+    });
     console.info(
       JSON.stringify({
         event: "stream_completed",
