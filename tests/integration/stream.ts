@@ -68,28 +68,6 @@ describe("Streaming Integration Tests", () => {
       assert.strictEqual(parsed.type, "error");
       assert.strictEqual(parsed.code, "TOOL_ERROR");
     });
-
-    it("should parse suggestions event correctly", () => {
-      const suggestionsEvent = JSON.stringify({
-        type: "suggestions",
-        suggestions: [
-          {
-            id: "suggestion_1",
-            type: "suggestion",
-            action: "track_stock",
-            description: "Track Nvidia stock daily",
-            taskType: "scheduled",
-            scheduleSpec: "daily at 8:00 AM",
-          },
-        ],
-      });
-
-      const parsed = JSON.parse(suggestionsEvent);
-
-      assert.strictEqual(parsed.type, "suggestions");
-      assert.strictEqual(parsed.suggestions.length, 1);
-      assert.strictEqual(parsed.suggestions[0].action, "track_stock");
-    });
   });
 
   describe("NDJSON stream sequence", () => {
@@ -170,14 +148,7 @@ describe("Streaming Integration Tests", () => {
 
   describe("NDJSON stream validation", () => {
     it("should validate only valid event types", () => {
-      const validTypes = [
-        "token",
-        "status",
-        "done",
-        "placeholder",
-        "branches",
-        "suggestions",
-      ];
+      const validTypes = ["token", "status", "done", "placeholder", "branches"];
 
       const testEvent = (type: string): boolean => {
         return validTypes.includes(type);
@@ -187,7 +158,6 @@ describe("Streaming Integration Tests", () => {
       assert.strictEqual(testEvent("status"), true);
       assert.strictEqual(testEvent("done"), true);
       assert.strictEqual(testEvent("placeholder"), true);
-      assert.strictEqual(testEvent("suggestions"), true);
       assert.strictEqual(testEvent("invalid"), false);
     });
 

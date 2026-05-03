@@ -80,9 +80,17 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       start(controller) {
         const send = (event: StreamEvent) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-          );
+          if (event.type === "status") {
+            console.info("STATUS:", event.message);
+          }
+          if (event.type === "token") {
+            console.info("TOKEN:", event.content);
+          }
+          if (event.type === "done") {
+            console.info("DONE");
+          }
+
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
         };
 
         const sendBranchList = async () => {
@@ -161,11 +169,13 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               messageId: result.assistantMessageId ?? undefined,
+              response: finalMessage,
+              suggestions: result.suggestions ?? [],
             });
           } catch (err) {
             console.error("Edit stream failed:", err);
             send({ type: "status", message: "Failed to generate a response." });
-            send({ type: "done" });
+            send({ type: "done", suggestions: [] });
           }
 
           controller.close();
@@ -178,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
+        "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
       },

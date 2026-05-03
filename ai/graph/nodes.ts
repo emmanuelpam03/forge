@@ -12,7 +12,6 @@ import {
   buildChatMessages,
   buildFreshnessClassificationMessage,
 } from "@/ai/prompts/router";
-import { SUGGESTION_PACKET_PROMPT } from "@/ai/prompts/system";
 import {
   loadContextForChat,
   maintainChatSummary,
@@ -24,7 +23,6 @@ import {
   parseClassificationText,
   shouldForceWebSearchFromClassification,
 } from "@/ai/graph/classification";
-import { parseStructuredAssistantOutput as parseStructuredAssistantOutputCore } from "@/ai/graph/structured-output";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -42,26 +40,6 @@ function emitStatus(
   message: string,
 ) {
   (onEvent ?? graphStreamEventEmitter)?.({ type: "status", message });
-}
-
-function emitSuggestion(suggestion: NonNullable<ChatGraphState["suggestion"]>) {
-  graphStreamEventEmitter?.({
-    type: "suggestion",
-    suggestion,
-  });
-}
-
-function emitSuggestions(
-  suggestions: NonNullable<ChatGraphState["suggestions"]>,
-) {
-  if (suggestions.length === 0) {
-    return;
-  }
-
-  graphStreamEventEmitter?.({
-    type: "suggestions",
-    suggestions,
-  });
 }
 
 function getToolStatusMessage(toolName: string): string {
@@ -485,6 +463,7 @@ export async function loadContextNode(state: ChatGraphState) {
 }
 
 export async function generateResponseNode(state: ChatGraphState) {
+  emitStatus(undefined, "Writing response...");
   const model = createGeminiModel();
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
@@ -506,11 +485,6 @@ export async function generateResponseNode(state: ChatGraphState) {
         console.info("FIRST TOKEN SENT (generateResponseNode)", {
           chatId: hashIdentifierForLogging(state.chatId),
           runId: hashIdentifierForLogging(state.runId),
-          ttftMs: firstTokenAt - startedAt,
-        });
-        // Emit an explicit first_token event for downstream listeners
-        graphStreamEventEmitter?.({
-          type: "first_token",
           ttftMs: firstTokenAt - startedAt,
         });
       }
@@ -1142,38 +1116,12 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
 
 export async function suggestTaskNode(state: ChatGraphState) {
   try {
-    const model = createGeminiModel();
     const sanitizedMessage = sanitizeUserInput(state.userMessage);
     const heuristicSuggestion =
       inferTaskSuggestionFromMessage(sanitizedMessage);
 
-    const contextSummary = [
-      state.intent ? `Intent: ${state.intent}` : "",
-      state.memorySummary ? "Memory summary available: yes" : "",
-      state.toolPlan?.toolsNeeded?.length
-        ? `Tools used: ${state.toolPlan.toolsNeeded.join(", ")}`
-        : "",
-      state.synthesisNote ? `Evidence note: ${state.synthesisNote}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const prompt = `${SUGGESTION_PACKET_PROMPT}
-
-Context:
-${contextSummary || "No extra context."}
-
-User request:
-${sanitizedMessage}`;
-
-    const response = await model.invoke([new HumanMessage(prompt)]);
-    const responseText = toTextContent(response.content).trim();
-
-    const parsedOutput = parseStructuredAssistantOutputCore(responseText);
-    const normalizedSuggestions = parsedOutput.suggestions;
-
-    let suggestions = normalizedSuggestions;
-    if (suggestions.length === 0 && heuristicSuggestion) {
+    let suggestions: TaskSuggestion[] = [];
+    if (heuristicSuggestion) {
       suggestions = [
         {
           id: crypto.randomUUID(),
@@ -1186,16 +1134,14 @@ ${sanitizedMessage}`;
       return {
         suggestion: null,
         suggestions: [],
-        suggestionResponse: parsedOutput.response,
+        suggestionResponse: "",
       };
     }
-
-    emitSuggestions(suggestions);
 
     return {
       suggestion: suggestions[0] ?? null,
       suggestions,
-      suggestionResponse: parsedOutput.response,
+      suggestionResponse: "",
     };
   } catch (error) {
     console.error("Task suggestion generation failed:", error);

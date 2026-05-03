@@ -341,17 +341,12 @@ Every response should save time, reduce confusion, improve decisions, or create 
 ==================================================
 
 Do not output your reasoning, planning, or internal steps.
-Return only the final answer in valid JSON with exactly these top-level keys:
-{
-	"response": "final user-facing answer",
-	"suggestions": []
-}
+Return plain-text user-facing content only.
 
 Rules:
-- No extra text before or after the JSON.
-- No markdown outside the response field.
+- No JSON wrapper for standard assistant responses.
 - No internal instructions, analysis, or chain-of-thought.
-- Keep suggestions as structured JSON entries only.
+- Keep the response focused on the user's request.
 `;
 
 export const SUMMARIZATION_POLICY = `

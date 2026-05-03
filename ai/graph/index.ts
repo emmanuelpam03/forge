@@ -26,7 +26,6 @@ import {
 } from "@/ai/graph/nodes";
 import { createGeminiModel } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
-import { parseStructuredAssistantOutput } from "@/ai/graph/structured-output";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
 
@@ -99,7 +98,6 @@ async function runGraphPreResponse(
   Object.assign(state, await planTaskNode(state));
   Object.assign(state, await toolRouterNodeImpl(state, onEvent));
   Object.assign(state, await synthesizeEvidenceNode(state));
-  Object.assign(state, await suggestTaskNode(state));
 
   // Clear the run-scoped emitter after all pre-response events are done.
   setGraphStreamEventEmitter(undefined);
@@ -160,9 +158,9 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
+    console.info("STATUS:", "Writing response...");
     onEvent?.({ type: "status", message: "Writing response..." });
     let firstTokenAt: number | null = null;
-    let rawAssistantOutput = "";
 
     // Use native Google Generative AI streaming for true token streaming
     const streamCallStart = Date.now();
@@ -177,11 +175,8 @@ export async function runChatGraphStream(
       timestamp: streamCallEnd - startedAt,
     });
 
-    // Collect the raw model output so we can parse and sanitize it before
-    // anything is forwarded to the UI.
+    // Forward tokens immediately as they arrive.
     for await (const chunk of nativeStream.stream) {
-      const tokenArrivalTime = Date.now() - startedAt;
-
       // Extract text from the chunk
       let chunkText = "";
       if (chunk?.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -194,52 +189,23 @@ export async function runChatGraphStream(
 
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
-      }
-
-      // Log batch size to see if tokens are arriving in groups
-      if (chunkText.length > 1) {
-        console.info("TOKEN_BATCH", {
+        console.info("FIRST TOKEN SENT", {
           chatId: hashIdentifierForLogging(input.chatId),
           runId: hashIdentifierForLogging(input.runId),
-          batchSize: chunkText.length,
-          content: chunkText.substring(0, 50),
-          timestamp: tokenArrivalTime,
+          ttftMs: firstTokenAt - startedAt,
         });
       }
 
-      rawAssistantOutput += chunkText;
+      assistantMessage += chunkText;
+      console.info("TOKEN:", chunkText);
+      onEvent?.({ type: "token", content: chunkText });
     }
 
-    const parsedOutput = parseStructuredAssistantOutput(rawAssistantOutput);
-    assistantMessage = parsedOutput.response;
-
-    if (!assistantMessage) {
+    if (!assistantMessage.trim()) {
       assistantMessage =
         "I encountered an issue generating a response. Please try again or rephrase your question.";
-    }
-
-    const responseStartAt = Date.now();
-    console.info("FIRST TOKEN SENT", {
-      chatId: hashIdentifierForLogging(input.chatId),
-      runId: hashIdentifierForLogging(input.runId),
-      ttftMs: firstTokenAt ? responseStartAt - startedAt : null,
-    });
-    console.info(
-      JSON.stringify({
-        event: "first_token",
-        chatId: hashIdentifierForLogging(input.chatId),
-        runId: hashIdentifierForLogging(input.runId),
-        ttftMs: firstTokenAt ? responseStartAt - startedAt : null,
-      }),
-    );
-    onEvent?.({
-      type: "first_token",
-      ttftMs: firstTokenAt ? responseStartAt - startedAt : undefined,
-    });
-
-    // Emit only the cleaned response text after JSON parsing succeeds.
-    for (const char of assistantMessage) {
-      onEvent?.({ type: "token", content: char });
+      console.info("TOKEN:", assistantMessage);
+      onEvent?.({ type: "token", content: assistantMessage });
     }
 
     const endedAt = Date.now();
@@ -274,6 +240,10 @@ export async function runChatGraphStream(
   } catch (error) {
     throw error;
   }
+
+  // Generate suggestions only after response streaming is complete.
+  Object.assign(state, await suggestTaskNode(state));
+
   // Stream validation: log if response is empty
   if (!assistantMessage.trim()) {
     console.warn(

@@ -104,10 +104,18 @@ export async function POST(request: NextRequest) {
             return false;
           }
 
+          if (event.type === "status") {
+            console.info("STATUS:", event.message);
+          }
+          if (event.type === "token") {
+            console.info("TOKEN:", event.content);
+          }
+          if (event.type === "done") {
+            console.info("DONE");
+          }
+
           try {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-            );
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
             return true;
           } catch (error) {
             controllerClosed = true;
@@ -255,7 +263,7 @@ export async function POST(request: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
+        "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
       },

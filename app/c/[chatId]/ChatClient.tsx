@@ -387,51 +387,6 @@ export function ChatClient({
     }
   };
 
-  const upsertSuggestion = useCallback((suggestion: TaskSuggestion) => {
-    setSuggestions((currentSuggestions) => {
-      const existingSuggestion = currentSuggestions.find(
-        (item) =>
-          item.action === suggestion.action &&
-          item.description === suggestion.description &&
-          item.taskType === suggestion.taskType &&
-          item.scheduleSpec === suggestion.scheduleSpec &&
-          item.conditionText === suggestion.conditionText &&
-          item.oneTimeAt === suggestion.oneTimeAt,
-      );
-
-      if (!existingSuggestion) {
-        return [
-          ...currentSuggestions,
-          {
-            ...suggestion,
-            status: "pending",
-            taskId: null,
-          },
-        ];
-      }
-
-      return currentSuggestions.map((item) =>
-        item === existingSuggestion || item.id === suggestion.id
-          ? {
-              ...item,
-              ...suggestion,
-              status: item.status,
-              taskId: item.taskId,
-            }
-          : item,
-      );
-    });
-  }, []);
-
-  const upsertSuggestions = useCallback(
-    (nextSuggestions: TaskSuggestion[]) => {
-      nextSuggestions.forEach((suggestion) => {
-        upsertSuggestion(suggestion);
-      });
-    },
-    [upsertSuggestion],
-  );
-
   const replaceSuggestionsFromPacket = useCallback(
     (nextSuggestions: TaskSuggestion[]) => {
       setSuggestions((currentSuggestions) => {
@@ -720,9 +675,11 @@ export function ChatClient({
       let finalAssistantMessage = "";
       let hasReceivedDone = false;
       let hasLoggedFirstToken = false;
+      let hasReceivedToken = false;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+        hasReceivedToken = true;
         if (!hasLoggedFirstToken) {
           hasLoggedFirstToken = true;
           console.info("FIRST TOKEN RECEIVED", {
@@ -793,38 +750,20 @@ export function ChatClient({
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-        let frameEndIndex = buffer.indexOf("\n\n");
-        while (frameEndIndex !== -1) {
-          const frame = buffer.slice(0, frameEndIndex).trim();
-          buffer = buffer.slice(frameEndIndex + 2);
-          frameEndIndex = buffer.indexOf("\n\n");
+        let lineEndIndex = buffer.indexOf("\n");
+        while (lineEndIndex !== -1) {
+          const line = buffer.slice(0, lineEndIndex).trim();
+          buffer = buffer.slice(lineEndIndex + 1);
+          lineEndIndex = buffer.indexOf("\n");
 
-          if (!frame) continue;
+          if (!line) continue;
 
           try {
-            const payloadText = frame.startsWith("data:")
-              ? frame.replace(/^data:\s*/, "")
-              : frame;
-            const event = JSON.parse(payloadText) as StreamEvent;
+            const event = JSON.parse(line) as StreamEvent;
+            console.info("EVENT:", event);
 
-            if (event.type === "status") applyStatus(event.message);
-            if (event.type === "suggestions") {
-              // Suggestions are applied from the terminal packet.erminal packet.
-            }
-            if (event.type === "first_token") {
-              console.info("FIRST TOKEN EVENT", {
-                chatId,
-                source: "edit",
-              });
-              updateAssistantMessage(
-                assistantPlaceholderId,
-                (currentMessage) => ({
-                  ...currentMessage,
-                  pending: false,
-                  streaming: true,
-                  status: undefined,
-                }),
-              );
+            if (event.type === "status" && !hasReceivedToken) {
+              applyStatus(event.message);
             }
             if (event.type === "token") applyChunk(event.content);
             if (event.type === "done") {
@@ -916,7 +855,6 @@ export function ChatClient({
               content: "",
               pending: true,
               streaming: false,
-              status: "Thinking...",
               reasoningSteps: [],
               reasoningExpanded: false,
               error: undefined,
@@ -951,9 +889,11 @@ export function ChatClient({
       let finalAssistantMessage = "";
       let hasReceivedDone = false;
       let hasLoggedFirstToken = false;
+      let hasReceivedToken = false;
 
       const applyChunk = (delta: string) => {
         finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+        hasReceivedToken = true;
         if (!hasLoggedFirstToken) {
           hasLoggedFirstToken = true;
           console.info("FIRST TOKEN RECEIVED", {
@@ -1054,19 +994,17 @@ export function ChatClient({
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-        let frameEndIndex = buffer.indexOf("\n\n");
-        while (frameEndIndex !== -1) {
-          const frame = buffer.slice(0, frameEndIndex).trim();
-          buffer = buffer.slice(frameEndIndex + 2);
-          frameEndIndex = buffer.indexOf("\n\n");
+        let lineEndIndex = buffer.indexOf("\n");
+        while (lineEndIndex !== -1) {
+          const line = buffer.slice(0, lineEndIndex).trim();
+          buffer = buffer.slice(lineEndIndex + 1);
+          lineEndIndex = buffer.indexOf("\n");
 
-          if (!frame) continue;
+          if (!line) continue;
 
           try {
-            const payloadText = frame.startsWith("data:")
-              ? frame.replace(/^data:\s*/, "")
-              : frame;
-            const event = JSON.parse(payloadText) as StreamEvent;
+            const event = JSON.parse(line) as StreamEvent;
+            console.info("EVENT:", event);
 
             if (event.type === "placeholder") {
               applyPlaceholder(event);
@@ -1076,25 +1014,14 @@ export function ChatClient({
               applyBranchList(event);
             }
 
-            if (event.type === "suggestions") {
-              upsertSuggestions(event.suggestions);
-            }
-            if (event.type === "first_token" && !hasReceivedDone) {
-              // Clear placeholder/thinking state immediately when first token arrives
-              updateAssistantMessage(
-                activeAssistantMessageId,
-                (currentMessage) => ({
-                  ...currentMessage,
-                  pending: false,
-                  streaming: true,
-                  status: undefined,
-                }),
-              );
-            }
             if (event.type === "token" && !hasReceivedDone) {
               applyChunk(event.content);
             }
-            if (event.type === "status" && !hasReceivedDone) {
+            if (
+              event.type === "status" &&
+              !hasReceivedDone &&
+              !hasReceivedToken
+            ) {
               applyStatus(event.message);
             }
             if (event.type === "done") {
@@ -1211,7 +1138,6 @@ export function ChatClient({
           content: "",
           pending: true,
           streaming: false,
-          status: "Thinking...",
         },
       ]);
 
@@ -1249,9 +1175,11 @@ export function ChatClient({
         let activeAssistantMessageId = assistantPlaceholderId;
         let hasReceivedDone = false;
         let hasLoggedFirstToken = false;
+        let hasReceivedToken = false;
 
         const applyChunk = (delta: string) => {
           finalAssistantMessage = `${finalAssistantMessage}${delta}`;
+          hasReceivedToken = true;
           if (!hasLoggedFirstToken) {
             hasLoggedFirstToken = true;
             console.info("FIRST TOKEN RECEIVED", {
@@ -1329,48 +1257,22 @@ export function ChatClient({
 
           buffer += decoder.decode(value, { stream: true });
 
-          let frameEndIndex = buffer.indexOf("\n\n");
-          while (frameEndIndex !== -1) {
-            const frame = buffer.slice(0, frameEndIndex).trim();
-            buffer = buffer.slice(frameEndIndex + 2);
-            frameEndIndex = buffer.indexOf("\n\n");
+          let lineEndIndex = buffer.indexOf("\n");
+          while (lineEndIndex !== -1) {
+            const line = buffer.slice(0, lineEndIndex).trim();
+            buffer = buffer.slice(lineEndIndex + 1);
+            lineEndIndex = buffer.indexOf("\n");
 
-            if (!frame) {
+            if (!line) {
               continue;
             }
 
             try {
-              const payloadText = frame.startsWith("data:")
-                ? frame.replace(/^data:\s*/, "")
-                : frame;
-              const event = JSON.parse(payloadText) as StreamEvent;
+              const event = JSON.parse(line) as StreamEvent;
+              console.info("EVENT:", event);
 
-              if (event.type === "suggestion") {
-                upsertSuggestion(event.suggestion);
-              }
-
-              if (event.type === "suggestions") {
-                // Suggestions are applied from the terminal packet.
-              }
-
-              if (event.type === "status") {
+              if (event.type === "status" && !hasReceivedToken) {
                 applyStatus(event.message);
-              }
-
-              if (event.type === "first_token") {
-                console.info("FIRST TOKEN EVENT", {
-                  chatId,
-                  source: "send",
-                });
-                updateAssistantMessage(
-                  assistantPlaceholderId,
-                  (currentMessage) => ({
-                    ...currentMessage,
-                    pending: false,
-                    streaming: true,
-                    status: undefined,
-                  }),
-                );
               }
 
               if (event.type === "token") {
@@ -1458,7 +1360,7 @@ export function ChatClient({
       isSending,
       showFeedback,
       updateAssistantMessage,
-      upsertSuggestion,
+      replaceSuggestionsFromPacket,
     ],
   );
 

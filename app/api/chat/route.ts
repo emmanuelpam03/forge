@@ -49,10 +49,18 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          if (event.type === "status") {
+            console.info("STATUS:", event.message);
+          }
+          if (event.type === "token") {
+            console.info("TOKEN:", event.content);
+          }
+          if (event.type === "done") {
+            console.info("DONE");
+          }
+
           try {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-            );
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
           } catch (err) {
             // If enqueue fails, log and close controller to avoid hangs
             console.error("Failed to enqueue stream event:", err);
@@ -76,8 +84,6 @@ export async function POST(request: NextRequest) {
                 ttftMs: placeholderSentAt - requestStartedAt,
               }),
             );
-
-            send({ type: "status", message: "Thinking..." });
 
             // Graph handles classification, tool routing, and streaming tokens
             const result = await runChatGraphStream(
@@ -199,7 +205,7 @@ export async function POST(request: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
+        "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
       },
