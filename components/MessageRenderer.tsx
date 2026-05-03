@@ -51,21 +51,10 @@ export function MessageRenderer({
         </h6>
       ),
       p: ({ children }) => {
-        const childArray = React.Children.toArray(children);
-        const hasBlockChild = childArray.some(
-          (child) =>
-            React.isValidElement(child) &&
-            (child.type === "pre" ||
-              child.type === "div" ||
-              child.type === CodeBlock),
-        );
-
-        const Wrapper: React.ElementType = hasBlockChild ? "div" : "p";
-
         return (
-          <Wrapper className="mb-4 leading-7 text-foreground/90 last:mb-0">
+          <div className="mb-4 leading-7 text-foreground/90 last:mb-0">
             {children}
-          </Wrapper>
+          </div>
         );
       },
       ul: ({ children }) => (

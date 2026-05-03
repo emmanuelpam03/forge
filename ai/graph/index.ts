@@ -1,8 +1,9 @@
 import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
-import { type AIMessage, type BaseMessage } from "@langchain/core/messages";
+import { type BaseMessage } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
+import { hashIdentifierForLogging } from "@/lib/logging";
 import {
   createChatGraphSeed,
   chatGraphState,
@@ -58,58 +59,6 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-function chunkTextForStreaming(text: string): string[] {
-  if (!text) {
-    return [];
-  }
-
-  const wordChunks = text.match(/\S+\s*/g) ?? [text];
-  const chunks: string[] = [];
-
-  for (const chunk of wordChunks) {
-    if (chunk.length <= 80) {
-      chunks.push(chunk);
-      continue;
-    }
-
-    for (let i = 0; i < chunk.length; i += 80) {
-      chunks.push(chunk.slice(i, i + 80));
-    }
-  }
-
-  return chunks;
-}
-
-function getChunkDelayMs(chunk: string, chunkCount: number): number {
-  if (!chunk) {
-    return 0;
-  }
-
-  // Speed up longer responses so incremental rendering feels responsive.
-  const speedMultiplier =
-    chunkCount > 260
-      ? 0.3
-      : chunkCount > 180
-        ? 0.45
-        : chunkCount > 110
-          ? 0.7
-          : 1;
-
-  if (/\n/.test(chunk)) {
-    return Math.round(18 * speedMultiplier);
-  }
-
-  if (/[.!?]["')\]]?\s*$/.test(chunk)) {
-    return Math.round(14 * speedMultiplier);
-  }
-
-  if (/[,:;]["')\]]?\s*$/.test(chunk)) {
-    return Math.round(10 * speedMultiplier);
-  }
-
-  return Math.round(6 * speedMultiplier);
-}
-
 async function runGraphPreResponse(
   input: ChatGraphInput,
   onEvent?: (event: StreamEvent) => void,
@@ -120,8 +69,13 @@ async function runGraphPreResponse(
   // changing their LangGraph-compatible signatures.
   setGraphStreamEventEmitter(onEvent);
 
-  Object.assign(state, await loadContextNode(state));
-  Object.assign(state, await classifyIntentNode(state));
+  const [contextResult, classificationResult] = await Promise.all([
+    loadContextNode(state),
+    classifyIntentNode(state),
+  ]);
+
+  Object.assign(state, contextResult);
+  Object.assign(state, classificationResult);
   Object.assign(state, await planTaskNode(state));
   Object.assign(state, await toolRouterNodeImpl(state));
   Object.assign(state, await synthesizeEvidenceNode(state));
@@ -173,31 +127,48 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
-    onEvent?.({ type: "status", message: "Writing response..." });
+    // Notify client we're starting work; keep message brief — frontend should
+    // show a 'Thinking...' indicator until the first token arrives.
+    onEvent?.({ type: "status", message: "Thinking..." });
 
-    const response = (await model.invoke(
+    let firstTokenAt: number | null = null;
+
+    // Prefer streaming tokens from the model. The model wrapper exposes
+    // an async iterator `stream(messages)` that yields token strings.
+    // This will reduce TTFT when the provider supports streaming.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokenStream = (model as any).stream(
       messages as BaseMessage[],
-    )) as AIMessage;
-    assistantMessage = toTextContent(response.content).trim();
+    ) as AsyncIterable<string>;
 
-    if (assistantMessage) {
-      const chunks = chunkTextForStreaming(assistantMessage);
-      let cumulativeDelayMs = 0;
-      const maxCumulativeDelayMs = 900;
-
-      for (let i = 0; i < chunks.length; i += 1) {
-        onEvent?.({ type: "token", content: chunks[i] });
-
-        // Tiny pacing delay gives a smoother typing feel without high latency.
-        const delayMs = getChunkDelayMs(chunks[i], chunks.length);
-        if (delayMs <= 0 || cumulativeDelayMs >= maxCumulativeDelayMs) {
-          continue;
-        }
-
-        cumulativeDelayMs += delayMs;
-        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+    for await (const token of tokenStream) {
+      if (firstTokenAt === null) {
+        firstTokenAt = Date.now();
+        console.info(
+          JSON.stringify({
+            event: "first_token",
+            chatId: hashIdentifierForLogging(input.chatId),
+            runId: hashIdentifierForLogging(input.runId),
+            ttftMs: firstTokenAt - startedAt,
+          }),
+        );
       }
+
+      const chunkText = String(token ?? "");
+      assistantMessage += chunkText;
+      onEvent?.({ type: "token", content: chunkText });
     }
+
+    const endedAt = Date.now();
+    console.info(
+      JSON.stringify({
+        event: "stream_completed",
+        chatId: hashIdentifierForLogging(input.chatId),
+        runId: hashIdentifierForLogging(input.runId),
+        durationMs: endedAt - startedAt,
+        ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+      }),
+    );
   } catch (error) {
     throw error;
   }

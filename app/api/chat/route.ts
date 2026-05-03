@@ -28,19 +28,44 @@ export async function POST(request: NextRequest) {
     const runId = crypto.randomUUID();
     const encoder = new TextEncoder();
 
+    const requestStartedAt = Date.now();
+    let firstTokenAt: number | null = null;
+    let placeholderSentAt: number | null = null;
+
     const stream = new ReadableStream({
       start(controller) {
         const send = (event: StreamEvent) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-          );
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+            );
+          } catch (err) {
+            // If enqueue fails, log and close controller to avoid hangs
+            console.error("Failed to enqueue stream event:", err);
+            try {
+              controller.close();
+            } catch {}
+          }
         };
 
         void (async () => {
           let assistantMessage = "";
+          let finalPersistedMessageId: string | undefined = undefined;
 
           try {
-            // Graph handles all classification and tool forcing decisions
+            placeholderSentAt = Date.now();
+            console.info(
+              JSON.stringify({
+                event: "first_token_placeholder",
+                chatId: hashIdentifierForLogging(parsedBody.data.chatId),
+                runId: hashIdentifierForLogging(runId),
+                ttftMs: placeholderSentAt - requestStartedAt,
+              }),
+            );
+
+            send({ type: "status", message: "Thinking..." });
+
+            // Graph handles classification, tool routing, and streaming tokens
             const result = await runChatGraphStream(
               {
                 chatId: parsedBody.data.chatId,
@@ -50,7 +75,22 @@ export async function POST(request: NextRequest) {
                 classifiedIntent: null,
               },
               (event) => {
+                // Track TTFT on first token forwarded
                 if (event.type === "token") {
+                  if (firstTokenAt === null) {
+                    firstTokenAt = Date.now();
+                    console.info(
+                      JSON.stringify({
+                        event: "first_token_forwarded",
+                        chatId: hashIdentifierForLogging(
+                          parsedBody.data.chatId,
+                        ),
+                        runId: hashIdentifierForLogging(runId),
+                        ttftMs: firstTokenAt - requestStartedAt,
+                      }),
+                    );
+                  }
+
                   assistantMessage += event.content;
                 }
 
@@ -62,6 +102,7 @@ export async function POST(request: NextRequest) {
             const finalMessage = (
               result.assistantMessage || assistantMessage
             ).trim();
+            finalPersistedMessageId = result.assistantMessageId ?? undefined;
 
             if (!finalMessage) {
               console.error(
@@ -75,30 +116,43 @@ export async function POST(request: NextRequest) {
                 }),
               );
 
+              // Send a friendly fallback token so the UI never receives an empty answer
               send({
-                type: "status",
-                message:
+                type: "token",
+                content:
                   "I wasn't able to generate a response. Please try again.",
               });
             }
 
             send({
               type: "done",
-              messageId: result.assistantMessageId ?? undefined,
+              messageId: finalPersistedMessageId,
             });
           } catch (error) {
             console.error("Chat stream failed:", error);
-            send({
-              type: "status",
-              message: "Failed to generate a response.",
-            });
-            send({ type: "done" });
-          }
 
-          controller.close();
+            // If no tokens were emitted, provide a fallback token so UI can render
+            if (!firstTokenAt) {
+              send({
+                type: "token",
+                content: "Failed to generate a response. Please try again.",
+              });
+            }
+
+            send({ type: "status", message: "Failed to generate a response." });
+            send({ type: "done" });
+          } finally {
+            try {
+              controller.close();
+            } catch (e) {
+              console.error("Failed to close stream controller:", e);
+            }
+          }
         })().catch((error) => {
           console.error("Chat stream failed:", error);
-          controller.close();
+          try {
+            controller.close();
+          } catch {}
         });
       },
     });

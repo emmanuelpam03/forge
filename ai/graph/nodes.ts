@@ -148,6 +148,10 @@ function toTextContent(content: unknown): string {
   return "";
 }
 
+function estimateTokens(text: string): number {
+  return Math.ceil((text?.length ?? 0) / 4);
+}
+
 function parseJsonFromModelText(text: string): unknown | null {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -335,11 +339,35 @@ export async function generateResponseNode(state: ChatGraphState) {
   const model = createGeminiModel();
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
-  const response = (await model.invoke(messages as BaseMessage[])) as AIMessage;
-  let assistantMessage = toTextContent(response.content).trim();
+  let assistantMessage = "";
+
+  // Prefer streaming from the model when available. Aggregate tokens
+  // as they arrive so upstream code can stream to clients.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokenStream = (model as any).stream(
+      messages as BaseMessage[],
+    ) as AsyncIterable<string>;
+
+    for await (const token of tokenStream) {
+      assistantMessage += String(token ?? "");
+    }
+  } catch (err) {
+    // If streaming isn't supported or fails, fall back to invoke.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fallback = await (model as any).invoke(messages as any[]);
+      assistantMessage = toTextContent((fallback as AIMessage)?.content).trim();
+    } catch (invokeErr) {
+      console.error(
+        `[CRITICAL] Model invocation failed in generateResponseNode. Chat: ${state.chatId}, RunId: ${state.runId}`,
+      );
+    }
+  }
 
   // Validate response content extraction
-  if (!response.content) {
+  if (!assistantMessage) {
     console.error(
       `[CRITICAL] Model returned null/undefined content. Chat: ${state.chatId}, Intent: ${state.intent}, RunId: ${state.runId}`,
     );
@@ -376,11 +404,18 @@ export async function generateResponseNode(state: ChatGraphState) {
     );
   }
 
-  const { inputTokens, outputTokens } = getUsageCounts(response);
+  const inputTokens = estimateTokens(
+    messages
+      .map((message) =>
+        toTextContent((message as { content?: unknown }).content),
+      )
+      .join("\n"),
+  );
+  const outputTokens = estimateTokens(assistantMessage);
 
   return {
     assistantMessage,
-    modelUsed: getModelName(response),
+    modelUsed: "gemini",
     provider: "google-genai",
     inputTokens,
     outputTokens,
@@ -393,6 +428,15 @@ export async function saveMessagesNode(state: ChatGraphState) {
   let persistedAssistantMessageId: string | null =
     state.assistantMessageId ?? null;
   let createdUserMessageId: string | null = null;
+
+  await prisma.chat.upsert({
+    where: { id: state.chatId },
+    create: {
+      id: state.chatId,
+      title: state.generatedTitle?.trim() || "New Chat",
+    },
+    update: {},
+  });
   // Avoid duplicating the user message when the database already contains
   // the edited user turn (edit flow). If the last previous message is a
   // user message with identical content, skip creating a new user row.
@@ -560,9 +604,7 @@ Rules:
 - Use tools proactively. Do not wait for explicit user requests like "search for", "calculate", etc.
 - If uncertain, default to no tools.
 - For independent tools (time + news), set sequential to false.
-- For dependent tools (search price → calculate margin), set sequential to true.
-- Only ask follow-up for constraints that fundamentally change the answer.
-- Respond with ONLY the JSON object, no markdown or explanation.`;
+`;
 
     const userPrompt = `User intent: ${state.intent}
 Project context available: ${state.memorySummary ? "yes" : "no"}
