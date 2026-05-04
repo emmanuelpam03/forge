@@ -101,33 +101,33 @@ function extractCalculatorExpression(message: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  return normalized || sanitizeUserInput(message);
+  return normalized || message;
 }
 
 function buildToolArgs(
   toolName: string,
   state: ChatGraphState,
 ): Record<string, unknown> {
-  const sanitizedMessage = sanitizeUserInput(state.userMessage);
+  const message = state.userMessage;
 
   if (toolName === "calculator") {
-    return { expression: extractCalculatorExpression(sanitizedMessage) };
+    return { expression: extractCalculatorExpression(message) };
   }
 
   if (toolName === "webSearch") {
-    return { query: sanitizedMessage, maxResults: 5 };
+    return { query: message, maxResults: 5 };
   }
 
   if (toolName === "currentDateTime") {
-    if (/\btimezone\b/i.test(sanitizedMessage)) {
+    if (/\btimezone\b/i.test(message)) {
       return { action: "timezone" };
     }
 
-    if (/\bdate|day of week|today\b/i.test(sanitizedMessage)) {
+    if (/\bdate|day of week|today\b/i.test(message)) {
       return { action: "date" };
     }
 
-    if (/\btime\b/i.test(sanitizedMessage)) {
+    if (/\btime\b/i.test(message)) {
       return { action: "time" };
     }
 
@@ -135,11 +135,11 @@ function buildToolArgs(
   }
 
   if (toolName === "summarizeText") {
-    return { text: sanitizedMessage, maxSentences: 3 };
+    return { text: message, maxSentences: 3 };
   }
 
   if (toolName === "projectContextLookup") {
-    return { query: sanitizedMessage, maxResults: 5 };
+    return { query: message, maxResults: 5 };
   }
 
   return {};
@@ -391,40 +391,6 @@ export function parseStructuredAssistantOutput(text: string): {
 }
 
 /**
- * Sanitize user input to prevent prompt injection attacks.
- * Removes/escapes common injection patterns and truncates excessively long inputs.
- */
-function sanitizeUserInput(input: string, maxLength: number = 2000): string {
-  // Truncate to max length
-  let sanitized = input.slice(0, maxLength).trim();
-
-  // Remove common prompt injection patterns
-  const injectionPatterns = [
-    /ignore\s+all\s+previous\s+instructions?/gi,
-    /forget\s+about/gi,
-    /disregard\s+everything\s+above/gi,
-    /new\s+system\s+prompt/gi,
-    /override\s+your\s+instructions/gi,
-    /respond\s+as\s+if/gi,
-    /pretend\s+you\s+are/gi,
-  ];
-
-  for (const pattern of injectionPatterns) {
-    sanitized = sanitized.replace(pattern, "");
-  }
-
-  return sanitized.trim();
-}
-
-/**
- * Sanitize assistant output for safe display and storage.
- * Performs basic cleanup (trimming, whitespace normalization).
- */
-function sanitizeAssistantOutput(output: string): string {
-  return output.trim().replace(/\s{2,}/g, " ");
-}
-
-/**
  * Checks if text looks like a valid numeric expression for the calculator tool.
  * The calculator needs expressions like "100 * 0.15", not prose like "Web search result: ..."
  * This is needed for multi-sequential tool chaining where intermediate results are prose.
@@ -567,8 +533,6 @@ export async function generateResponseNode(state: ChatGraphState) {
       }),
     );
   }
-
-  assistantMessage = sanitizeAssistantOutput(assistantMessage);
 
   // GUARANTEE: assistantMessage is always non-empty after fallbacks
   if (!assistantMessage || !assistantMessage.trim()) {
@@ -1033,18 +997,11 @@ export function generateSuggestions(
   userQuery: string,
   response: string,
 ): TaskSuggestion[] {
-  const sanitizedMessage = sanitizeUserInput(userQuery);
-  const sanitizedResponse = sanitizeUserInput(response);
-
-  if (
-    !sanitizedMessage ||
-    !sanitizedResponse ||
-    !hasOngoingIntent(sanitizedMessage)
-  ) {
+  if (!userQuery || !response || !hasOngoingIntent(userQuery)) {
     return [];
   }
 
-  const heuristicSuggestion = inferTaskSuggestionFromMessage(sanitizedMessage);
+  const heuristicSuggestion = inferTaskSuggestionFromMessage(userQuery);
   if (!heuristicSuggestion) {
     return [];
   }
@@ -1107,12 +1064,10 @@ export async function generateTitleNode(state: ChatGraphState) {
     }
 
     const model = createGeminiModel();
-    const sanitizedMessage = sanitizeUserInput(state.userMessage);
-    const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
     const prompt = TITLE_GENERATION_PROMPT.replace(
       /"{USER_MESSAGE}"/g,
-      sanitizedMessage,
-    ).replace(/"{ASSISTANT_MESSAGE}"/g, sanitizedAssistant);
+      state.userMessage,
+    ).replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage);
 
     const response = await model.invoke([new HumanMessage(prompt)]);
     const generatedTitle = toTextContent(response.content)
@@ -1147,13 +1102,11 @@ export async function generateTitleNode(state: ChatGraphState) {
 export async function extractMemoryNode(state: ChatGraphState) {
   try {
     const model = createGeminiModel();
-    const sanitizedMessage = sanitizeUserInput(state.userMessage);
-    const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
     const prompt = MEMORY_EXTRACTION_PROMPT.replace(
       /"{USER_MESSAGE}"/g,
-      sanitizedMessage,
+      state.userMessage,
     )
-      .replace(/"{ASSISTANT_MESSAGE}"/g, sanitizedAssistant)
+      .replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage)
       .replace(/"{INTENT}"/g, state.intent || "");
 
     const response = await model.invoke([new HumanMessage(prompt)]);
