@@ -5,6 +5,7 @@ import {
 } from "@langchain/core/messages";
 import { CHAT_SYSTEM_PROMPT } from "@/ai/prompts/system";
 import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
+import { buildTopicTemplateLayer } from "@/ai/prompts/templates";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 
@@ -108,6 +109,9 @@ function formatToolPlan(state: ChatGraphState): string {
 }
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
+  const topicTemplateLayer = buildTopicTemplateLayer(
+    state.classifiedIntent?.intent,
+  );
 
   // Use selected context from engine if available, otherwise fall back to raw snapshots.
   // Tool evidence is always prepended so fresh search results outrank memory.
@@ -133,7 +137,9 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
       .join(" ");
   }
 
-  const systemPrompt = [CHAT_SYSTEM_PROMPT, context].join("\n\n");
+  const systemPrompt = [CHAT_SYSTEM_PROMPT, topicTemplateLayer, context]
+    .filter(Boolean)
+    .join("\n\n");
 
   return [new SystemMessage(systemPrompt), new HumanMessage(state.userMessage)];
 }

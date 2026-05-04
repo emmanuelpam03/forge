@@ -21,6 +21,7 @@ import {
   buildFreshnessClassificationMessage as buildFreshnessFromIntent,
   buildIntentClassificationMessage,
 } from "../ai/prompts/intent.ts";
+import { buildTopicTemplateLayer } from "../ai/prompts/templates.ts";
 
 function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -49,6 +50,7 @@ test("system prompt composes all required layers in order", () => {
   assert.ok(behaviorIndex > outputControlIndex);
   assert.ok(routingIndex > behaviorIndex);
   assert.ok(extensionsIndex > routingIndex);
+  assert.match(CORE_LAYER, /You are the senior engineer for Forge\./);
 });
 
 test("extensions layer includes execution, writing, tools, and ai backend policies", () => {
@@ -120,4 +122,13 @@ test("legacy writing and summarization modules re-export canonical policies", ()
 
   assert.ok(WRITING_POLICY.trim().length > 0);
   assert.ok(SUMMARIZATION_POLICY.trim().length > 0);
+});
+
+test("topic template layer resolves by classified intent", () => {
+  const codeLayer = buildTopicTemplateLayer("code");
+  const factualLayer = buildTopicTemplateLayer("factual");
+
+  assert.match(codeLayer, /Topic Template: Code/);
+  assert.match(factualLayer, /Topic Template: Factual/);
+  assert.equal(buildTopicTemplateLayer(null), "");
 });
