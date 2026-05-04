@@ -16,6 +16,7 @@ import {
   type QueryIntentClassification,
 } from "@/ai/graph/classification";
 import { isAnswerStart } from "@/ai/graph/reasoning-split";
+import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -557,6 +558,8 @@ export async function generateResponseNode(state: ChatGraphState) {
       }),
     );
   }
+
+  assistantMessage = sanitizeAssistantOutput(assistantMessage);
 
   // GUARANTEE: assistantMessage is always non-empty after fallbacks
   if (!assistantMessage || !assistantMessage.trim()) {

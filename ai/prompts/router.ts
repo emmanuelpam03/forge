@@ -18,17 +18,17 @@ function formatPreferences(state: ChatGraphState): string {
 
   return state.preferences
     .map((preference) => {
-      const category = preference.category ? `${preference.category}: ` : "";
-      return `- ${category}${preference.key} = ${preference.value}`;
+      const category = preference.category ? `${preference.category} ` : "";
+      return `${category}${preference.key} = ${preference.value}`;
     })
-    .join("\n");
+    .join("; ");
 }
 
 function formatIntent(state: ChatGraphState): string {
   if (!state.intent) {
     return "";
   }
-  return `User intent: ${state.intent}`;
+  return `User intent is ${state.intent}.`;
 }
 
 function formatQueryIntent(state: ChatGraphState): string {
@@ -36,11 +36,7 @@ function formatQueryIntent(state: ChatGraphState): string {
     return "";
   }
 
-  return [
-    "Query intent:",
-    `- type: ${state.queryIntent.type}`,
-    `- needsTools: ${state.queryIntent.needsTools}`,
-  ].join("\n");
+  return `Current query intent is ${state.queryIntent.type} and tools are ${state.queryIntent.needsTools ? "needed" : "not needed"}.`;
 }
 
 function formatMemorySummary(state: ChatGraphState): string {
@@ -48,7 +44,7 @@ function formatMemorySummary(state: ChatGraphState): string {
     return "No memory summary available.";
   }
 
-  return `Version ${state.memorySummary.version}: ${state.memorySummary.summary}`;
+  return `Memory summary version ${state.memorySummary.version}: ${state.memorySummary.summary}`;
 }
 
 function formatHistory(state: ChatGraphState): string {
@@ -57,8 +53,8 @@ function formatHistory(state: ChatGraphState): string {
   }
 
   return state.previousMessages
-    .map((message) => `${message.role}: ${message.content}`)
-    .join("\n");
+    .map((message) => `${message.role} said ${message.content}`)
+    .join(" ");
 }
 
 function formatToolContext(state: ChatGraphState): string {
@@ -71,8 +67,8 @@ function formatToolContext(state: ChatGraphState): string {
   // Include evidence bundles if available (newer flow)
   if (state.evidenceBundles.length > 0) {
     context = state.evidenceBundles
-      .map((bundle) => `### ${bundle.tool}\n${bundle.content}`)
-      .join("\n\n");
+      .map((bundle) => `${bundle.tool} evidence: ${bundle.content}`)
+      .join(" ");
   } else if (state.toolContext) {
     // Fallback to legacy toolContext
     context = state.toolContext;
@@ -80,7 +76,7 @@ function formatToolContext(state: ChatGraphState): string {
 
   // Include synthesis note if available
   if (state.synthesisNote) {
-    context += `\n\n**Note:** ${state.synthesisNote}`;
+    context += ` Synthesis note: ${state.synthesisNote}`;
   }
 
   return context;
@@ -90,12 +86,13 @@ function formatEvidencePriorityContext(state: ChatGraphState): string {
   const sections: string[] = [];
 
   if (state.evidenceBundles.length > 0 || state.toolContext) {
-    sections.push("Tool evidence:");
-    sections.push(formatToolContext(state));
+    sections.push(
+      `Verified tool evidence includes ${formatToolContext(state)}.`,
+    );
   }
 
   if (state.queryIntent) {
-    sections.push("", formatQueryIntent(state));
+    sections.push(formatQueryIntent(state));
   }
 
   return sections.join("\n").trim();
@@ -110,7 +107,7 @@ function formatToolPlan(state: ChatGraphState): string {
     return "";
   }
 
-  return `Tools used: ${state.toolPlan.toolsNeeded.join(", ")} (${state.executionMode})`;
+  return `Tools used were ${state.toolPlan.toolsNeeded.join(", ")} in ${state.executionMode} mode.`;
 }
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
@@ -123,29 +120,20 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
     const selectedContext = formatSelectedContext(state.selectedContext);
     context = [evidencePriorityContext, selectedContext]
       .filter(Boolean)
-      .join("\n\n");
+      .join(" ");
   } else {
     // Legacy fallback to raw snapshot formatting
     context = [
       evidencePriorityContext,
-      "Project context:",
-      formatMemorySummary(state),
-      "",
+      `Project context is ${formatMemorySummary(state)}.`,
       formatIntent(state),
-      "",
-      "Tool context:",
       formatToolContext(state),
-      "",
       formatToolPlan(state),
-      "",
-      "User preferences:",
-      formatPreferences(state),
-      "",
-      "Recent conversation:",
-      formatHistory(state),
+      `User preferences are ${formatPreferences(state)}.`,
+      `Recent conversation is ${formatHistory(state)}.`,
     ]
-      .filter((line) => line !== "") // Remove empty intent lines
-      .join("\n");
+      .filter((line) => line !== "")
+      .join(" ");
   }
 
   const systemPrompt = [
