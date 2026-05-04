@@ -94,8 +94,9 @@ export async function POST(request: NextRequest) {
           controllerClosed = true;
           try {
             controller.close();
-          } catch {
-            // No-op: the stream may already be closed/cancelled.
+            console.info("Regenerate stream: controller closed");
+          } catch (err) {
+            console.warn("Regenerate stream: controller.close() failed:", err);
           }
         };
 
@@ -120,6 +121,9 @@ export async function POST(request: NextRequest) {
           } catch (error) {
             controllerClosed = true;
             console.warn("Regenerate SSE send skipped after close:", error);
+            try {
+              controller.close();
+            } catch {}
             return false;
           }
         };
@@ -204,10 +208,6 @@ export async function POST(request: NextRequest) {
                 send(event);
               },
             );
-
-            await persistProgress;
-            await sendBranchList();
-
             const finalMessage = (
               result.assistantMessage || assistantMessage
             ).trim();
@@ -234,11 +234,21 @@ export async function POST(request: NextRequest) {
               });
             }
 
+            console.info("Regenerate stream: emitting done", {
+              messageId: assistantPlaceholder.id,
+              length: finalMessage.length,
+            });
             send({
               type: "done",
+              messageId: assistantPlaceholder.id,
               response: finalMessage,
               suggestions: result.suggestions ?? [],
             });
+
+            // Post-processing can be slower; keep it after `done` so UI exits
+            // generating state as soon as model output is complete.
+            await persistProgress;
+            await sendBranchList();
           } catch (err) {
             console.error("Regenerate stream failed:", err);
             await prisma.message
@@ -247,8 +257,12 @@ export async function POST(request: NextRequest) {
               })
               .catch(() => null);
             send({ type: "status", message: "Failed to generate a response." });
+            console.info("Regenerate stream: emitting error done", {
+              messageId: assistantPlaceholder.id,
+            });
             send({
               type: "done",
+              messageId: assistantPlaceholder.id,
               suggestions: [],
             });
           }
@@ -270,8 +284,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Chat regenerate route failed:", error);
+    const detail =
+      error instanceof Error
+        ? { message: error.message, stack: error.stack }
+        : String(error);
     return new Response(
-      JSON.stringify({ error: "Failed to regenerate message." }),
+      JSON.stringify({ error: "Failed to regenerate message.", detail }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },

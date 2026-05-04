@@ -154,17 +154,23 @@ export async function runChatGraphStream(
 
     // Stream model output in a provider-agnostic way.
     const streamCallStart = Date.now();
-    let tokenStream: AsyncIterable<unknown>;
+    let tokenStreamRaw: unknown;
 
     if (modelConfig.provider === "ollama") {
       // For Ollama, use the stream() method for real token streaming
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tokenStream = (model as any).stream(messages);
+      tokenStreamRaw = (model as any).stream(messages);
     } else {
-      // For Gemini, use native streaming
+      // For Gemini, use native streaming (nativeStream is async, must await)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tokenStream = (model as any).nativeStream(messages);
+      tokenStreamRaw = (model as any).nativeStream(messages);
     }
+
+    // Ensure tokenStream is awaited if it's a Promise
+    const tokenStream: AsyncIterable<unknown> =
+      tokenStreamRaw instanceof Promise
+        ? await tokenStreamRaw
+        : (tokenStreamRaw as AsyncIterable<unknown>);
 
     const streamCallEnd = Date.now();
     console.info("MODEL_STREAM_CREATED", {

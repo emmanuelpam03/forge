@@ -488,6 +488,28 @@ export function ChatClient({
     );
   }, []);
 
+  const clearAssistantStreamingStates = useCallback((messageIds: string[]) => {
+    if (messageIds.length === 0) {
+      return;
+    }
+
+    const messageIdSet = new Set(messageIds);
+    setMessages((currentMessages) =>
+      currentMessages.map((currentMessage) =>
+        messageIdSet.has(currentMessage.id)
+          ? {
+              ...currentMessage,
+              pending: false,
+              streaming: false,
+              status: undefined,
+              reasoningSteps: [],
+              reasoningExpanded: false,
+            }
+          : currentMessage,
+      ),
+    );
+  }, []);
+
   const finalizeStreamState = useCallback(
     (messageId: string, source: string) => {
       console.info("STREAM END DETECTED", {
@@ -922,6 +944,7 @@ export function ChatClient({
       let hasLoggedFirstToken = false;
       let streamedReasoning = "";
       let streamedMessage = "";
+      let activeAssistantParentId: string | null = null;
 
       const applyReasoning = (delta: string) => {
         streamedReasoning = `${streamedReasoning}${delta}`;
@@ -944,6 +967,7 @@ export function ChatClient({
         event: Extract<StreamEvent, { type: "placeholder" }>,
       ) => {
         activeAssistantMessageId = event.messageId;
+        activeAssistantParentId = event.parentId;
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
             currentMessage.id === assistantPlaceholderId
@@ -978,29 +1002,55 @@ export function ChatClient({
         );
       };
 
-      const applyDone = (content: string) => {
+      const applyDone = (content: string, persistedMessageId?: string) => {
         const finalContent = (content || streamedMessage || "").trim();
+        const nextAssistantMessageId =
+          persistedMessageId && persistedMessageId.trim().length > 0
+            ? persistedMessageId
+            : activeAssistantMessageId;
+        const previousAssistantMessageId = activeAssistantMessageId;
+        const messageIdsToClear = Array.from(
+          new Set([
+            assistantPlaceholderId,
+            previousAssistantMessageId,
+            nextAssistantMessageId,
+          ]),
+        );
+        const shouldClearByParent =
+          activeAssistantParentId !== null
+            ? (currentMessage: ChatMessage) =>
+                currentMessage.role === "assistant" &&
+                currentMessage.parentId === activeAssistantParentId
+            : () => false;
+
+        activeAssistantMessageId = nextAssistantMessageId;
 
         if (!finalContent) {
           setError("No response generated. Please try again.");
           setMessages((currentMessages) =>
-            currentMessages.filter(
-              (m) =>
-                m.id !== assistantPlaceholderId &&
-                m.id !== activeAssistantMessageId,
-            ),
+            currentMessages.filter((m) => !messageIdsToClear.includes(m.id)),
           );
           activeAssistantMessageId = assistantPlaceholderId;
-          finalizeStreamState(assistantPlaceholderId, "regenerate");
+          clearAssistantStreamingStates(messageIdsToClear);
+          setIsSending(false);
+          console.info("STREAM END DETECTED", {
+            chatId,
+            source: "regenerate",
+          });
+          console.info("STATE RESET", {
+            chatId,
+            source: "regenerate",
+          });
           return;
         }
 
         setMessages((currentMessages) =>
           currentMessages.map((currentMessage) =>
-            currentMessage.id === activeAssistantMessageId
+            messageIdsToClear.includes(currentMessage.id) ||
+            shouldClearByParent(currentMessage)
               ? {
                   ...currentMessage,
-                  id: activeAssistantMessageId,
+                  id: nextAssistantMessageId,
                   role: "assistant",
                   content: finalContent,
                   pending: false,
@@ -1012,7 +1062,16 @@ export function ChatClient({
               : currentMessage,
           ),
         );
-        finalizeStreamState(activeAssistantMessageId, "regenerate");
+        clearAssistantStreamingStates(messageIdsToClear);
+        setIsSending(false);
+        console.info("STREAM END DETECTED", {
+          chatId,
+          source: "regenerate",
+        });
+        console.info("STATE RESET", {
+          chatId,
+          source: "regenerate",
+        });
       };
 
       while (true) {
@@ -1055,7 +1114,7 @@ export function ChatClient({
                   source: "regenerate",
                 });
                 replaceSuggestionsFromPacket(event.suggestions ?? []);
-                applyDone(event.response ?? streamedMessage);
+                applyDone(event.response ?? streamedMessage, event.messageId);
               }
             }
           } catch (parseError) {
@@ -1079,7 +1138,7 @@ export function ChatClient({
           chatId,
           source: "regenerate",
         });
-        applyDone(streamedMessage);
+        applyDone(streamedMessage, activeAssistantMessageId);
       }
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
@@ -1103,6 +1162,10 @@ export function ChatClient({
         sendError instanceof Error
           ? sendError.message
           : "Failed to regenerate.";
+      clearAssistantStreamingStates([
+        assistantPlaceholderId,
+        activeAssistantMessageId,
+      ]);
       setMessages((currentMessages) =>
         currentMessages.filter(
           (m) =>
