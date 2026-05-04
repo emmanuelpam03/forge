@@ -73,10 +73,12 @@ export async function refineAssistantResponseText(
     const prompt = `Rewrite the text below so it is clean, readable, and professionally formatted.
 
 Rules:
-- Fix spelling, spacing, punctuation, capitalization, and obvious word breaks.
+  - Fix spelling, spacing, punctuation, capitalization, and every obvious word break.
 - Preserve the original meaning exactly.
 - Preserve paragraph structure, headings, and list structure.
 - Do not add new facts, examples, warnings, or conclusions.
+  - Do not preserve broken words, extra spaces, or awkward line breaks.
+  - If a heading or sentence is malformed, repair it into standard English.
 - Return only the corrected text.
 
 Text:
