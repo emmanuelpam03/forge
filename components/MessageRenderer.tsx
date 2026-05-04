@@ -10,92 +10,193 @@ type MessageRendererProps = {
   isStreaming?: boolean;
 };
 
-// Copy state helper removed — currently unused. Reintroduce when enabling copy UI.
-
-export function MessageRenderer({
-  content,
-  isStreaming,
-}: MessageRendererProps) {
-  // copy helper not used currently
-
+export function MessageRenderer({ content, isStreaming }: MessageRendererProps) {
   const components = useMemo<Components>(
     () => ({
       h1: ({ children }) => (
-        <h1 className="mb-4 mt-7 text-3xl font-semibold tracking-[-0.04em] text-foreground first:mt-0">
+        <h1
+          className="mb-4 mt-7 first:mt-0"
+          style={{
+            fontSize: "1.6rem",
+            fontWeight: 600,
+            letterSpacing: "-0.04em",
+            color: "rgba(255,255,255,0.92)",
+            fontFamily: "var(--font-manrope), sans-serif",
+          }}
+        >
           {children}
         </h1>
       ),
       h2: ({ children }) => (
-        <h2 className="mb-3 mt-6 text-2xl font-semibold tracking-[-0.03em] text-foreground first:mt-0">
+        <h2
+          className="mb-3 mt-6 first:mt-0"
+          style={{
+            fontSize: "1.25rem",
+            fontWeight: 600,
+            letterSpacing: "-0.03em",
+            color: "rgba(255,255,255,0.9)",
+            fontFamily: "var(--font-manrope), sans-serif",
+          }}
+        >
           {children}
         </h2>
       ),
       h3: ({ children }) => (
-        <h3 className="mb-2.5 mt-5 text-xl font-semibold tracking-[-0.02em] text-foreground first:mt-0">
+        <h3
+          className="mb-2.5 mt-5 first:mt-0"
+          style={{
+            fontSize: "1.05rem",
+            fontWeight: 600,
+            letterSpacing: "-0.02em",
+            color: "rgba(255,255,255,0.88)",
+            fontFamily: "var(--font-manrope), sans-serif",
+          }}
+        >
           {children}
         </h3>
       ),
       h4: ({ children }) => (
-        <h4 className="mb-2 mt-4 text-lg font-semibold tracking-[-0.01em] text-foreground first:mt-0">
+        <h4
+          className="mb-2 mt-4 first:mt-0"
+          style={{
+            fontSize: "0.95rem",
+            fontWeight: 600,
+            letterSpacing: "-0.01em",
+            color: "rgba(255,255,255,0.86)",
+          }}
+        >
           {children}
         </h4>
       ),
       h5: ({ children }) => (
-        <h5 className="mb-2 mt-4 text-base font-semibold text-foreground first:mt-0">
+        <h5
+          className="mb-2 mt-4 text-base font-semibold first:mt-0"
+          style={{ color: "rgba(255,255,255,0.84)" }}
+        >
           {children}
         </h5>
       ),
       h6: ({ children }) => (
-        <h6 className="mb-2 mt-4 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground first:mt-0">
+        <h6
+          className="mb-2 mt-4 text-sm font-semibold first:mt-0"
+          style={{
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            color: "rgba(255,255,255,0.4)",
+          }}
+        >
           {children}
         </h6>
       ),
-      p: ({ children }) => {
-        return (
-          <div className="mb-4 leading-7 text-foreground/90 last:mb-0">
-            {children}
-          </div>
-        );
-      },
+      p: ({ children }) => (
+        <div
+          className="mb-4 last:mb-0"
+          style={{
+            lineHeight: "1.75",
+            color: "rgba(255,255,255,0.78)",
+          }}
+        >
+          {children}
+        </div>
+      ),
       ul: ({ children }) => (
-        <ul className="mb-4 ml-6 list-disc space-y-2 text-foreground/90 [&_ul]:mt-2 [&_ul]:mb-0 [&_ul]:ml-5">
+        <ul
+          className="mb-4 ml-6 space-y-2"
+          style={{
+            listStyleType: "disc",
+            color: "rgba(255,255,255,0.78)",
+          }}
+        >
           {children}
         </ul>
       ),
       ol: ({ children }) => (
-        <ol className="mb-4 ml-6 list-decimal space-y-2 text-foreground/90 [&_ol]:mt-2 [&_ol]:mb-0 [&_ol]:ml-5">
+        <ol
+          className="mb-4 ml-6 space-y-2"
+          style={{
+            listStyleType: "decimal",
+            color: "rgba(255,255,255,0.78)",
+          }}
+        >
           {children}
         </ol>
       ),
-      li: ({ children }) => <li className="pl-1 leading-7">{children}</li>,
+      li: ({ children }) => (
+        <li className="pl-1" style={{ lineHeight: "1.75" }}>
+          {children}
+        </li>
+      ),
       blockquote: ({ children }) => (
-        <blockquote className="mb-4 border-l-4 border-border bg-muted/30 px-4 py-3 text-foreground/80 italic">
+        <blockquote
+          className="mb-4 px-4 py-3 italic"
+          style={{
+            borderLeft: "3px solid rgba(251,191,36,0.4)",
+            background: "rgba(251,191,36,0.04)",
+            borderRadius: "0 10px 10px 0",
+            color: "rgba(255,255,255,0.6)",
+          }}
+        >
           {children}
         </blockquote>
       ),
       table: ({ children }) => (
-        <div className="mb-4 overflow-x-auto rounded-xl border border-border bg-card/40">
-          <table className="w-full border-collapse text-left text-sm text-foreground/90">
+        <div
+          className="mb-4 overflow-x-auto"
+          style={{
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "12px",
+          }}
+        >
+          <table
+            className="w-full border-collapse text-left text-sm"
+            style={{ color: "rgba(255,255,255,0.8)" }}
+          >
             {children}
           </table>
         </div>
       ),
       thead: ({ children }) => (
-        <thead className="bg-muted/60">{children}</thead>
+        <thead style={{ background: "rgba(255,255,255,0.04)" }}>{children}</thead>
       ),
       tbody: ({ children }) => (
-        <tbody className="divide-y divide-border">{children}</tbody>
+        <tbody style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          {children}
+        </tbody>
       ),
       tr: ({ children }) => (
-        <tr className="transition-colors hover:bg-muted/40">{children}</tr>
+        <tr
+          style={{
+            borderBottom: "1px solid rgba(255,255,255,0.05)",
+            transition: "background 0.1s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background =
+              "rgba(255,255,255,0.025)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+          }}
+        >
+          {children}
+        </tr>
       ),
       th: ({ children }) => (
-        <th className="border-b border-border px-4 py-3 font-semibold text-foreground">
+        <th
+          className="px-4 py-3 text-[12px] font-semibold"
+          style={{
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.45)",
+          }}
+        >
           {children}
         </th>
       ),
       td: ({ children }) => (
-        <td className="border-b border-border/70 px-4 py-3 align-top text-foreground/85 last:border-b-0">
+        <td
+          className="px-4 py-3 align-top"
+          style={{ color: "rgba(255,255,255,0.72)" }}
+        >
           {children}
         </td>
       ),
@@ -104,7 +205,18 @@ export function MessageRenderer({
           href={href}
           target="_blank"
           rel="noreferrer"
-          className="font-medium text-sky-400 underline decoration-sky-400/40 underline-offset-4 transition hover:text-sky-300 hover:decoration-sky-300"
+          className="font-medium underline underline-offset-4 transition-colors"
+          style={{
+            color: "rgba(251,191,36,0.85)",
+            textDecorationColor: "rgba(251,191,36,0.3)",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.color = "rgba(251,191,36,1)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.color =
+              "rgba(251,191,36,0.85)";
+          }}
         >
           {children}
         </a>
@@ -121,7 +233,12 @@ export function MessageRenderer({
           return (
             <code
               {...restProps}
-              className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground"
+              className="rounded-md px-1.5 py-0.5 font-mono text-[0.875em]"
+              style={{
+                background: "rgba(251,191,36,0.08)",
+                border: "1px solid rgba(251,191,36,0.15)",
+                color: "rgba(251,191,36,0.9)",
+              }}
             >
               {children}
             </code>
@@ -130,12 +247,24 @@ export function MessageRenderer({
 
         return <CodeBlock language={language} code={codeText} />;
       },
-      hr: () => <hr className="my-5 border-border" />,
+      hr: () => (
+        <hr
+          className="my-5"
+          style={{ borderColor: "rgba(255,255,255,0.07)" }}
+        />
+      ),
       em: ({ children }) => (
-        <em className="italic text-foreground/90">{children}</em>
+        <em className="italic" style={{ color: "rgba(255,255,255,0.75)" }}>
+          {children}
+        </em>
       ),
       strong: ({ children }) => (
-        <strong className="font-semibold text-foreground">{children}</strong>
+        <strong
+          className="font-semibold"
+          style={{ color: "rgba(255,255,255,0.95)" }}
+        >
+          {children}
+        </strong>
       ),
     }),
     [],
@@ -147,7 +276,10 @@ export function MessageRenderer({
         {content}
       </ReactMarkdown>
       {isStreaming ? (
-        <span className="ml-0.5 inline-block animate-pulse text-primary">
+        <span
+          className="ml-0.5 inline-block animate-pulse"
+          style={{ color: "rgba(251,191,36,0.8)" }}
+        >
           ▍
         </span>
       ) : null}

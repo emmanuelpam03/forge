@@ -30,20 +30,35 @@ function createId() {
   ) {
     return crypto.randomUUID();
   }
-
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function feedbackStyles(type: FeedbackType) {
+function feedbackStyles(type: FeedbackType): React.CSSProperties {
   if (type === "success") {
-    return "border-primary/35 bg-primary/10 text-foreground";
+    return {
+      background: "rgba(14,12,10,0.97)",
+      border: "1px solid rgba(251,191,36,0.3)",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(251,191,36,0.1)",
+    };
   }
-
   if (type === "error") {
-    return "border-destructive/45 bg-destructive/10 text-foreground";
+    return {
+      background: "rgba(14,12,10,0.97)",
+      border: "1px solid rgba(239,68,68,0.35)",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(239,68,68,0.1)",
+    };
   }
+  return {
+    background: "rgba(14,12,10,0.97)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+  };
+}
 
-  return "border-border bg-card text-foreground";
+function accentColor(type: FeedbackType): string {
+  if (type === "success") return "rgba(251,191,36,0.9)";
+  if (type === "error") return "rgba(239,68,68,0.9)";
+  return "rgba(255,255,255,0.6)";
 }
 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
@@ -52,7 +67,6 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   const showFeedback = useCallback((item: Omit<FeedbackItem, "id">) => {
     const id = createId();
     setItems((prev) => [...prev, { ...item, id }]);
-
     window.setTimeout(() => {
       setItems((prev) => prev.filter((entry) => entry.id !== id));
     }, 2800);
@@ -64,22 +78,38 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     <FeedbackContext.Provider value={value}>
       {children}
 
-      <div className="pointer-events-none fixed right-4 top-4 z-[120] flex w-[min(92vw,360px)] flex-col gap-2">
+      <div className="pointer-events-none fixed right-4 top-4 z-[120] flex w-[min(92vw,340px)] flex-col gap-2">
         {items.map((item) => (
           <div
             key={item.id}
-            className={`pointer-events-auto rounded-xl border px-3 py-2 shadow-lg backdrop-blur ${feedbackStyles(item.type)}`}
+            className="pointer-events-auto rounded-2xl px-4 py-3 backdrop-blur-xl"
+            style={feedbackStyles(item.type)}
             role="status"
             aria-live="polite"
           >
-            <p className="text-[13px] font-semibold leading-tight">
-              {item.title}
-            </p>
-            {item.description ? (
-              <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
-                {item.description}
-              </p>
-            ) : null}
+            <div className="flex items-start gap-3">
+              {/* Accent dot */}
+              <span
+                className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                style={{ background: accentColor(item.type) }}
+              />
+              <div>
+                <p
+                  className="text-[13px] font-semibold leading-tight"
+                  style={{ color: "rgba(255,255,255,0.92)" }}
+                >
+                  {item.title}
+                </p>
+                {item.description ? (
+                  <p
+                    className="mt-1 text-[12px] leading-snug"
+                    style={{ color: "rgba(255,255,255,0.42)" }}
+                  >
+                    {item.description}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -89,10 +119,8 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
 
 export function useFeedback() {
   const context = useContext(FeedbackContext);
-
   if (!context) {
     throw new Error("useFeedback must be used inside FeedbackProvider.");
   }
-
   return context;
 }

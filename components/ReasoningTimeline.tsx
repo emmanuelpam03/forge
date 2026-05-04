@@ -7,7 +7,7 @@ export type ReasoningTimelineProps = {
   steps: string[];
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
-  maxPreview?: number; // number of recent steps to show when collapsed
+  maxPreview?: number;
 };
 
 export function ReasoningTimeline({
@@ -27,31 +27,96 @@ export function ReasoningTimeline({
   const latestStep = shownSteps[shownSteps.length - 1];
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2.5 text-[13px] text-muted-foreground">
+    <div
+      className="overflow-hidden"
+      style={{
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: "14px",
+        background: "rgba(255,255,255,0.02)",
+      }}
+    >
+      {/* Toggle header */}
       <button
         type="button"
         onClick={() => onExpandedChange?.(!expanded)}
-        className="flex w-full items-center justify-between gap-3 text-left text-[12px] font-medium uppercase tracking-[0.14em] text-muted-foreground transition hover:text-foreground"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors"
+        style={{
+          borderBottom: expanded ? "1px solid rgba(255,255,255,0.06)" : "none",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.background =
+            "rgba(255,255,255,0.025)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "transparent";
+        }}
       >
-        <span>{expanded ? "Hide reasoning" : "View reasoning"}</span>
-        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        <span className="flex items-center gap-2.5">
+          {/* Thinking indicator */}
+          <span className="flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: "rgba(251,191,36,0.5)",
+                  animation: expanded
+                    ? "none"
+                    : `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                }}
+              />
+            ))}
+          </span>
+          <span
+            className="text-[11.5px] font-semibold"
+            style={{
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.4)",
+            }}
+          >
+            {expanded ? "Hide reasoning" : "View reasoning"}
+          </span>
+        </span>
+        {expanded ? (
+          <ChevronUp size={13} style={{ color: "rgba(255,255,255,0.3)" }} />
+        ) : (
+          <ChevronDown size={13} style={{ color: "rgba(255,255,255,0.3)" }} />
+        )}
       </button>
 
-      {expanded ? (
-        <ol className="mt-2 space-y-1.5 pl-1">
-          {shownSteps.map((step, index) => (
-            <li
-              key={`${step}-${index}`}
-              className="flex items-start gap-2 leading-5 text-foreground/85"
-            >
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/80" />
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="mt-2 leading-5 text-foreground/80">{latestStep}</p>
-      )}
+      {/* Content */}
+      <div className="px-4 py-3">
+        {expanded ? (
+          <ol className="space-y-3">
+            {shownSteps.map((step, index) => (
+              <li
+                key={`${step}-${index}`}
+                className="flex items-start gap-3"
+                style={{ lineHeight: "1.6" }}
+              >
+                <span
+                  className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: "rgba(251,191,36,0.5)" }}
+                />
+                <span
+                  className="text-[13px]"
+                  style={{ color: "rgba(255,255,255,0.65)" }}
+                >
+                  {step}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p
+            className="text-[13px]"
+            style={{ lineHeight: "1.65", color: "rgba(255,255,255,0.55)" }}
+          >
+            {latestStep}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
