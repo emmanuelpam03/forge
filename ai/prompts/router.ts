@@ -3,7 +3,7 @@ import {
   SystemMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import { SYSTEM_PROMPT } from "@/ai/prompts/system";
+import { CHAT_SYSTEM_PROMPT } from "@/ai/prompts/system";
 import { SUMMARIZATION_POLICY } from "@/ai/prompts/summarization";
 import { WRITING_POLICY } from "@/ai/prompts/writing";
 import { formatSelectedContext } from "@/ai/context/engine";
@@ -135,7 +135,7 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   }
 
   const systemPrompt = [
-    SYSTEM_PROMPT,
+    CHAT_SYSTEM_PROMPT,
     SUMMARIZATION_POLICY,
     WRITING_POLICY,
     context,
