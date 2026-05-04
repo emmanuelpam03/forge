@@ -471,6 +471,24 @@ export async function loadContextNode(state: ChatGraphState) {
 
 export async function generateResponseNode(state: ChatGraphState) {
   emitStatus(undefined, "Writing response...");
+  function joinWithSpacing(
+    prev: string,
+    next: string,
+  ): { combined: string; emitted: string } {
+    if (!prev) return { combined: next, emitted: next };
+    if (!next) return { combined: prev, emitted: "" };
+
+    const prevLast = prev.slice(-1);
+    const nextFirst = next.charAt(0);
+    const needsSpace =
+      (/[A-Za-z0-9\)\]]$/.test(prevLast) || /[.,:;!?]$/.test(prevLast)) &&
+      /^[A-Za-z0-9\(\[]/.test(nextFirst);
+    if (needsSpace) {
+      return { combined: `${prev} ${next}`, emitted: ` ${next}` };
+    }
+
+    return { combined: `${prev}${next}`, emitted: next };
+  }
   const model = createGeminiModel();
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
@@ -528,10 +546,15 @@ export async function generateResponseNode(state: ChatGraphState) {
         });
       }
 
-      assistantMessage += sanitizedChunk;
+      // Ensure we preserve a space between token boundaries when needed
+      const { combined, emitted } = joinWithSpacing(
+        assistantMessage,
+        sanitizedChunk,
+      );
+      assistantMessage = combined;
 
-      // Forward the answer token to any registered stream listener for this run.
-      graphStreamEventEmitter?.({ type: "token", content: sanitizedChunk });
+      // Forward the (possibly prefixed) emitted chunk to stream listeners
+      graphStreamEventEmitter?.({ type: "token", content: emitted });
     }
 
     const endedAt = Date.now();

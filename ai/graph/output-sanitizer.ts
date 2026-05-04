@@ -4,6 +4,12 @@ const FORBIDDEN_LINE_PATTERNS = [
   /^\s*\*?\s*Avoid\s*:?/i,
   /^\s*\*?\s*Specificity\b/i,
   /^\s*\*?\s*Refine\b/i,
+  /^\s*\*?\s*Insight(?:\s+Layer)?\s*[:\*\-]*/i,
+  /^\s*\*?\s*Insight\b[:\*\-]*/i,
+  /^\s*\*?\s*Takeaway\b[:\*\-]*/i,
+  /^\s*\*+\s*Check\b/i,
+  /^\s*Check\b[:\s]*/i,
+  /^\s*\*+\s*Take\s*away\b/i,
   /high-performance ai/i,
   /direct, high-signal/i,
   /clear structure/i,
@@ -15,8 +21,31 @@ const FORBIDDEN_LINE_PATTERNS = [
 
 const CODE_FENCE_PATTERN = /^\s*```/;
 
+const INLINE_LABEL_PATTERNS = [
+  /\*+\s*Check[:\*\-\s]*/gi,
+  /Framing\s+Sentence[:\*\-\s]*/gi,
+  /\bSentence[:\*\-\s]*/gi,
+  /Key\s+Pillars[:\*\-\s]*/gi,
+  /Section\s*\d+[:\*\-\s]*/gi,
+  /Insight(?:\s+Layer)?[:\*\-\s]*/gi,
+  /Take(?:-|\s)?away[:\*\-\s]*/gi,
+  /Body\s+Paragraphs[:\*\-\s]*/gi,
+  /\*+\s*Did\s+I\b.*$/gi,
+];
+
+const PREAMBLE_NOISE =
+  /^(?:\*+\s*)?(?:Check\b|Did I\b|Framing\b|Body\b|Section\b|Key\s+Pillars\b|What actually matters|A simple mental model|Takeaway\b)/i;
+
+// Lines that are JUST a broken header: punctuation/asterisks + text + nothing else
+const BROKEN_HEADER = /^\s*[\*\:\-\.]+\s*[A-Z][^.!?]*\s*[\*\:\-]*\s*$/;
+
 function stripForbiddenFragments(line: string): string {
   let cleaned = line;
+
+  // Remove inline label tokens like "Check:", "Framing Sentence:", "Section 1:", etc.
+  for (const p of INLINE_LABEL_PATTERNS) {
+    cleaned = cleaned.replace(p, "");
+  }
 
   for (const pattern of FORBIDDEN_LINE_PATTERNS) {
     const match = cleaned.match(pattern);
@@ -32,10 +61,9 @@ function stripForbiddenFragments(line: string): string {
 }
 
 function normalizeVisibleLine(line: string): string {
+  // Only remove bold/italic formatting and excess whitespace
+  // Preserve markdown headings and bullet points (they're legitimate structure)
   return line
-    .replace(/^#{1,6}\s*/g, "")
-    .replace(/^\s*[*+-]+\s*/g, "")
-    .replace(/^(?=\*)\*+/g, "")
     .replace(/\*\*/g, "")
     .replace(/__/g, "")
     .replace(/\s{2,}/g, " ")
@@ -76,6 +104,16 @@ function shouldSuppressLeadInLine(line: string): boolean {
     return true;
   }
 
+  // Filter lines that are clearly fragments or malformed
+  if (/^[\)\]\}\*\-\.\,\:\;]/.test(trimmed)) {
+    return true;
+  }
+
+  // Filter bullet points that are just questions (likely drafting notes)
+  if (/^\s*[\*\-]\s*(?:Why|How|What|When|Where|Which|Who)\b/.test(trimmed)) {
+    return true;
+  }
+
   if (/^\s*\*+\s*\w+/i.test(trimmed)) {
     return true;
   }
@@ -113,6 +151,34 @@ export function sanitizeAssistantOutputChunk(
       continue;
     }
 
+    // FILTER: Remove checklist Q/A anywhere: "Is X? Yes." or "Are X? Yes."
+    if (
+      /^\s*(?:Is|Are|Do|Does|Did|Can|Could|Should|Would|Have|Has|Why|What|Where|When|How)\b.{0,100}\?\s*(?:Yes|No|yes|no|Yeah|Nope|True|False)\s*\.?\s*$/i.test(
+        trimmed,
+      )
+    ) {
+      continue;
+    }
+
+    // FILTER: Remove broken headers (lines that are JUST punctuation+heading with no content)
+    if (BROKEN_HEADER.test(trimmed)) {
+      continue;
+    }
+
+    // Aggressively suppress short meta/checklist lines before the visible answer starts
+    if (!state.startedVisibleAnswer) {
+      const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+      if (
+        PREAMBLE_NOISE.test(trimmed) ||
+        (wordCount <= 8 &&
+          /\b(Check|Did I|Takeaway|Framing|Section|Body|Key|What actually matters)\b/i.test(
+            trimmed,
+          ))
+      ) {
+        continue;
+      }
+    }
+
     if (!state.startedVisibleAnswer) {
       if (shouldSuppressLeadInLine(trimmed)) {
         continue;
@@ -135,10 +201,84 @@ export function sanitizeAssistantOutputChunk(
   }
 
   return {
-    text: output
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim(),
+    text: (function () {
+      let joined = output
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      // FINAL PASS: Remove any remaining checklist Q/A lines and meta-commentary
+      joined = joined
+        .split("\n")
+        .filter((l) => {
+          const trimmed = l.trim();
+          // Remove Q/A style: "Is X? Yes." or "No X" or lines starting with "No \"..."
+          if (
+            /^\s*(?:\*?\s*)?(?:Is|Are|Do|Does|Did|Can|Could|Should|Would|Have|Has|Why|What|Where|When|How)\b.{0,100}\?\s*(?:Yes|No|yeah|nope|True|False)\s*\.?\s*$/i.test(
+              trimmed,
+            )
+          ) {
+            return false;
+          }
+          // Remove meta-verification lines: "No "...", "No fragments", "No planning" etc.
+          if (
+            /^No\s+(?:\"|fragment|planning|step|instruction|label|outline|template)/i.test(
+              trimmed,
+            )
+          ) {
+            return false;
+          }
+          // Remove lines that are pure meta-text about the response
+          if (
+            /^(?:Confident tone|Natural spacing|Clear explanation|Well-structured|Good flow|Complete answer|Full response)/i.test(
+              trimmed,
+            )
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .join("\n");
+
+      // If we haven't yet started the visible answer, find a strong opening
+      if (!state.startedVisibleAnswer) {
+        // Find a complete sentence: starts with A-Z, has substance, ends with .!?
+        // Require at least 20 chars of content to avoid fragments
+        const sentenceMatch = joined.match(/([A-Z][^\.!?]{20,}?[\.\!\?])/);
+
+        if (sentenceMatch && sentenceMatch.index !== undefined) {
+          let sliced = joined.slice(sentenceMatch.index);
+
+          // Remove leading stray punctuation
+          sliced = sliced.replace(/^[\s\*\:\-\.,'\"]+/g, "").trim();
+
+          // CRITICAL: If it starts with lowercase, this is a fragment (e.g., "a rentier state...")
+          // Skip to the next full uppercase sentence instead
+          if (sliced && /^[a-z]/.test(sliced)) {
+            // Look for: sentence terminator + whitespace + uppercase letter + content + terminator
+            const nextSentence = sliced.match(
+              /[.!?]\s*([A-Z][^\.!?]{20,}?[\.\!\?])/,
+            );
+            if (nextSentence && nextSentence[1]) {
+              sliced = nextSentence[1]
+                .replace(/^[\s\*\:\-\.,'\"]+/g, "")
+                .trim();
+            } else {
+              // No suitable next sentence found; suppress this chunk
+              return "";
+            }
+          }
+
+          state.startedVisibleAnswer = true;
+          return sliced;
+        }
+
+        // No suitable sentence found yet; suppress this chunk
+        return "";
+      }
+
+      return joined;
+    })(),
     state,
   };
 }

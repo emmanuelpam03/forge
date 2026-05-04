@@ -210,9 +210,16 @@ export async function runChatGraphStream(
         });
       }
 
-      assistantMessage += sanitizedChunk;
-      console.info("TOKEN:", sanitizedChunk);
-      onEvent?.({ type: "token", content: sanitizedChunk });
+      // Preserve spacing across chunk boundaries when streaming
+      const prevLast = assistantMessage.slice(-1);
+      const nextFirst = sanitizedChunk.charAt(0);
+      const needsSpace =
+        (/[A-Za-z0-9\)\]]$/.test(prevLast) || /[.,:;!?]$/.test(prevLast)) &&
+        /^[A-Za-z0-9\(\[]/.test(nextFirst);
+      const emitted = needsSpace ? ` ${sanitizedChunk}` : sanitizedChunk;
+      assistantMessage += emitted;
+      console.info("TOKEN:", emitted);
+      onEvent?.({ type: "token", content: emitted });
     }
 
     if (!assistantMessage.trim()) {
