@@ -40,10 +40,92 @@ describe("Output sanitizer", () => {
     assert.ok(!output.includes("Copy"));
   });
 
+  it("should remove outline pseudo-headings even after answer starts", async () => {
+    const { sanitizeAssistantOutput } = await loadSanitizer();
+
+    const input = [
+      "Nigeria is a federal republic with a complex power-sharing structure.",
+      "- Drivers: oil revenue, regional patronage networks, and party competition.",
+      "**Implications:** policy swings and uneven service delivery.",
+      "Heading 1: The Shift in Global Power (Discuss the UN, decolonization).",
+      "Paragraph 2: The roots of the conflict lay in unresolved tensions.",
+      "Closing: It reshaped the modern world.",
+      "### What changes in practice",
+      "Elections often determine who controls state-level budgets.",
+    ].join("\n");
+
+    const output = sanitizeAssistantOutput(input);
+
+    assert.ok(output.includes("Nigeria is a federal republic"));
+    assert.ok(!output.includes("Drivers:"));
+    assert.ok(!output.toLowerCase().includes("implications"));
+    assert.ok(!output.includes("Heading 1:"));
+    assert.ok(!output.includes("Paragraph 2:"));
+    assert.ok(!output.includes("Closing:"));
+    assert.ok(output.includes("### What changes in practice"));
+    assert.ok(output.includes("Elections often determine"));
+  });
+
+  it("should drop outline labels in streaming chunks after answer started", async () => {
+    const { sanitizeAssistantOutputChunk } = await loadSanitizer();
+
+    const state = {
+      insideCodeFence: false,
+      startedVisibleAnswer: false,
+      lineBuffer: "",
+    };
+
+    const first = sanitizeAssistantOutputChunk(
+      "Nigeria is a federal republic with overlapping authorities.\n",
+      state,
+    );
+    assert.ok(first.text.includes("Nigeria is a federal republic"));
+
+    const second = sanitizeAssistantOutputChunk("- Drivers: oil and patronage.\n", state);
+    assert.strictEqual(second.text, "");
+
+    const third = sanitizeAssistantOutputChunk("That creates incentives for rent-seeking.\n", state);
+    assert.ok(third.text.includes("That creates incentives"));
+  });
+
+  it("should suppress outline labels split across chunk boundaries", async () => {
+    const { sanitizeAssistantOutputChunk } = await loadSanitizer();
+
+    const state = {
+      insideCodeFence: false,
+      startedVisibleAnswer: false,
+      lineBuffer: "",
+    };
+
+    // Start answer
+    const first = sanitizeAssistantOutputChunk(
+      "Nigeria is a federal republic with overlapping authorities.\n",
+      state,
+    );
+    assert.ok(first.text.includes("Nigeria is a federal republic"));
+
+    // Label split across chunks: "Heading " + "1: ..."
+    const second = sanitizeAssistantOutputChunk("Heading ", state);
+    assert.strictEqual(second.text, "");
+
+    const third = sanitizeAssistantOutputChunk("1: The New World Order\n", state);
+    assert.strictEqual(third.text, "");
+
+    const fourth = sanitizeAssistantOutputChunk(
+      "That shift changed diplomatic institutions.\n",
+      state,
+    );
+    assert.ok(fourth.text.includes("That shift changed"));
+  });
+
   it("should sanitize streaming chunks without leaking fenced blocks", async () => {
     const { sanitizeAssistantOutputChunk } = await loadSanitizer();
 
-    const state = { insideCodeFence: false, startedVisibleAnswer: false };
+    const state = {
+      insideCodeFence: false,
+      startedVisibleAnswer: false,
+      lineBuffer: "",
+    };
     const first = sanitizeAssistantOutputChunk(
       "Politics in Nigeria. High-performance AI (Forge).\n",
       state,

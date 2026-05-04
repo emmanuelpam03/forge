@@ -2,7 +2,11 @@ import "server-only";
 
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
-import { createGeminiModel } from "@/ai/models";
+import {
+  createGeminiModel,
+  extractTextFromModelChunk,
+  getChatModelConfig,
+} from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
 import {
   loadContextForChat,
@@ -15,7 +19,6 @@ import {
   classifyQueryIntent,
   type QueryIntentClassification,
 } from "@/ai/graph/classification";
-import { isAnswerStart } from "@/ai/graph/reasoning-split";
 import {
   sanitizeAssistantOutput,
   sanitizeAssistantOutputChunk,
@@ -272,31 +275,6 @@ function toTextContent(content: unknown): string {
   return "";
 }
 
-function toChunkText(chunk: unknown): string {
-  if (typeof chunk === "string") {
-    return chunk;
-  }
-
-  if (chunk && typeof chunk === "object") {
-    const chunkContent = (chunk as { content?: unknown }).content;
-    const textFromContent = toTextContent(chunkContent);
-    if (textFromContent) {
-      return textFromContent;
-    }
-
-    const chunkText = (chunk as { text?: unknown }).text;
-    if (typeof chunkText === "string") {
-      return chunkText;
-    }
-
-    if (chunkText && typeof chunkText === "object") {
-      return toTextContent(chunkText);
-    }
-  }
-
-  return String(chunk ?? "").replace(/^\[object\s[\w$]+\]$/, "");
-}
-
 function estimateTokens(text: string): number {
   return Math.ceil((text?.length ?? 0) / 4);
 }
@@ -490,11 +468,20 @@ export async function generateResponseNode(state: ChatGraphState) {
     return { combined: `${prev}${next}`, emitted: next };
   }
   const model = createGeminiModel();
+  const modelConfig = getChatModelConfig();
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   let assistantMessage = "";
-  const answerSanitizerState = { insideCodeFence: false };
-  const reasoningSanitizerState = { insideCodeFence: false };
+  const answerSanitizerState = {
+    insideCodeFence: false,
+    startedVisibleAnswer: false,
+    lineBuffer: "",
+  };
+  const reasoningSanitizerState = {
+    insideCodeFence: false,
+    startedVisibleAnswer: false,
+    lineBuffer: "",
+  };
   // Prefer streaming from the model when available. Emit tokens as they
   // arrive via the run-scoped event emitter so upstream code can forward
   // them to clients immediately. Do NOT fall back to `invoke()` here —
@@ -503,12 +490,12 @@ export async function generateResponseNode(state: ChatGraphState) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tokenStream = (model as any).stream(
       messages as BaseMessage[],
-    ) as AsyncIterable<string>;
+    ) as AsyncIterable<unknown>;
 
     let firstTokenAt: number | null = null;
     let mode: "pre" | "answer" = "pre";
     for await (const token of tokenStream) {
-      const rawChunkText = toChunkText(token);
+      const rawChunkText = extractTextFromModelChunk(token);
       const chunkText = rawChunkText.trim() ? rawChunkText : "";
       if (!chunkText.trim()) {
         continue;
@@ -521,20 +508,21 @@ export async function generateResponseNode(state: ChatGraphState) {
         sanitizerState,
       ).text;
 
-      if (!sanitizedChunk) {
-        continue;
-      }
-
-      if (mode === "pre" && !isAnswerStart(sanitizedChunk)) {
-        graphStreamEventEmitter?.({
-          type: "reasoning",
-          content: sanitizedChunk,
-        });
-        continue;
-      }
-
       if (mode === "pre") {
+        if (!reasoningSanitizerState.startedVisibleAnswer) {
+          if (sanitizedChunk.trim()) {
+            graphStreamEventEmitter?.({
+              type: "reasoning",
+              content: sanitizedChunk,
+            });
+          }
+          continue;
+        }
         mode = "answer";
+      }
+
+      if (!sanitizedChunk.trim()) {
+        continue;
       }
 
       if (firstTokenAt === null) {
@@ -622,8 +610,8 @@ export async function generateResponseNode(state: ChatGraphState) {
 
   return {
     assistantMessage,
-    modelUsed: "gemini",
-    provider: "google-genai",
+    modelUsed: modelConfig.model,
+    provider: modelConfig.provider,
     inputTokens,
     outputTokens,
     latencyMs: Date.now() - startedAt,
@@ -1143,18 +1131,36 @@ export async function generateTitleNode(state: ChatGraphState) {
     const model = createGeminiModel();
     const sanitizedMessage = sanitizeUserInput(state.userMessage);
     const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
-    const prompt = `Generate a short, 3–7 word chat title based on this exchange:
+    const prompt = `Generate a short, neutral chat title based on this exchange:
 
 User: "${sanitizedMessage}"
 Assistant: "${sanitizedAssistant}"
 
-Respond with ONLY the title, no quotes or punctuation.`;
+Rules:
+- Use 3 to 6 words.
+- Make it descriptive, not promotional.
+- Do not add slogans, subtitles, or taglines.
+- Do not use em dashes, colons, or quotation marks.
+- Respond with ONLY the title.
+
+Examples:
+- "Politics in Nigeria"
+- "Quantum Entanglement"
+- "Photosynthesis Basics"`;
 
     const response = await model.invoke([new HumanMessage(prompt)]);
     const generatedTitle = toTextContent(response.content)
       .toLowerCase()
       .trim()
-      .replace(/^["']|["']$/g, ""); // Remove quotes if model added them
+      .replace(/^["']|["']$/g, "") // Remove quotes if model added them
+      .replace(/[—–-].*$/, "")
+      .replace(
+        /\b(straight to the point|quick take|in brief|explained simply)\b.*$/i,
+        "",
+      )
+      .replace(/\s{2,}/g, " ")
+      .replace(/[^\p{L}\p{N}\s'-]/gu, "")
+      .trim();
 
     return {
       generatedTitle,

@@ -17,6 +17,7 @@
     "@langchain/core": "^1.1.42",
     "@langchain/google-genai": "^2.1.29",
     "@langchain/langgraph": "^1.2.9",
+    "@langchain/ollama": "^1.2.7",
     "@langchain/openai": "^1.4.5",
     "@prisma/client": "^7.8.0",
     "@prisma/extension-accelerate": "^3.0.1",

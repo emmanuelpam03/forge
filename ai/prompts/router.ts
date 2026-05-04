@@ -4,6 +4,7 @@ import {
   type BaseMessage,
 } from "@langchain/core/messages";
 import {
+  CHAT_POLICY_PRECEDENCE,
   CHAT_SYSTEM_PROMPT,
   SUMMARIZATION_POLICY,
   WRITING_POLICY,
@@ -138,6 +139,7 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
 
   const systemPrompt = [
     CHAT_SYSTEM_PROMPT,
+    CHAT_POLICY_PRECEDENCE,
     SUMMARIZATION_POLICY,
     WRITING_POLICY,
     context,

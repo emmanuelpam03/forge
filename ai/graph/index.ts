@@ -1,7 +1,6 @@
 import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
-import { type BaseMessage } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import {
@@ -25,7 +24,11 @@ import {
   setGraphStreamEventEmitter,
 } from "@/ai/graph/nodes";
 import { sanitizeAssistantOutputChunk } from "@/ai/graph/output-sanitizer";
-import { createGeminiModel } from "@/ai/models";
+import {
+  createGeminiModel,
+  extractTextFromModelChunk,
+  getChatModelConfig,
+} from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
@@ -62,20 +65,6 @@ function estimateTokens(text: string): number {
 
 type GraphStateWithDiagnostics = ReturnType<typeof createChatGraphSeed> & {
   __preResponseMs?: number;
-};
-
-type GeminiModelWithNativeStream = {
-  nativeStream(messages: BaseMessage[]): Promise<{
-    stream: AsyncIterable<{
-      candidates?: Array<{
-        content?: {
-          parts?: Array<{
-            text?: string;
-          }>;
-        };
-      }>;
-    }>;
-  }>;
 };
 
 async function runGraphPreResponse(
@@ -141,6 +130,7 @@ export async function runChatGraphStream(
   const state = await runGraphPreResponse(input, onEvent);
 
   const model = createGeminiModel();
+  const modelConfig = getChatModelConfig();
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   console.info("PRE-RESPONSE_MS", {
@@ -160,6 +150,7 @@ export async function runChatGraphStream(
   const streamSanitizerState = {
     insideCodeFence: false,
     startedVisibleAnswer: false,
+    lineBuffer: "",
   };
 
   try {
@@ -167,26 +158,23 @@ export async function runChatGraphStream(
     onEvent?.({ type: "status", message: "Writing response..." });
     let firstTokenAt: number | null = null;
 
-    // Use native Google Generative AI streaming for true token streaming
+    // Stream model output in a provider-agnostic way.
     const streamCallStart = Date.now();
-    const nativeStream = await (
-      model as unknown as GeminiModelWithNativeStream
-    ).nativeStream(messages as BaseMessage[]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokenStream = (model as any).stream(messages);
     const streamCallEnd = Date.now();
-    console.info("NATIVE_STREAM_CREATED", {
+    console.info("MODEL_STREAM_CREATED", {
       chatId: hashIdentifierForLogging(input.chatId),
       runId: hashIdentifierForLogging(input.runId),
       streamSetupTimeMs: streamCallEnd - streamCallStart,
       timestamp: streamCallEnd - startedAt,
+      provider: modelConfig.provider,
+      model: modelConfig.model,
     });
 
     // Forward tokens immediately as they arrive.
-    for await (const chunk of nativeStream.stream) {
-      // Extract text from the chunk
-      let chunkText = "";
-      if (chunk?.candidates?.[0]?.content?.parts?.[0]?.text) {
-        chunkText = chunk.candidates[0].content.parts[0].text;
-      }
+    for await (const chunk of tokenStream as AsyncIterable<unknown>) {
+      const chunkText = extractTextFromModelChunk(chunk);
 
       if (!chunkText) {
         continue;
@@ -283,8 +271,8 @@ export async function runChatGraphStream(
 
   Object.assign(state, {
     assistantMessage,
-    modelUsed: "gemini",
-    provider: "google-genai",
+    modelUsed: modelConfig.model,
+    provider: modelConfig.provider,
     inputTokens,
     outputTokens,
     latencyMs: Date.now() - startedAt,

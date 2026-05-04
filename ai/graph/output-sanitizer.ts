@@ -1,4 +1,27 @@
+// Pseudo-headings / outline labels: list markers, numbering, emphasis, then "Drivers:", etc.
+const OUTLINE_LABEL_WORDS =
+  "(?:Core concept|Drivers|Implications|Opening|Paragraph|Heading|Takeaway|Summary|Notes?|Key(?:\\s+points?)?|Overview|Framework|Architecture|Insight(?:\\s+Layer)?|Structure|System|Body|Framing|Section|Sunset|Intro|Content|Tone|Check|Closing)";
+
+const OUTLINE_LABEL_LINE_START = new RegExp(
+  // Match:
+  // - optional list marker(s) or numbering
+  // - optional emphasis tokens
+  // - label word (Drivers/Heading/Paragraph/etc)
+  // - optional numeric suffix (e.g. "Heading 1", "Paragraph 2")
+  // - a separator (colon / dash / emdash) OR end-of-line (some models omit the colon)
+  `^\\s*(?:(?:[-*+]|\\d+[.)])\\s+)*(?:\\*{1,4}|_{1,2}\\*{1,2}|\\*{1,2}_{1,2})?\\s*${OUTLINE_LABEL_WORDS}\\b(?:\\s*\\d+)?\\s*(?:[:,—–-]|$)`,
+  "i",
+);
+
+function isOutlineScaffoldLine(trimmed: string): boolean {
+  if (/^\s*#{1,6}\s+\S/.test(trimmed)) {
+    return false;
+  }
+  return OUTLINE_LABEL_LINE_START.test(trimmed);
+}
+
 const FORBIDDEN_LINE_PATTERNS = [
+  OUTLINE_LABEL_LINE_START,
   /^\s*\*?\s*Structure\s*:?/i,
   /^\s*\*?\s*System\s*:?/i,
   /^\s*\*?\s*Avoid\s*:?/i,
@@ -34,7 +57,7 @@ const INLINE_LABEL_PATTERNS = [
 ];
 
 const PREAMBLE_NOISE =
-  /^(?:\*+\s*)?(?:Check\b|Did I\b|Framing\b|Body\b|Section\b|Key\s+Pillars\b|What actually matters|A simple mental model|Takeaway\b)/i;
+  /^(?:\*+\s*)?(?:Check\b|Did I\b|Framing\b|Body\b|Section\b|Key\s+Pillars\b|What actually matters|A simple mental model|Takeaway\b|Sunset|Intro|Opening|Paragraph|Heading|Tone|Core|Drivers|Implications|Content|Notes?|Overview)\b/i;
 
 // Lines that are JUST a broken header: punctuation/asterisks + text + nothing else
 const BROKEN_HEADER = /^\s*[\*\:\-\.]+\s*[A-Z][^.!?]*\s*[\*\:\-]*\s*$/;
@@ -73,6 +96,10 @@ function normalizeVisibleLine(line: string): string {
 export type AssistantOutputSanitizerState = {
   insideCodeFence: boolean;
   startedVisibleAnswer: boolean;
+  // Streaming chunk-safety: buffer an incomplete line across chunks so
+  // outline labels split across chunk boundaries ("Heading " + "1: ...")
+  // can still be detected as a single line.
+  lineBuffer: string;
 };
 
 function looksLikeAnswerStart(line: string): boolean {
@@ -109,12 +136,13 @@ function shouldSuppressLeadInLine(line: string): boolean {
     return true;
   }
 
-  // Filter bullet points that are just questions (likely drafting notes)
-  if (/^\s*[\*\-]\s*(?:Why|How|What|When|Where|Which|Who)\b/.test(trimmed)) {
+  // Filter ANY bullet/asterisk lines until we find real prose (suppress all drafting outline)
+  if (/^\s*[\*\-]+/.test(trimmed)) {
     return true;
   }
 
-  if (/^\s*\*+\s*\w+/i.test(trimmed)) {
+  // Filter bullet points that are just questions (likely drafting notes)
+  if (/^\s*[\*\-]\s*(?:Why|How|What|When|Where|Which|Who)\b/.test(trimmed)) {
     return true;
   }
 
@@ -131,7 +159,11 @@ export function sanitizeAssistantOutputChunk(
   text: string,
   state: AssistantOutputSanitizerState,
 ): { text: string; state: AssistantOutputSanitizerState } {
-  const lines = text.split(/\r?\n/);
+  const combinedText = `${state.lineBuffer}${text}`;
+  const endsWithNewline = /\r?\n$/.test(combinedText);
+  const parts = combinedText.split(/\r?\n/);
+  state.lineBuffer = endsWithNewline ? "" : (parts.pop() ?? "");
+  const lines = parts;
   const output: string[] = [];
 
   for (const line of lines) {
@@ -160,8 +192,23 @@ export function sanitizeAssistantOutputChunk(
       continue;
     }
 
+    // FILTER: Remove any line that has "? Yes/No" pattern (catches "*One strong ? Yes" etc.)
+    if (/\?\s*(?:Yes|No|yeah|nope|true|false)\s*\.?\s*$/i.test(trimmed)) {
+      continue;
+    }
+
     // FILTER: Remove broken headers (lines that are JUST punctuation+heading with no content)
     if (BROKEN_HEADER.test(trimmed)) {
+      continue;
+    }
+
+    // FILTER: Remove outline template / pseudo-heading lines even after answer started
+    if (
+      /^\s*\*+\s*(?:Paragraph|Heading|Opening|Tone|Core|Drivers|Implications|Structure|System|Check|Body|Framing|Section|Sunset|Intro|Content|Notes?|Overview|Key|Insight|Takeaway)\b/i.test(
+        trimmed,
+      ) ||
+      isOutlineScaffoldLine(trimmed)
+    ) {
       continue;
     }
 
@@ -220,6 +267,10 @@ export function sanitizeAssistantOutputChunk(
           ) {
             return false;
           }
+          // Remove any line ending with "? Yes/No" pattern (catches "*One strong ? Yes" etc.)
+          if (/\?\s*(?:Yes|No|yeah|nope|true|false)\s*\.?\s*$/i.test(trimmed)) {
+            return false;
+          }
           // Remove meta-verification lines: "No "...", "No fragments", "No planning" etc.
           if (
             /^No\s+(?:\"|fragment|planning|step|instruction|label|outline|template)/i.test(
@@ -234,6 +285,9 @@ export function sanitizeAssistantOutputChunk(
               trimmed,
             )
           ) {
+            return false;
+          }
+          if (!/^#{1,6}\s/.test(trimmed) && isOutlineScaffoldLine(trimmed)) {
             return false;
           }
           return true;
@@ -284,8 +338,16 @@ export function sanitizeAssistantOutputChunk(
 }
 
 export function sanitizeAssistantOutput(text: string): string {
-  return sanitizeAssistantOutputChunk(text, {
+  return sanitizeAssistantOutputChunk(`${text}\n`, {
     insideCodeFence: false,
     startedVisibleAnswer: false,
+    lineBuffer: "",
   }).text;
+}
+
+/** True once streaming sanitizer has committed to visible answer prose (align with chunk gate). */
+export function assistantVisibleAnswerStarted(
+  state: AssistantOutputSanitizerState,
+): boolean {
+  return state.startedVisibleAnswer;
 }
