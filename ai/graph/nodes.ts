@@ -8,6 +8,8 @@ import {
   getChatModelConfig,
 } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
+import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
+import { MEMORY_EXTRACTION_PROMPT } from "@/ai/prompts/memory";
 import {
   loadContextForChat,
   maintainChatSummary,
@@ -412,6 +414,14 @@ function sanitizeUserInput(input: string, maxLength: number = 2000): string {
   }
 
   return sanitized.trim();
+}
+
+/**
+ * Sanitize assistant output for safe display and storage.
+ * Performs basic cleanup (trimming, whitespace normalization).
+ */
+function sanitizeAssistantOutput(output: string): string {
+  return output.trim().replace(/\s{2,}/g, " ");
 }
 
 /**
@@ -1099,22 +1109,10 @@ export async function generateTitleNode(state: ChatGraphState) {
     const model = createGeminiModel();
     const sanitizedMessage = sanitizeUserInput(state.userMessage);
     const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
-    const prompt = `Generate a short, neutral chat title based on this exchange:
-
-User: "${sanitizedMessage}"
-Assistant: "${sanitizedAssistant}"
-
-Rules:
-- Use 3 to 6 words.
-- Make it descriptive, not promotional.
-- Do not add slogans, subtitles, or taglines.
-- Do not use em dashes, colons, or quotation marks.
-- Respond with ONLY the title.
-
-Examples:
-- "Politics in Nigeria"
-- "Quantum Entanglement"
-- "Photosynthesis Basics"`;
+    const prompt = TITLE_GENERATION_PROMPT.replace(
+      /"{USER_MESSAGE}"/g,
+      sanitizedMessage,
+    ).replace(/"{ASSISTANT_MESSAGE}"/g, sanitizedAssistant);
 
     const response = await model.invoke([new HumanMessage(prompt)]);
     const generatedTitle = toTextContent(response.content)
@@ -1151,19 +1149,12 @@ export async function extractMemoryNode(state: ChatGraphState) {
     const model = createGeminiModel();
     const sanitizedMessage = sanitizeUserInput(state.userMessage);
     const sanitizedAssistant = sanitizeUserInput(state.assistantMessage);
-    const prompt = `Extract ONE key fact or preference learned from this exchange. 
-Be specific and concise (max 10 words).
-
-User: "${sanitizedMessage}"
-Assistant: "${sanitizedAssistant}"
-Intent: ${state.intent}
-
-Examples:
-- "User prefers TypeScript over Python"
-- "User works in fintech backend systems"
-- "User likes concise, bullet-point responses"
-
-Respond with ONLY the extracted fact, nothing else.`;
+    const prompt = MEMORY_EXTRACTION_PROMPT.replace(
+      /"{USER_MESSAGE}"/g,
+      sanitizedMessage,
+    )
+      .replace(/"{ASSISTANT_MESSAGE}"/g, sanitizedAssistant)
+      .replace(/"{INTENT}"/g, state.intent || "");
 
     const response = await model.invoke([new HumanMessage(prompt)]);
     const extractedMemory = toTextContent(response.content)
