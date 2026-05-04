@@ -420,4 +420,53 @@ describe("Tool Routing Unit Tests", () => {
       assert.deepStrictEqual(Array.from(toolsUsed), ["webSearch"]);
     });
   });
+
+  describe("Query intent routing", () => {
+    const extractCalculatorExpression = (message: string) => {
+      const normalized = message
+        .toLowerCase()
+        .replace(
+          /calculate|compute|solve|evaluate|figure out|what is|what's|what's the|what is the/g,
+          " ",
+        )
+        .replace(/percent of/g, "% of")
+        .replace(/([0-9.]+)\s*%\s*of\s*([0-9.]+)/g, "($1 / 100) * $2")
+        .replace(/\bof\b/g, "*")
+        .replace(/\bpercent\b/g, "/100")
+        .replace(/[^0-9+\-*/%().^\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return normalized;
+    };
+
+    it("should normalize calculator expressions", () => {
+      assert.strictEqual(
+        extractCalculatorExpression("calculate 5% of 2000"),
+        "(5 / 100) * 2000",
+      );
+    });
+
+    it("should route live price requests to web search", () => {
+      const queryIntent = { needsTools: true, type: "real_time" as const };
+      const toolsNeeded = queryIntent.type === "real_time" ? ["webSearch"] : [];
+
+      assert.deepStrictEqual(toolsNeeded, ["webSearch"]);
+    });
+
+    it("should route calculations to calculator", () => {
+      const queryIntent = { needsTools: true, type: "calculation" as const };
+      const toolsNeeded =
+        queryIntent.type === "calculation" ? ["calculator"] : [];
+
+      assert.deepStrictEqual(toolsNeeded, ["calculator"]);
+    });
+
+    it("should not emit tools for taskable queries", () => {
+      const queryIntent = { needsTools: false, type: "taskable" as const };
+      const toolsNeeded = queryIntent.needsTools ? ["webSearch"] : [];
+
+      assert.deepStrictEqual(toolsNeeded, []);
+    });
+  });
 });

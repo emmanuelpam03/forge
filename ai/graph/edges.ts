@@ -22,10 +22,10 @@ export const CHAT_GRAPH_EDGE_LIST = [
   [CHAT_GRAPH_NODES.classifyIntent, CHAT_GRAPH_NODES.planTask],
   [CHAT_GRAPH_NODES.planTask, CHAT_GRAPH_NODES.toolRouter],
   [CHAT_GRAPH_NODES.toolRouter, CHAT_GRAPH_NODES.synthesizeEvidence],
-  [CHAT_GRAPH_NODES.synthesizeEvidence, CHAT_GRAPH_NODES.suggestTask],
-  [CHAT_GRAPH_NODES.suggestTask, CHAT_GRAPH_NODES.generateResponse],
+  [CHAT_GRAPH_NODES.synthesizeEvidence, CHAT_GRAPH_NODES.generateResponse],
   [CHAT_GRAPH_NODES.generateResponse, CHAT_GRAPH_NODES.saveMessages],
   [CHAT_GRAPH_NODES.saveMessages, CHAT_GRAPH_NODES.generateTitle],
   [CHAT_GRAPH_NODES.generateTitle, CHAT_GRAPH_NODES.extractMemory],
-  [CHAT_GRAPH_NODES.extractMemory, "__end__"],
+  [CHAT_GRAPH_NODES.extractMemory, CHAT_GRAPH_NODES.suggestTask],
+  [CHAT_GRAPH_NODES.suggestTask, "__end__"],
 ] as const satisfies readonly [ChatGraphEdgeEndpoint, ChatGraphEdgeEndpoint][];

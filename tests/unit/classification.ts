@@ -44,11 +44,16 @@ function parseClassificationText(text: string) {
   }
 }
 
-function shouldForceWebSearchFromClassification(classification: {
-  intent: "factual" | "reasoning" | "code" | "creative";
-  requiresFreshData: boolean;
-  confidence: "high" | "medium" | "low";
-} | null | undefined): boolean {
+function shouldForceWebSearchFromClassification(
+  classification:
+    | {
+        intent: "factual" | "reasoning" | "code" | "creative";
+        requiresFreshData: boolean;
+        confidence: "high" | "medium" | "low";
+      }
+    | null
+    | undefined,
+): boolean {
   if (!classification) {
     return false;
   }
@@ -66,7 +71,10 @@ describe("Classification Unit Tests", () => {
   describe("normalizeClassificationIntent", () => {
     it("should accept valid intents", () => {
       assert.strictEqual(normalizeClassificationIntent("factual"), "factual");
-      assert.strictEqual(normalizeClassificationIntent("reasoning"), "reasoning");
+      assert.strictEqual(
+        normalizeClassificationIntent("reasoning"),
+        "reasoning",
+      );
       assert.strictEqual(normalizeClassificationIntent("code"), "code");
       assert.strictEqual(normalizeClassificationIntent("creative"), "creative");
     });
@@ -173,7 +181,10 @@ describe("Classification Unit Tests", () => {
   describe("shouldForceWebSearchFromClassification", () => {
     it("should return false for null or undefined", () => {
       assert.strictEqual(shouldForceWebSearchFromClassification(null), false);
-      assert.strictEqual(shouldForceWebSearchFromClassification(undefined), false);
+      assert.strictEqual(
+        shouldForceWebSearchFromClassification(undefined),
+        false,
+      );
     });
 
     it("should return true when factual + requiresFreshData", () => {
@@ -185,7 +196,7 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(classification),
-        true
+        true,
       );
     });
 
@@ -198,7 +209,7 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(classification),
-        true
+        true,
       );
     });
 
@@ -211,7 +222,7 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(classification),
-        true
+        true,
       );
     });
 
@@ -224,7 +235,7 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(classification),
-        false
+        false,
       );
     });
 
@@ -237,7 +248,7 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(reasoningClassification),
-        false
+        false,
       );
 
       const codeClassification = {
@@ -248,7 +259,7 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(codeClassification),
-        false
+        false,
       );
     });
 
@@ -261,8 +272,64 @@ describe("Classification Unit Tests", () => {
 
       assert.strictEqual(
         shouldForceWebSearchFromClassification(classification),
-        true
+        true,
       );
+    });
+  });
+
+  describe("Query intent routing", () => {
+    const classifyQueryIntent = (query: string) => {
+      const normalized = query.trim().replace(/\s+/g, " ").toLowerCase();
+
+      const realTime =
+        /\b(latest|current|today|currently|right now|live|breaking|news|price|prices|stock|stocks|rank|ranking|rankings|score|scores)\b/i.test(
+          normalized,
+        );
+      const calculation =
+        /\b(calculate|compute|solve|evaluate|figure out)\b/i.test(normalized) ||
+        (/\d/.test(normalized) && /[=+\-*/%]/.test(normalized));
+      const taskable =
+        /\b(track|monitor|remind(?: me)?|notify me|alert me|follow up|follow-up|schedule|check in|keep an eye on)\b/i.test(
+          normalized,
+        );
+
+      if (!normalized) return { needsTools: false, type: "knowledge" as const };
+      if (calculation)
+        return { needsTools: true, type: "calculation" as const };
+      if (taskable) return { needsTools: false, type: "taskable" as const };
+      if (realTime) return { needsTools: true, type: "real_time" as const };
+      if (/\b(search|lookup|find|research|verify|check)\b/i.test(normalized)) {
+        return { needsTools: true, type: "knowledge" as const };
+      }
+      return { needsTools: false, type: "knowledge" as const };
+    };
+
+    it("should skip tools for conceptual questions", () => {
+      assert.deepStrictEqual(classifyQueryIntent("what is racism"), {
+        needsTools: false,
+        type: "knowledge",
+      });
+    });
+
+    it("should require tools for live price queries", () => {
+      assert.deepStrictEqual(classifyQueryIntent("latest bitcoin price"), {
+        needsTools: true,
+        type: "real_time",
+      });
+    });
+
+    it("should require tools for calculations", () => {
+      assert.deepStrictEqual(classifyQueryIntent("calculate 5% of 2000"), {
+        needsTools: true,
+        type: "calculation",
+      });
+    });
+
+    it("should classify taskable requests without tools", () => {
+      assert.deepStrictEqual(classifyQueryIntent("track bitcoin price"), {
+        needsTools: false,
+        type: "taskable",
+      });
     });
   });
 });

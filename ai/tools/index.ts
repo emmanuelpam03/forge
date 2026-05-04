@@ -4,6 +4,7 @@ import { z } from "zod";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import {
   calculatorTool,
+  datetimeTool,
   projectContextLookupTool,
   summarizeTextTool,
   webSearchToolAsync,
@@ -16,6 +17,10 @@ export const calculatorToolSchema = z.object({
 export const webSearchToolSchema = z.object({
   query: z.string().min(1),
   maxResults: z.number().int().min(1).max(10).optional(),
+});
+
+export const datetimeToolSchema = z.object({
+  action: z.enum(["now", "timezone", "date", "time"]).optional(),
 });
 
 export const summarizeTextToolSchema = z.object({
@@ -80,6 +85,16 @@ export function createForgeTools(
       schema: webSearchToolSchema,
       func: async ({ query, maxResults }) => {
         const result = await webSearchToolAsync(query, maxResults ?? 5);
+        return formatToolOutput(result);
+      },
+    }),
+    new DynamicStructuredTool({
+      name: "currentDateTime",
+      description:
+        "Get the current date, time, or timezone for scheduling and live queries.",
+      schema: datetimeToolSchema,
+      func: async ({ action }) => {
+        const result = datetimeTool(action ?? "now");
         return formatToolOutput(result);
       },
     }),

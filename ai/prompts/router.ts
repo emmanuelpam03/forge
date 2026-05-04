@@ -31,16 +31,15 @@ function formatIntent(state: ChatGraphState): string {
   return `User intent: ${state.intent}`;
 }
 
-function formatClassifier(state: ChatGraphState): string {
-  if (!state.classifiedIntent) {
+function formatQueryIntent(state: ChatGraphState): string {
+  if (!state.queryIntent) {
     return "";
   }
 
   return [
-    "Classifier result:",
-    `- intent: ${state.classifiedIntent.intent}`,
-    `- requiresFreshData: ${state.classifiedIntent.requiresFreshData}`,
-    `- confidence: ${state.classifiedIntent.confidence}`,
+    "Query intent:",
+    `- type: ${state.queryIntent.type}`,
+    `- needsTools: ${state.queryIntent.needsTools}`,
   ].join("\n");
 }
 
@@ -95,8 +94,8 @@ function formatEvidencePriorityContext(state: ChatGraphState): string {
     sections.push(formatToolContext(state));
   }
 
-  if (state.classifiedIntent) {
-    sections.push("", formatClassifier(state));
+  if (state.queryIntent) {
+    sections.push("", formatQueryIntent(state));
   }
 
   return sections.join("\n").trim();

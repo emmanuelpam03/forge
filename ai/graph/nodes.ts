@@ -1,17 +1,9 @@
 import "server-only";
 
-import {
-  HumanMessage,
-  SystemMessage,
-  type AIMessage,
-  type BaseMessage,
-} from "@langchain/core/messages";
+import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
 import { createGeminiModel } from "@/ai/models";
-import {
-  buildChatMessages,
-  buildFreshnessClassificationMessage,
-} from "@/ai/prompts/router";
+import { buildChatMessages } from "@/ai/prompts/router";
 import {
   loadContextForChat,
   maintainChatSummary,
@@ -20,8 +12,8 @@ import {
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import {
-  parseClassificationText,
-  shouldForceWebSearchFromClassification,
+  classifyQueryIntent,
+  type QueryIntentClassification,
 } from "@/ai/graph/classification";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
@@ -45,9 +37,112 @@ function emitStatus(
 function getToolStatusMessage(toolName: string): string {
   if (toolName === "webSearch") return "Searching...";
   if (toolName === "calculator") return "Calculating...";
+  if (toolName === "currentDateTime") return "Checking time...";
   if (toolName === "summarizeText") return "Summarizing...";
   if (toolName === "projectContextLookup") return "Loading context...";
   return "Working...";
+}
+
+function looksLikeDateTimeQuery(message: string): boolean {
+  return /\b(time|timezone|date|day of week|calendar)\b/i.test(message);
+}
+
+function looksLikeProjectLookupQuery(message: string): boolean {
+  return /\b(project|workspace|this chat|this conversation|previous decision|prior decision|earlier discussion|history|what did we decide)\b/i.test(
+    message,
+  );
+}
+
+function resolveToolPlanForQueryIntent(
+  state: ChatGraphState,
+  queryIntent: QueryIntentClassification,
+): string[] {
+  const message = state.userMessage;
+
+  if (!queryIntent.needsTools) {
+    return [];
+  }
+
+  if (queryIntent.type === "calculation") {
+    return ["calculator"];
+  }
+
+  if (queryIntent.type === "real_time") {
+    return looksLikeDateTimeQuery(message)
+      ? ["currentDateTime"]
+      : ["webSearch"];
+  }
+
+  if (looksLikeProjectLookupQuery(message)) {
+    return ["projectContextLookup"];
+  }
+
+  return ["webSearch"];
+}
+
+function extractCalculatorExpression(message: string): string {
+  const normalized = message
+    .toLowerCase()
+    .replace(
+      /calculate|compute|solve|evaluate|figure out|what is|what's|what's the|what is the/g,
+      " ",
+    )
+    .replace(/percent of/g, "% of")
+    .replace(/([0-9.]+)\s*%\s*of\s*([0-9.]+)/g, "($1 / 100) * $2")
+    .replace(/\bof\b/g, "*")
+    .replace(/\bpercent\b/g, "/100")
+    .replace(/[^0-9+\-*/%().^\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized || sanitizeUserInput(message);
+}
+
+function buildToolArgs(
+  toolName: string,
+  state: ChatGraphState,
+): Record<string, unknown> {
+  const sanitizedMessage = sanitizeUserInput(state.userMessage);
+
+  if (toolName === "calculator") {
+    return { expression: extractCalculatorExpression(sanitizedMessage) };
+  }
+
+  if (toolName === "webSearch") {
+    return { query: sanitizedMessage, maxResults: 5 };
+  }
+
+  if (toolName === "currentDateTime") {
+    if (/\btimezone\b/i.test(sanitizedMessage)) {
+      return { action: "timezone" };
+    }
+
+    if (/\bdate|day of week|today\b/i.test(sanitizedMessage)) {
+      return { action: "date" };
+    }
+
+    if (/\btime\b/i.test(sanitizedMessage)) {
+      return { action: "time" };
+    }
+
+    return { action: "now" };
+  }
+
+  if (toolName === "summarizeText") {
+    return { text: sanitizedMessage, maxSentences: 3 };
+  }
+
+  if (toolName === "projectContextLookup") {
+    return { query: sanitizedMessage, maxResults: 5 };
+  }
+
+  return {};
+}
+
+function hasOngoingIntent(message: string): boolean {
+  return /\b(track|monitor|remind(?: me)?|notify me|alert me|follow up|follow-up|schedule|check in|keep an eye on)\b/i.test(
+    message,
+  );
 }
 
 function toTaskTypeValue(taskType: string): TaskSuggestion["taskType"] {
@@ -314,38 +409,6 @@ export function parseStructuredAssistantOutput(text: string): {
   };
 }
 
-function getUsageCounts(message: AIMessage) {
-  const usageMetadata = message.usage_metadata;
-  const responseMetadata = message.response_metadata as {
-    usageMetadata?: {
-      input_tokens?: number;
-      output_tokens?: number;
-    };
-  };
-
-  return {
-    inputTokens:
-      usageMetadata?.input_tokens ??
-      responseMetadata?.usageMetadata?.input_tokens ??
-      0,
-    outputTokens:
-      usageMetadata?.output_tokens ??
-      responseMetadata?.usageMetadata?.output_tokens ??
-      0,
-  };
-}
-
-function getModelName(message: AIMessage): string {
-  const responseMetadata = message.response_metadata as {
-    model_name?: string;
-    modelName?: string;
-  };
-
-  return (
-    responseMetadata?.model_name ?? responseMetadata?.modelName ?? "gemini"
-  );
-}
-
 /**
  * Sanitize user input to prevent prompt injection attacks.
  * Removes/escapes common injection patterns and truncates excessively long inputs.
@@ -377,67 +440,6 @@ function sanitizeUserInput(input: string, maxLength: number = 2000): string {
  * The calculator needs expressions like "100 * 0.15", not prose like "Web search result: ..."
  * This is needed for multi-sequential tool chaining where intermediate results are prose.
  */
-function isValidNumericExpression(text: string): boolean {
-  if (!text || text.trim().length === 0) return false;
-  // Allow digits, operators, parentheses, decimal points, and basic function names
-  // Reject prose indicators (URLs, search results, colons indicating key-value pairs)
-  return (
-    /^[0-9+\-*/%().\s^a-zA-Z]+$/.test(text) &&
-    !/https?:\/\/|search|result|:/i.test(text)
-  );
-}
-
-async function executeWebSearchTool(
-  state: ChatGraphState,
-  tools: ReturnType<typeof createForgeTools>,
-  evidenceBundles: Array<{ tool: string; content: string; timestamp: string }>,
-  toolsUsed: Set<string>,
-  onEvent?: (event: StreamEvent) => void,
-) {
-  const webSearchTool = tools.find((tool) => tool.name === "webSearch");
-  if (!webSearchTool) {
-    return {
-      toolsUsed: Array.from(toolsUsed),
-      evidenceBundles,
-      toolContext: state.toolContext,
-    };
-  }
-
-  emitStatus(onEvent, "Searching...");
-  const rawResult = await webSearchTool.invoke({
-    query: state.userMessage,
-    maxResults: 5,
-  });
-  const toolResultText =
-    typeof rawResult === "string"
-      ? rawResult
-      : JSON.stringify(rawResult, null, 2);
-
-  toolsUsed.add("webSearch");
-  evidenceBundles.push({
-    tool: "webSearch",
-    content: toolResultText,
-    timestamp: new Date().toISOString(),
-  });
-
-  console.info(
-    JSON.stringify({
-      event: "webSearch.forced_result",
-      chatId: hashIdentifierForLogging(state.chatId),
-      runId: hashIdentifierForLogging(state.runId),
-      toolResult: toolResultText,
-    }),
-  );
-
-  emitStatus(onEvent, "Analyzing results...");
-
-  return {
-    toolsUsed: Array.from(toolsUsed),
-    evidenceBundles,
-    toolContext: `Web Search Result:\n${toolResultText}`,
-  };
-}
-
 export async function loadContextNode(state: ChatGraphState) {
   emitStatus(undefined, "Loading context...");
   const selectedContext = await loadContextForChat(
@@ -695,121 +697,15 @@ export async function saveMessagesNode(state: ChatGraphState) {
  */
 export async function planTaskNode(state: ChatGraphState) {
   try {
-    // If an external caller forced a tool, short-circuit planning and honor it.
-    if (
-      state.forceTool ||
-      shouldForceWebSearchFromClassification(state.classifiedIntent)
-    ) {
-      const forced = state.forceTool;
-      const classifier = state.classifiedIntent;
-      if (classifier) {
-        console.info(
-          JSON.stringify({
-            event: "toolRouting.forced",
-            chatId: hashIdentifierForLogging(state.chatId),
-            runId: hashIdentifierForLogging(state.runId),
-            classifier,
-            forcedTool: forced || "webSearch",
-          }),
-        );
-      }
-
-      return {
-        toolPlan: {
-          intent: state.intent || state.classifiedIntent?.intent || "factual",
-          toolsNeeded: [forced || "webSearch"],
-          sequential: false,
-          followUpNeeded: false,
-        },
-        executionMode: "single",
-      };
-    }
-
-    const model = createGeminiModel();
-
-    // Sanitize user input to prevent prompt injection
-    const sanitizedMessage = sanitizeUserInput(state.userMessage);
-
-    const systemPrompt = `You are a tool planner for Forge. Analyze the user request and decide if tools are NECESSARY.
-
-Available tools:
-- calculator: For arithmetic, percentages, conversions, risk calculations
-- currentDateTime: For current time, timezones, dates, scheduling
-- webSearch: For current facts, news, prices, products, changing information
-- summarizeText: For summarizing long content or extracting key points
-- projectContextLookup: For project history, prior decisions, or project-specific notes
-
-Return a JSON object with:
-{
-  "toolsNeeded": ["tool1", "tool2"] or [],
-  "sequential": false if independent, true if tool B needs tool A result,
-  "followUpNeeded": true only if a critical constraint is missing (budget, location, timeframe, project, account),
-  "followUpQuestion": "What is X?" if followUpNeeded is true
-}
-
-SELECTIVE TOOL USAGE RULES:
-
-USE tools for:
-✓ Current events, news, or real-time data (webSearch required)
-✓ Changing facts like prices, rankings, or live information (webSearch required)
-✓ Calculations involving numbers (percentages, risk, estimates, conversions)
-✓ Current time, timezone, or scheduling questions (currentDateTime required)
-✓ Project-specific history or prior decisions (projectContextLookup required)
-
-DO NOT use tools for:
-✗ Definitions ("what is X?", "explain Y")
-✗ Historical facts or past events (training data sufficient)
-✗ Conceptual questions or reasoning
-✗ General knowledge from training data
-✗ Code examples or syntax questions
-✗ Creative tasks or brainstorming
-✗ Summarizing content the user already provided (only if external source)
-
-Decision: If the answer comes from general knowledge or definitions, toolsNeeded = [].
-If uncertain about urgency/freshness, default to NO tools.
-Only use tools if information is time-sensitive, external, or involves calculation.
-`;
-
-    const userPrompt = `User intent: ${state.intent}
-Project context available: ${state.memorySummary ? "yes" : "no"}
-User request: ${sanitizedMessage}`;
-
-    const response = await model.invoke([
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt),
-    ]);
-    const responseText = toTextContent(response.content);
-
-    const parsedPlanRaw = parseJsonFromModelText(responseText);
-    let parsedPlan: {
-      toolsNeeded?: unknown;
-      sequential?: unknown;
-      followUpNeeded?: unknown;
-      followUpQuestion?: unknown;
-    };
-
-    if (!parsedPlanRaw || typeof parsedPlanRaw !== "object") {
-      console.warn("Failed to parse tool plan JSON, defaulting to no tools");
-      parsedPlan = {
-        toolsNeeded: [],
-        sequential: false,
-        followUpNeeded: false,
-      };
-    } else {
-      parsedPlan = parsedPlanRaw as {
-        toolsNeeded?: unknown;
-        sequential?: unknown;
-        followUpNeeded?: unknown;
-        followUpQuestion?: unknown;
-      };
-    }
-
-    const toolsNeeded = Array.isArray(parsedPlan.toolsNeeded)
-      ? parsedPlan.toolsNeeded
-      : [];
-    const sequential = parsedPlan.sequential === true;
-    const followUpNeeded = parsedPlan.followUpNeeded === true;
-    const followUpQuestion = parsedPlan.followUpQuestion || "";
+    const queryIntent =
+      state.queryIntent ?? classifyQueryIntent(state.userMessage);
+    const forcedTool = state.forceTool ?? null;
+    const toolsNeeded = forcedTool
+      ? [forcedTool]
+      : resolveToolPlanForQueryIntent(state, queryIntent);
+    const sequential = false;
+    const followUpNeeded = false;
+    const followUpQuestion = "";
 
     let executionMode:
       | "none"
@@ -826,15 +722,29 @@ User request: ${sanitizedMessage}`;
       executionMode = "multi-parallel";
     }
 
+    console.info(
+      JSON.stringify({
+        event: "toolRouting.decision",
+        chatId: hashIdentifierForLogging(state.chatId),
+        runId: hashIdentifierForLogging(state.runId),
+        queryIntent,
+        forcedTool,
+        toolsNeeded,
+        executionMode,
+      }),
+    );
+
     return {
       toolPlan: {
-        intent: state.intent,
+        intent: queryIntent.type,
         toolsNeeded,
         sequential,
         followUpNeeded,
         followUpQuestion,
       },
       executionMode,
+      intent: queryIntent.type,
+      queryIntent,
     };
   } catch (error) {
     console.error("Tool planning failed:", error);
@@ -846,6 +756,11 @@ User request: ${sanitizedMessage}`;
         followUpNeeded: false,
       },
       executionMode: "none",
+      intent: state.intent || "knowledge",
+      queryIntent: state.queryIntent ?? {
+        needsTools: false,
+        type: "knowledge",
+      },
     };
   }
 }
@@ -860,30 +775,12 @@ export async function toolRouterNodeImpl(
   onEvent?: (event: StreamEvent) => void,
 ) {
   try {
-    // If no tools needed, return early without emitting "Using tools..." status
     if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
-      if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
-        // Forced web search happens - emit status for it
-        emitStatus(onEvent, "Using tools...");
-        const tools = createForgeTools({ chatId: state.chatId });
-        return executeWebSearchTool(
-          state,
-          tools,
-          [],
-          new Set<string>(),
-          onEvent,
-        );
-      }
-
-      // No tools needed and no forced search - return clean
       return {
         toolsUsed: [],
         evidenceBundles: [],
       };
     }
-
-    // Tools are planned - emit status that we're using them
-    emitStatus(onEvent, "Using tools...");
 
     const tools = createForgeTools({ chatId: state.chatId });
     const toolByName = new Map(tools.map((tool) => [tool.name, tool]));
@@ -895,37 +792,15 @@ export async function toolRouterNodeImpl(
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
 
-    if (shouldForceWebSearchFromClassification(state.classifiedIntent)) {
-      console.info(
-        JSON.stringify({
-          event: "toolRouter.forced_web_search",
-          chatId: hashIdentifierForLogging(state.chatId),
-          runId: hashIdentifierForLogging(state.runId),
-          classifier: state.classifiedIntent,
-        }),
-      );
-      return executeWebSearchTool(
-        state,
-        tools,
-        evidenceBundles,
-        toolsUsed,
-        onEvent,
-      );
-    }
-
-    // If a caller forced a tool, run it deterministically and return its results.
     if (state.forceTool) {
       const forcedName = state.forceTool;
       const forcedTool = toolByName.get(forcedName);
       if (forcedTool) {
         try {
-          let args: Record<string, unknown> = {};
-          if (forcedName === "webSearch") {
-            args = { query: state.userMessage, maxResults: 5 };
-          }
-
           emitStatus(onEvent, getToolStatusMessage(forcedName));
-          const rawResult = await forcedTool.invoke(args);
+          const rawResult = await forcedTool.invoke(
+            buildToolArgs(forcedName, state),
+          );
           const toolResultText =
             typeof rawResult === "string"
               ? rawResult
@@ -941,8 +816,6 @@ export async function toolRouterNodeImpl(
           // set toolContext to forced result for downstream nodes
           intermediateContext = toolResultText;
 
-          emitStatus(onEvent, "Analyzing results...");
-
           return {
             toolsUsed: Array.from(toolsUsed),
             evidenceBundles,
@@ -955,31 +828,15 @@ export async function toolRouterNodeImpl(
       }
     }
 
-    // For multi-parallel execution, run independent tools concurrently
     if (state.executionMode === "multi-parallel") {
-      const independentTools = state.toolPlan.toolsNeeded.filter(
-        (t) => t !== "webSearch",
-      );
-
       const parallelResults = await Promise.all(
-        independentTools.map(async (toolName) => {
+        state.toolPlan.toolsNeeded.map(async (toolName) => {
           const tool = toolByName.get(toolName);
           if (!tool) return null;
 
           try {
-            let args: Record<string, unknown> = {};
-            // Build appropriate arguments based on tool
-            if (toolName === "calculator") {
-              args = { expression: state.userMessage };
-            } else if (toolName === "currentDateTime") {
-              args = { mode: "now" };
-            } else if (toolName === "summarizeText") {
-              args = { text: state.userMessage };
-            } else if (toolName === "projectContextLookup") {
-              args = { query: state.userMessage, maxResults: 5 };
-            }
-
-            const rawResult = await tool.invoke(args);
+            emitStatus(onEvent, getToolStatusMessage(toolName));
+            const rawResult = await tool.invoke(buildToolArgs(toolName, state));
             const toolResultText =
               typeof rawResult === "string"
                 ? rawResult
@@ -1011,38 +868,17 @@ export async function toolRouterNodeImpl(
       };
     }
 
-    // For multi-sequential execution, run tools in order
-    if (state.executionMode === "multi-sequential") {
+    if (
+      state.executionMode === "multi-sequential" ||
+      state.executionMode === "single"
+    ) {
       for (const toolName of state.toolPlan.toolsNeeded) {
         const tool = toolByName.get(toolName);
         if (!tool) continue;
 
         try {
-          let args: Record<string, unknown> = {};
-          if (toolName === "calculator") {
-            // For sequential chaining, check if previous result is a valid numeric expression
-            // If previous tool returned prose (e.g., web search), fall back to user message
-            const expression =
-              intermediateContext &&
-              isValidNumericExpression(intermediateContext)
-                ? intermediateContext
-                : state.userMessage;
-            args = { expression };
-          } else if (toolName === "currentDateTime") {
-            args = { mode: "now" };
-          } else if (toolName === "webSearch") {
-            args = { query: state.userMessage, maxResults: 5 };
-          } else if (toolName === "summarizeText") {
-            args = {
-              text: intermediateContext || state.userMessage,
-              maxSentences: 3,
-            };
-          } else if (toolName === "projectContextLookup") {
-            args = { query: state.userMessage, maxResults: 5 };
-          }
-
           emitStatus(onEvent, getToolStatusMessage(toolName));
-          const rawResult = await tool.invoke(args);
+          const rawResult = await tool.invoke(buildToolArgs(toolName, state));
           const toolResultText =
             typeof rawResult === "string"
               ? rawResult
@@ -1057,8 +893,6 @@ export async function toolRouterNodeImpl(
 
           // Store result for potential use by next tool without mutating input state
           intermediateContext = toolResultText;
-
-          emitStatus(onEvent, "Analyzing results...");
         } catch (err) {
           console.error(`Tool ${toolName} failed:`, err);
         }
@@ -1098,14 +932,14 @@ export async function toolRouterNode(state: ChatGraphState) {
  */
 export async function synthesizeEvidenceNode(state: ChatGraphState) {
   try {
-    emitStatus(undefined, "Analyzing...");
-
     if (state.evidenceBundles.length === 0) {
       return {
         toolContext: "",
         synthesisNote: "",
       };
     }
+
+    emitStatus(undefined, "Analyzing results...");
 
     // Format evidence bundles into a clear context
     const contextLines = state.evidenceBundles.map(
@@ -1137,19 +971,20 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
 
 export async function suggestTaskNode(state: ChatGraphState) {
   try {
-    const sanitizedMessage = sanitizeUserInput(state.userMessage);
-    const heuristicSuggestion =
-      inferTaskSuggestionFromMessage(sanitizedMessage);
+    const suggestions = generateSuggestions(
+      state.userMessage,
+      state.assistantMessage,
+    );
 
-    let suggestions: TaskSuggestion[] = [];
-    if (heuristicSuggestion) {
-      suggestions = [
-        {
-          id: crypto.randomUUID(),
-          ...heuristicSuggestion,
-        },
-      ];
-    }
+    console.info(
+      JSON.stringify({
+        event: "suggestions.generated",
+        chatId: hashIdentifierForLogging(state.chatId),
+        runId: hashIdentifierForLogging(state.runId),
+        count: suggestions.length,
+        action: suggestions[0]?.action ?? null,
+      }),
+    );
 
     if (suggestions.length === 0) {
       return {
@@ -1170,6 +1005,34 @@ export async function suggestTaskNode(state: ChatGraphState) {
   }
 }
 
+export function generateSuggestions(
+  userQuery: string,
+  response: string,
+): TaskSuggestion[] {
+  const sanitizedMessage = sanitizeUserInput(userQuery);
+  const sanitizedResponse = sanitizeUserInput(response);
+
+  if (
+    !sanitizedMessage ||
+    !sanitizedResponse ||
+    !hasOngoingIntent(sanitizedMessage)
+  ) {
+    return [];
+  }
+
+  const heuristicSuggestion = inferTaskSuggestionFromMessage(sanitizedMessage);
+  if (!heuristicSuggestion) {
+    return [];
+  }
+
+  return [
+    {
+      id: crypto.randomUUID(),
+      ...heuristicSuggestion,
+    },
+  ];
+}
+
 /**
  * Classify user intent
  * Input: userMessage + context
@@ -1177,53 +1040,29 @@ export async function suggestTaskNode(state: ChatGraphState) {
  */
 export async function classifyIntentNode(state: ChatGraphState) {
   try {
-    emitStatus(undefined, "Understanding request...");
-
-    if (state.classifiedIntent) {
-      console.info(
-        JSON.stringify({
-          event: "classifier.seeded",
-          chatId: hashIdentifierForLogging(state.chatId),
-          runId: hashIdentifierForLogging(state.runId),
-          classifier: state.classifiedIntent,
-        }),
-      );
-
-      return {
-        intent: state.classifiedIntent.intent,
-        classifiedIntent: state.classifiedIntent,
-      };
-    }
-
-    const model = createGeminiModel();
-    const message = buildFreshnessClassificationMessage(state.userMessage);
-
-    const response = await model.invoke([new HumanMessage(message)]);
-    const classifiedIntent = parseClassificationText(
-      toTextContent(response.content),
-    );
+    const queryIntent = classifyQueryIntent(state.userMessage);
 
     console.info(
       JSON.stringify({
-        event: "classifier.output",
+        event: "intent.classified",
         chatId: hashIdentifierForLogging(state.chatId),
         runId: hashIdentifierForLogging(state.runId),
-        classifier: classifiedIntent,
+        queryIntent,
+        message: state.userMessage,
       }),
     );
 
     return {
-      intent: classifiedIntent.intent,
-      classifiedIntent,
+      intent: queryIntent.type,
+      queryIntent,
     };
   } catch (error) {
     console.error("Intent classification failed:", error);
     return {
-      intent: "factual",
-      classifiedIntent: {
-        intent: "factual",
-        requiresFreshData: false,
-        confidence: "low",
+      intent: "knowledge",
+      queryIntent: {
+        needsTools: false,
+        type: "knowledge",
       },
     };
   }

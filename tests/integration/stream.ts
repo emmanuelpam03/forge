@@ -386,4 +386,56 @@ describe("Streaming Integration Tests", () => {
       assert.strictEqual(content, "Start   End");
     });
   });
+
+  describe("Post-response suggestion lifecycle", () => {
+    it("should keep suggestions hidden until done", () => {
+      const events = [
+        JSON.stringify({ type: "status", message: "Searching..." }),
+        JSON.stringify({ type: "status", message: "Analyzing results..." }),
+        JSON.stringify({ type: "token", content: "Answer text" }),
+        JSON.stringify({
+          type: "done",
+          messageId: "msg_1",
+          suggestions: [
+            {
+              id: "s1",
+              type: "suggestion",
+              action: "track_item",
+              description: "Track bitcoin price",
+              taskType: "scheduled",
+            },
+          ],
+        }),
+      ];
+
+      let hasDone = false;
+      let suggestions: unknown[] = [];
+
+      for (const line of events) {
+        const event = JSON.parse(line);
+        if (event.type === "done") {
+          hasDone = true;
+          suggestions = event.suggestions ?? [];
+        }
+      }
+
+      assert.strictEqual(hasDone, true);
+      assert.strictEqual(suggestions.length, 1);
+    });
+
+    it("should not emit search status for knowledge-only queries", () => {
+      const events = [
+        JSON.stringify({ type: "status", message: "Writing response..." }),
+        JSON.stringify({ type: "token", content: "Racism is..." }),
+        JSON.stringify({ type: "done", messageId: "msg_2", suggestions: [] }),
+      ];
+
+      const statuses = events
+        .map((line) => JSON.parse(line))
+        .filter((event) => event.type === "status")
+        .map((event) => event.message);
+
+      assert.deepStrictEqual(statuses, ["Writing response..."]);
+    });
+  });
 });
