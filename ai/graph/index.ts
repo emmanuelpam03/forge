@@ -24,6 +24,7 @@ import {
   extractMemoryNode,
   setGraphStreamEventEmitter,
 } from "@/ai/graph/nodes";
+import { sanitizeAssistantOutputChunk } from "@/ai/graph/output-sanitizer";
 import { createGeminiModel } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
 import type { StreamEvent } from "./stream";
@@ -156,6 +157,10 @@ export async function runChatGraphStream(
   let assistantMessage = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  const streamSanitizerState = {
+    insideCodeFence: false,
+    startedVisibleAnswer: false,
+  };
 
   try {
     console.info("STATUS:", "Writing response...");
@@ -187,6 +192,15 @@ export async function runChatGraphStream(
         continue;
       }
 
+      const sanitizedChunk = sanitizeAssistantOutputChunk(
+        chunkText,
+        streamSanitizerState,
+      ).text;
+
+      if (!sanitizedChunk) {
+        continue;
+      }
+
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
         console.info("FIRST TOKEN SENT", {
@@ -196,9 +210,9 @@ export async function runChatGraphStream(
         });
       }
 
-      assistantMessage += chunkText;
-      console.info("TOKEN:", chunkText);
-      onEvent?.({ type: "token", content: chunkText });
+      assistantMessage += sanitizedChunk;
+      console.info("TOKEN:", sanitizedChunk);
+      onEvent?.({ type: "token", content: sanitizedChunk });
     }
 
     if (!assistantMessage.trim()) {

@@ -16,7 +16,10 @@ import {
   type QueryIntentClassification,
 } from "@/ai/graph/classification";
 import { isAnswerStart } from "@/ai/graph/reasoning-split";
-import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
+import {
+  sanitizeAssistantOutput,
+  sanitizeAssistantOutputChunk,
+} from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -472,6 +475,8 @@ export async function generateResponseNode(state: ChatGraphState) {
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   let assistantMessage = "";
+  const answerSanitizerState = { insideCodeFence: false };
+  const reasoningSanitizerState = { insideCodeFence: false };
   // Prefer streaming from the model when available. Emit tokens as they
   // arrive via the run-scoped event emitter so upstream code can forward
   // them to clients immediately. Do NOT fall back to `invoke()` here —
@@ -485,13 +490,28 @@ export async function generateResponseNode(state: ChatGraphState) {
     let firstTokenAt: number | null = null;
     let mode: "pre" | "answer" = "pre";
     for await (const token of tokenStream) {
-      const chunkText = toChunkText(token);
+      const rawChunkText = toChunkText(token);
+      const chunkText = rawChunkText.trim() ? rawChunkText : "";
       if (!chunkText.trim()) {
         continue;
       }
 
-      if (mode === "pre" && !isAnswerStart(chunkText)) {
-        graphStreamEventEmitter?.({ type: "reasoning", content: chunkText });
+      const sanitizerState =
+        mode === "pre" ? reasoningSanitizerState : answerSanitizerState;
+      const sanitizedChunk = sanitizeAssistantOutputChunk(
+        chunkText,
+        sanitizerState,
+      ).text;
+
+      if (!sanitizedChunk) {
+        continue;
+      }
+
+      if (mode === "pre" && !isAnswerStart(sanitizedChunk)) {
+        graphStreamEventEmitter?.({
+          type: "reasoning",
+          content: sanitizedChunk,
+        });
         continue;
       }
 
@@ -508,10 +528,10 @@ export async function generateResponseNode(state: ChatGraphState) {
         });
       }
 
-      assistantMessage += chunkText;
+      assistantMessage += sanitizedChunk;
 
       // Forward the answer token to any registered stream listener for this run.
-      graphStreamEventEmitter?.({ type: "token", content: chunkText });
+      graphStreamEventEmitter?.({ type: "token", content: sanitizedChunk });
     }
 
     const endedAt = Date.now();
