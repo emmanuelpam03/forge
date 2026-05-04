@@ -129,7 +129,7 @@ function MessageBubble({
                 }
                 className="rounded bg-primary px-3 py-1 text-sm text-primary-foreground"
               >
-                Save
+                Send
               </button>
               <button
                 onClick={onCancelEdit}
@@ -173,6 +173,9 @@ function MessageBubble({
             ) : showThinkingOnly ? (
               <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
                 <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                <span className="text-sm">
+                  {message.status ?? "Thinking..."}
+                </span>
               </div>
             ) : (
               <div className="text-[14px]">

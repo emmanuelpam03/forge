@@ -19,10 +19,6 @@ import {
   classifyQueryIntent,
   type QueryIntentClassification,
 } from "@/ai/graph/classification";
-import {
-  sanitizeAssistantOutput,
-  sanitizeAssistantOutputChunk,
-} from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -472,56 +468,28 @@ export async function generateResponseNode(state: ChatGraphState) {
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   let assistantMessage = "";
-  const answerSanitizerState = {
-    insideCodeFence: false,
-    startedVisibleAnswer: false,
-    lineBuffer: "",
-  };
-  const reasoningSanitizerState = {
-    insideCodeFence: false,
-    startedVisibleAnswer: false,
-    lineBuffer: "",
-  };
   // Prefer streaming from the model when available. Emit tokens as they
   // arrive via the run-scoped event emitter so upstream code can forward
   // them to clients immediately. Do NOT fall back to `invoke()` here —
   // streaming is required for low TTFT.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tokenStream = (model as any).stream(
-      messages as BaseMessage[],
-    ) as AsyncIterable<unknown>;
+    let tokenStream: AsyncIterable<unknown>;
+    const modelConfig = getChatModelConfig();
+
+    if (modelConfig.provider === "ollama") {
+      // For Ollama, use the stream() method for real token streaming
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenStream = (model as any).stream(messages as BaseMessage[]);
+    } else {
+      // For Gemini, use native streaming
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenStream = (model as any).nativeStream(messages as BaseMessage[]);
+    }
 
     let firstTokenAt: number | null = null;
-    let mode: "pre" | "answer" = "pre";
     for await (const token of tokenStream) {
-      const rawChunkText = extractTextFromModelChunk(token);
-      const chunkText = rawChunkText.trim() ? rawChunkText : "";
+      const chunkText = extractTextFromModelChunk(token);
       if (!chunkText.trim()) {
-        continue;
-      }
-
-      const sanitizerState =
-        mode === "pre" ? reasoningSanitizerState : answerSanitizerState;
-      const sanitizedChunk = sanitizeAssistantOutputChunk(
-        chunkText,
-        sanitizerState,
-      ).text;
-
-      if (mode === "pre") {
-        if (!reasoningSanitizerState.startedVisibleAnswer) {
-          if (sanitizedChunk.trim()) {
-            graphStreamEventEmitter?.({
-              type: "reasoning",
-              content: sanitizedChunk,
-            });
-          }
-          continue;
-        }
-        mode = "answer";
-      }
-
-      if (!sanitizedChunk.trim()) {
         continue;
       }
 
@@ -537,7 +505,7 @@ export async function generateResponseNode(state: ChatGraphState) {
       // Ensure we preserve a space between token boundaries when needed
       const { combined, emitted } = joinWithSpacing(
         assistantMessage,
-        sanitizedChunk,
+        chunkText,
       );
       assistantMessage = combined;
 

@@ -23,7 +23,6 @@ import {
   extractMemoryNode,
   setGraphStreamEventEmitter,
 } from "@/ai/graph/nodes";
-import { sanitizeAssistantOutputChunk } from "@/ai/graph/output-sanitizer";
 import {
   createGeminiModel,
   extractTextFromModelChunk,
@@ -147,21 +146,26 @@ export async function runChatGraphStream(
   let assistantMessage = "";
   let inputTokens = 0;
   let outputTokens = 0;
-  const streamSanitizerState = {
-    insideCodeFence: false,
-    startedVisibleAnswer: false,
-    lineBuffer: "",
-  };
 
   try {
     console.info("STATUS:", "Writing response...");
-    onEvent?.({ type: "status", message: "Writing response..." });
+    onEvent?.({ type: "status", message: "Generating response..." });
     let firstTokenAt: number | null = null;
 
     // Stream model output in a provider-agnostic way.
     const streamCallStart = Date.now();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tokenStream = (model as any).stream(messages);
+    let tokenStream: AsyncIterable<unknown>;
+
+    if (modelConfig.provider === "ollama") {
+      // For Ollama, use the stream() method for real token streaming
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenStream = (model as any).stream(messages);
+    } else {
+      // For Gemini, use native streaming
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenStream = (model as any).nativeStream(messages);
+    }
+
     const streamCallEnd = Date.now();
     console.info("MODEL_STREAM_CREATED", {
       chatId: hashIdentifierForLogging(input.chatId),
@@ -173,19 +177,10 @@ export async function runChatGraphStream(
     });
 
     // Forward tokens immediately as they arrive.
-    for await (const chunk of tokenStream as AsyncIterable<unknown>) {
+    for await (const chunk of tokenStream) {
       const chunkText = extractTextFromModelChunk(chunk);
 
       if (!chunkText) {
-        continue;
-      }
-
-      const sanitizedChunk = sanitizeAssistantOutputChunk(
-        chunkText,
-        streamSanitizerState,
-      ).text;
-
-      if (!sanitizedChunk) {
         continue;
       }
 
@@ -200,11 +195,11 @@ export async function runChatGraphStream(
 
       // Preserve spacing across chunk boundaries when streaming
       const prevLast = assistantMessage.slice(-1);
-      const nextFirst = sanitizedChunk.charAt(0);
+      const nextFirst = chunkText.charAt(0);
       const needsSpace =
         (/[A-Za-z0-9\)\]]$/.test(prevLast) || /[.,:;!?]$/.test(prevLast)) &&
         /^[A-Za-z0-9\(\[]/.test(nextFirst);
-      const emitted = needsSpace ? ` ${sanitizedChunk}` : sanitizedChunk;
+      const emitted = needsSpace ? ` ${chunkText}` : chunkText;
       assistantMessage += emitted;
       console.info("TOKEN:", emitted);
       onEvent?.({ type: "token", content: emitted });

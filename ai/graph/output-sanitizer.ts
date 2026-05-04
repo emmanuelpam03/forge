@@ -1,27 +1,4 @@
-// Pseudo-headings / outline labels: list markers, numbering, emphasis, then "Drivers:", etc.
-const OUTLINE_LABEL_WORDS =
-  "(?:Core concept|Drivers|Implications|Opening|Paragraph|Heading|Takeaway|Summary|Notes?|Key(?:\\s+points?)?|Overview|Framework|Architecture|Insight(?:\\s+Layer)?|Structure|System|Body|Framing|Section|Sunset|Intro|Content|Tone|Check|Closing)";
-
-const OUTLINE_LABEL_LINE_START = new RegExp(
-  // Match:
-  // - optional list marker(s) or numbering
-  // - optional emphasis tokens
-  // - label word (Drivers/Heading/Paragraph/etc)
-  // - optional numeric suffix (e.g. "Heading 1", "Paragraph 2")
-  // - a separator (colon / dash / emdash) OR end-of-line (some models omit the colon)
-  `^\\s*(?:(?:[-*+]|\\d+[.)])\\s+)*(?:\\*{1,4}|_{1,2}\\*{1,2}|\\*{1,2}_{1,2})?\\s*${OUTLINE_LABEL_WORDS}\\b(?:\\s*\\d+)?\\s*(?:[:,—–-]|$)`,
-  "i",
-);
-
-function isOutlineScaffoldLine(trimmed: string): boolean {
-  if (/^\s*#{1,6}\s+\S/.test(trimmed)) {
-    return false;
-  }
-  return OUTLINE_LABEL_LINE_START.test(trimmed);
-}
-
 const FORBIDDEN_LINE_PATTERNS = [
-  OUTLINE_LABEL_LINE_START,
   /^\s*\*?\s*Structure\s*:?/i,
   /^\s*\*?\s*System\s*:?/i,
   /^\s*\*?\s*Avoid\s*:?/i,
@@ -40,6 +17,7 @@ const FORBIDDEN_LINE_PATTERNS = [
   /no fluff/i,
   /no planning steps/i,
   /no instruction labels/i,
+  /^\s*\*?\s*(?:Core concept|Drivers|Implications|Opening|Paragraph|Heading|Takeaway|Summary|Notes?|Key points?|Overview|Framework|Architecture)\s*:?/i,
 ];
 
 const CODE_FENCE_PATTERN = /^\s*```/;
@@ -96,10 +74,6 @@ function normalizeVisibleLine(line: string): string {
 export type AssistantOutputSanitizerState = {
   insideCodeFence: boolean;
   startedVisibleAnswer: boolean;
-  // Streaming chunk-safety: buffer an incomplete line across chunks so
-  // outline labels split across chunk boundaries ("Heading " + "1: ...")
-  // can still be detected as a single line.
-  lineBuffer: string;
 };
 
 function looksLikeAnswerStart(line: string): boolean {
@@ -159,11 +133,7 @@ export function sanitizeAssistantOutputChunk(
   text: string,
   state: AssistantOutputSanitizerState,
 ): { text: string; state: AssistantOutputSanitizerState } {
-  const combinedText = `${state.lineBuffer}${text}`;
-  const endsWithNewline = /\r?\n$/.test(combinedText);
-  const parts = combinedText.split(/\r?\n/);
-  state.lineBuffer = endsWithNewline ? "" : (parts.pop() ?? "");
-  const lines = parts;
+  const lines = text.split(/\r?\n/);
   const output: string[] = [];
 
   for (const line of lines) {
@@ -202,12 +172,12 @@ export function sanitizeAssistantOutputChunk(
       continue;
     }
 
-    // FILTER: Remove outline template / pseudo-heading lines even after answer started
+    // FILTER: Remove outline template lines even after answer started (catches "*Paragraph 2:", "*Heading 1:", etc)
+    // These are drafting artifacts the model includes inline
     if (
       /^\s*\*+\s*(?:Paragraph|Heading|Opening|Tone|Core|Drivers|Implications|Structure|System|Check|Body|Framing|Section|Sunset|Intro|Content|Notes?|Overview|Key|Insight|Takeaway)\b/i.test(
         trimmed,
-      ) ||
-      isOutlineScaffoldLine(trimmed)
+      )
     ) {
       continue;
     }
@@ -287,9 +257,6 @@ export function sanitizeAssistantOutputChunk(
           ) {
             return false;
           }
-          if (!/^#{1,6}\s/.test(trimmed) && isOutlineScaffoldLine(trimmed)) {
-            return false;
-          }
           return true;
         })
         .join("\n");
@@ -338,16 +305,8 @@ export function sanitizeAssistantOutputChunk(
 }
 
 export function sanitizeAssistantOutput(text: string): string {
-  return sanitizeAssistantOutputChunk(`${text}\n`, {
+  return sanitizeAssistantOutputChunk(text, {
     insideCodeFence: false,
     startedVisibleAnswer: false,
-    lineBuffer: "",
   }).text;
-}
-
-/** True once streaming sanitizer has committed to visible answer prose (align with chunk gate). */
-export function assistantVisibleAnswerStarted(
-  state: AssistantOutputSanitizerState,
-): boolean {
-  return state.startedVisibleAnswer;
 }

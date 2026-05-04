@@ -151,12 +151,22 @@ export function createGeminiModel() {
   const config = getChatModelConfig();
 
   if (config.provider === "ollama") {
-    return new ChatOllama({
+    const apiKey = process.env.OLLAMA_API_KEY?.trim();
+    const ollamaOpts: ConstructorParameters<typeof ChatOllama>[0] = {
       baseUrl: config.baseUrl,
       model: config.model,
       temperature: 0.6,
       maxRetries: 2,
-    });
+      ...(apiKey
+        ? {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+            },
+          }
+        : {}),
+    };
+
+    return new ChatOllama(ollamaOpts);
   }
 
   const apiKey = process.env.GOOGLE_API_KEY?.trim();
@@ -216,4 +226,3 @@ export function createGeminiModel() {
 export function createGeminiToolModel(tools: DynamicStructuredTool[]) {
   return createGeminiModel().bindTools(tools);
 }
-
