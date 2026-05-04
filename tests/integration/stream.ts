@@ -20,6 +20,18 @@ describe("Streaming Integration Tests", () => {
       assert.strictEqual(parsed.content, "Hello, ");
     });
 
+    it("should parse reasoning event correctly", () => {
+      const reasoningEvent = JSON.stringify({
+        type: "reasoning",
+        content: "Drafting the answer...",
+      });
+
+      const parsed = JSON.parse(reasoningEvent);
+
+      assert.strictEqual(parsed.type, "reasoning");
+      assert.strictEqual(parsed.content, "Drafting the answer...");
+    });
+
     it("should parse status event correctly", () => {
       const statusEvent = JSON.stringify({
         type: "status",
@@ -74,11 +86,12 @@ describe("Streaming Integration Tests", () => {
     it("should sequence reasoning statuses and tokens in order", () => {
       const events = [
         JSON.stringify({ type: "status", message: "Loading context..." }),
-        JSON.stringify({ type: "status", message: "Understanding request..." }),
+        JSON.stringify({
+          type: "reasoning",
+          content: "Considering the request...",
+        }),
         JSON.stringify({ type: "status", message: "Writing response..." }),
-        JSON.stringify({ type: "token", content: "The " }),
-        JSON.stringify({ type: "token", content: "answer " }),
-        JSON.stringify({ type: "token", content: "is " }),
+        JSON.stringify({ type: "token", content: "The answer is " }),
         JSON.stringify({ type: "token", content: "42." }),
         JSON.stringify({
           type: "done",
@@ -87,10 +100,15 @@ describe("Streaming Integration Tests", () => {
       ];
 
       let content = "";
+      let reasoning = "";
       let isDone = false;
 
       events.forEach((eventLine) => {
         const event = JSON.parse(eventLine);
+
+        if (event.type === "reasoning") {
+          reasoning += event.content;
+        }
 
         if (event.type === "token") {
           content += event.content;
@@ -99,6 +117,7 @@ describe("Streaming Integration Tests", () => {
         }
       });
 
+      assert.strictEqual(reasoning, "Considering the request...");
       assert.strictEqual(content, "The answer is 42.");
       assert.strictEqual(isDone, true);
     });
@@ -148,7 +167,14 @@ describe("Streaming Integration Tests", () => {
 
   describe("NDJSON stream validation", () => {
     it("should validate only valid event types", () => {
-      const validTypes = ["token", "status", "done", "placeholder", "branches"];
+      const validTypes = [
+        "token",
+        "reasoning",
+        "status",
+        "done",
+        "placeholder",
+        "branches",
+      ];
 
       const testEvent = (type: string): boolean => {
         return validTypes.includes(type);

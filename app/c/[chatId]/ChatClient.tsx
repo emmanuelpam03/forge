@@ -13,7 +13,6 @@ import {
   Square,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
-import { ReasoningTimeline } from "@/components/ReasoningTimeline";
 import { TaskSuggestionCard } from "@/components/task-suggestion-card";
 import { useFeedback } from "@/components/feedback-provider";
 import { type StreamEvent } from "@/ai/graph/stream";
@@ -37,7 +36,7 @@ type ChatMessage = {
   pending?: boolean;
   streaming?: boolean;
   status?: string;
-  reasoningSteps?: string[];
+  reasoning?: string;
   reasoningExpanded?: boolean;
   error?: string;
 };
@@ -67,6 +66,8 @@ function MessageBubble({
   onSwitchBranch,
   onToggleReasoning,
   onCopyMessage,
+  reasoning,
+  showReasoning,
 }: {
   message: ChatMessage;
   onStartEdit: (m: ChatMessage) => void;
@@ -79,17 +80,15 @@ function MessageBubble({
   onSwitchBranch?: (messageId: string, branch: BranchOption) => void;
   onToggleReasoning?: (messageId: string, expanded: boolean) => void;
   onCopyMessage?: (content: string) => void;
+  reasoning: string;
+  showReasoning: boolean;
 }) {
   const isStreamingAssistant =
     message.role === "assistant" && message.streaming;
   const showThinkingOnly =
     message.role === "assistant" && message.pending && !message.content;
-  const reasoningSteps = message.reasoningSteps ?? [];
-  const showReasoning =
-    message.role === "assistant" &&
-    reasoningSteps.length > 0 &&
-    (showThinkingOnly || isStreamingAssistant);
-  const showLegacyThinking = showThinkingOnly && !showReasoning;
+  const reasoningText = reasoning.trim();
+  const hasReasoning = reasoningText.length > 0;
 
   const isUser = message.role === "user";
   const branchOptions = message.branchOptions ?? [];
@@ -142,24 +141,35 @@ function MessageBubble({
           </div>
         ) : (
           <div className="space-y-2">
-            {showReasoning ? (
-              <ReasoningTimeline
-                steps={reasoningSteps}
-                expanded={message.reasoningExpanded ?? false}
-                onExpandedChange={(expanded) => {
-                  onToggleReasoning?.(message.id, expanded);
-                }}
-              />
-            ) : null}
-            {showLegacyThinking ? (
-              <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
-                <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                <span>{message.status ?? "Thinking..."}</span>
+            {hasReasoning ? (
+              <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2.5 text-[13px] text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => onToggleReasoning?.(message.id, !showReasoning)}
+                  className="flex w-full items-center justify-between gap-3 text-left text-[12px] font-medium uppercase tracking-[0.14em] text-muted-foreground transition hover:text-foreground"
+                >
+                  <span>{showReasoning ? "Hide reasoning" : "View reasoning"}</span>
+                  <span className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground/80">
+                    Hidden by default
+                  </span>
+                </button>
+
+                {showReasoning ? (
+                  <p className="mt-2 whitespace-pre-wrap leading-5 text-foreground/85">
+                    {reasoningText}
+                  </p>
+                ) : null}
               </div>
-            ) : message.error ? (
+            ) : null}
+
+            {message.error ? (
               <p className="text-[14px] leading-7 text-red-400">
                 {message.error}
               </p>
+            ) : showThinkingOnly ? (
+              <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
+                <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+              </div>
             ) : (
               <div className="text-[14px]">
                 {message.role === "assistant" ? (
@@ -268,6 +278,9 @@ export function ChatClient({
 }: ChatClientProps) {
   const { showFeedback } = useFeedback();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [reasoning, setReasoning] = useState("");
+  const [message, setMessage] = useState("");
+  const [showReasoning, setShowReasoning] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionState[]>([]);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -284,6 +297,12 @@ export function ChatClient({
   const hasSuggestions = suggestions.length > 0;
   const showSuggestionsPanel = hasSuggestions && !isSending;
 
+  const resetStreamBuffers = useCallback(() => {
+    setReasoning("");
+    setMessage("");
+    setShowReasoning(false);
+  }, []);
+
   const updateAssistantMessage = useCallback(
     (messageId: string, updater: (message: ChatMessage) => ChatMessage) => {
       setMessages((currentMessages) =>
@@ -297,26 +316,38 @@ export function ChatClient({
     [],
   );
 
-  const appendReasoningStep = useCallback(
-    (messageId: string, step: string) => {
-      updateAssistantMessage(messageId, (currentMessage) => {
-        const reasoningSteps = currentMessage.reasoningSteps ?? [];
-        // Avoid duplicate consecutive steps
-        if (reasoningSteps[reasoningSteps.length - 1] === step) {
-          return currentMessage;
-        }
+  const appendReasoningChunk = useCallback(
+    (messageId: string, chunk: string) => {
+      setReasoning((currentReasoning) => {
+        const nextReasoning = `${currentReasoning}${chunk}`;
 
-        const MAX_REASONING_STEPS = 50;
-        const newSteps = [...reasoningSteps, step].slice(
-          Math.max(0, reasoningSteps.length + 1 - MAX_REASONING_STEPS),
-        );
-
-        return {
+        updateAssistantMessage(messageId, (currentMessage) => ({
           ...currentMessage,
-          reasoningSteps: newSteps,
-          reasoningExpanded: currentMessage.reasoningExpanded ?? false,
-          status: step,
-        };
+          reasoning: nextReasoning,
+        }));
+
+        return nextReasoning;
+      });
+    },
+    [updateAssistantMessage],
+  );
+
+  const appendReasoningStep = appendReasoningChunk;
+
+  const appendAnswerChunk = useCallback(
+    (messageId: string, chunk: string) => {
+      setMessage((currentMessageText) => {
+        const nextMessage = `${currentMessageText}${chunk}`;
+
+        updateAssistantMessage(messageId, (currentMessage) => ({
+          ...currentMessage,
+          content: nextMessage,
+          pending: false,
+          streaming: true,
+          status: undefined,
+        }));
+
+        return nextMessage;
       });
     },
     [updateAssistantMessage],
@@ -444,8 +475,6 @@ export function ChatClient({
               pending: false,
               streaming: false,
               status: undefined,
-              reasoningSteps: [],
-              reasoningExpanded: false,
             }
           : currentMessage,
       ),
@@ -611,6 +640,7 @@ export function ChatClient({
 
   const toggleReasoning = useCallback(
     (messageId: string, expanded: boolean) => {
+      setShowReasoning(expanded);
       updateAssistantMessage(messageId, (currentMessage) => ({
         ...currentMessage,
         reasoningExpanded: expanded,
@@ -646,11 +676,14 @@ export function ChatClient({
         pending: true,
         streaming: false,
         status: "Thinking...",
+        reasoning: "",
+        reasoningExpanded: false,
       },
     ]);
 
     abortControllerRef.current = new AbortController();
     let activeAssistantMessageId = assistantPlaceholderId;
+    resetStreamBuffers();
 
     try {
       const response = await fetch("/api/chat/edit", {
@@ -672,14 +705,18 @@ export function ChatClient({
 
       const decoder = new TextDecoder();
       let buffer = "";
-      let finalAssistantMessage = "";
       let hasReceivedDone = false;
       let hasLoggedFirstToken = false;
-      let hasReceivedToken = false;
+      let streamedReasoning = "";
+      let streamedMessage = "";
+
+      const applyReasoning = (delta: string) => {
+        streamedReasoning = `${streamedReasoning}${delta}`;
+        appendReasoningChunk(activeAssistantMessageId, delta);
+      };
 
       const applyChunk = (delta: string) => {
-        finalAssistantMessage = `${finalAssistantMessage}${delta}`;
-        hasReceivedToken = true;
+        streamedMessage = `${streamedMessage}${delta}`;
         if (!hasLoggedFirstToken) {
           hasLoggedFirstToken = true;
           console.info("FIRST TOKEN RECEIVED", {
@@ -687,21 +724,11 @@ export function ChatClient({
             source: "edit",
           });
         }
-        updateAssistantMessage(activeAssistantMessageId, (currentMessage) => ({
-          ...currentMessage,
-          content: finalAssistantMessage,
-          pending: false,
-          streaming: true,
-          status: undefined,
-        }));
-      };
-
-      const applyStatus = (status: string) => {
-        appendReasoningStep(activeAssistantMessageId, status);
+        appendAnswerChunk(activeAssistantMessageId, delta);
       };
 
       const applyDone = (content: string, persistedMessageId?: string) => {
-        const finalContent = (content || finalAssistantMessage || "").trim();
+        const finalContent = (content || streamedMessage || "").trim();
         const nextAssistantMessageId =
           persistedMessageId && persistedMessageId.trim().length > 0
             ? persistedMessageId
@@ -736,8 +763,8 @@ export function ChatClient({
                   pending: false,
                   streaming: false,
                   status: undefined,
-                  reasoningSteps: [],
-                  reasoningExpanded: false,
+                  reasoning: streamedReasoning,
+                  reasoningExpanded: currentMessage.reasoningExpanded ?? false,
                 }
               : currentMessage,
           ),
@@ -762,8 +789,8 @@ export function ChatClient({
             const event = JSON.parse(line) as StreamEvent;
             console.info("EVENT:", event);
 
-            if (event.type === "status" && !hasReceivedToken) {
-              applyStatus(event.message);
+            if (event.type === "reasoning") {
+              applyReasoning(event.content);
             }
             if (event.type === "token") applyChunk(event.content);
             if (event.type === "done") {
@@ -774,7 +801,7 @@ export function ChatClient({
               });
               replaceSuggestionsFromPacket(event.suggestions ?? []);
               applyDone(
-                event.response ?? finalAssistantMessage,
+                event.response ?? streamedMessage,
                 event.messageId,
               );
             }
@@ -796,7 +823,7 @@ export function ChatClient({
           chatId,
           source: "edit",
         });
-        applyDone(finalAssistantMessage, undefined);
+        applyDone(streamedMessage, undefined);
       }
       // Clear editing state on success
       setEditingId(null);
@@ -855,7 +882,7 @@ export function ChatClient({
               content: "",
               pending: true,
               streaming: false,
-              reasoningSteps: [],
+              reasoning: "",
               reasoningExpanded: false,
               error: undefined,
             }
@@ -865,6 +892,7 @@ export function ChatClient({
 
     abortControllerRef.current = new AbortController();
     let activeAssistantMessageId = assistantPlaceholderId;
+    resetStreamBuffers();
 
     try {
       const response = await fetch("/api/chat/regenerate", {
@@ -886,14 +914,18 @@ export function ChatClient({
 
       const decoder = new TextDecoder();
       let buffer = "";
-      let finalAssistantMessage = "";
       let hasReceivedDone = false;
       let hasLoggedFirstToken = false;
-      let hasReceivedToken = false;
+      let streamedReasoning = "";
+      let streamedMessage = "";
+
+      const applyReasoning = (delta: string) => {
+        streamedReasoning = `${streamedReasoning}${delta}`;
+        appendReasoningChunk(activeAssistantMessageId, delta);
+      };
 
       const applyChunk = (delta: string) => {
-        finalAssistantMessage = `${finalAssistantMessage}${delta}`;
-        hasReceivedToken = true;
+        streamedMessage = `${streamedMessage}${delta}`;
         if (!hasLoggedFirstToken) {
           hasLoggedFirstToken = true;
           console.info("FIRST TOKEN RECEIVED", {
@@ -901,17 +933,7 @@ export function ChatClient({
             source: "regenerate",
           });
         }
-        updateAssistantMessage(activeAssistantMessageId, (currentMessage) => ({
-          ...currentMessage,
-          content: finalAssistantMessage,
-          pending: false,
-          streaming: true,
-          status: undefined,
-        }));
-      };
-
-      const applyStatus = (status: string) => {
-        appendReasoningStep(activeAssistantMessageId, status);
+        appendAnswerChunk(activeAssistantMessageId, delta);
       };
 
       const applyPlaceholder = (
@@ -953,7 +975,7 @@ export function ChatClient({
       };
 
       const applyDone = (content: string) => {
-        const finalContent = (content || finalAssistantMessage || "").trim();
+        const finalContent = (content || streamedMessage || "").trim();
 
         if (!finalContent) {
           setError("No response generated. Please try again.");
@@ -980,8 +1002,8 @@ export function ChatClient({
                   pending: false,
                   streaming: false,
                   status: undefined,
-                  reasoningSteps: [],
-                  reasoningExpanded: false,
+                  reasoning: streamedReasoning,
+                  reasoningExpanded: currentMessage.reasoningExpanded ?? false,
                 }
               : currentMessage,
           ),
@@ -1014,15 +1036,12 @@ export function ChatClient({
               applyBranchList(event);
             }
 
+            if (event.type === "reasoning" && !hasReceivedDone) {
+              applyReasoning(event.content);
+            }
+
             if (event.type === "token" && !hasReceivedDone) {
               applyChunk(event.content);
-            }
-            if (
-              event.type === "status" &&
-              !hasReceivedDone &&
-              !hasReceivedToken
-            ) {
-              applyStatus(event.message);
             }
             if (event.type === "done") {
               if (!hasReceivedDone) {
@@ -1032,7 +1051,7 @@ export function ChatClient({
                   source: "regenerate",
                 });
                 replaceSuggestionsFromPacket(event.suggestions ?? []);
-                applyDone(event.response ?? finalAssistantMessage);
+                applyDone(event.response ?? streamedMessage);
               }
             }
           } catch (parseError) {
@@ -1056,7 +1075,7 @@ export function ChatClient({
           chatId,
           source: "regenerate",
         });
-        applyDone(finalAssistantMessage);
+        applyDone(streamedMessage);
       }
     } catch (sendError) {
       if (sendError instanceof Error && sendError.name === "AbortError") {
@@ -1138,10 +1157,13 @@ export function ChatClient({
           content: "",
           pending: true,
           streaming: false,
+          reasoning: "",
+          reasoningExpanded: false,
         },
       ]);
 
       abortControllerRef.current = new AbortController();
+      resetStreamBuffers();
 
       try {
         const response = await fetch("/api/chat", {
@@ -1171,15 +1193,19 @@ export function ChatClient({
 
         const decoder = new TextDecoder();
         let buffer = "";
-        let finalAssistantMessage = "";
         let activeAssistantMessageId = assistantPlaceholderId;
         let hasReceivedDone = false;
         let hasLoggedFirstToken = false;
-        let hasReceivedToken = false;
+        let streamedReasoning = "";
+        let streamedMessage = "";
+
+        const applyReasoning = (delta: string) => {
+          streamedReasoning = `${streamedReasoning}${delta}`;
+          appendReasoningChunk(activeAssistantMessageId, delta);
+        };
 
         const applyChunk = (delta: string) => {
-          finalAssistantMessage = `${finalAssistantMessage}${delta}`;
-          hasReceivedToken = true;
+          streamedMessage = `${streamedMessage}${delta}`;
           if (!hasLoggedFirstToken) {
             hasLoggedFirstToken = true;
             console.info("FIRST TOKEN RECEIVED", {
@@ -1187,24 +1213,11 @@ export function ChatClient({
               source: "send",
             });
           }
-          updateAssistantMessage(
-            activeAssistantMessageId,
-            (currentMessage) => ({
-              ...currentMessage,
-              content: finalAssistantMessage,
-              pending: false,
-              streaming: true,
-              status: undefined,
-            }),
-          );
-        };
-
-        const applyStatus = (status: string) => {
-          appendReasoningStep(activeAssistantMessageId, status);
+          appendAnswerChunk(activeAssistantMessageId, delta);
         };
 
         const applyDone = (content: string, persistedMessageId?: string) => {
-          const finalContent = (content || finalAssistantMessage || "").trim();
+          const finalContent = (content || streamedMessage || "").trim();
           const nextAssistantMessageId =
             persistedMessageId && persistedMessageId.trim().length > 0
               ? persistedMessageId
@@ -1239,8 +1252,8 @@ export function ChatClient({
                     pending: false,
                     streaming: false,
                     status: undefined,
-                    reasoningSteps: [],
-                    reasoningExpanded: false,
+                    reasoning: streamedReasoning,
+                    reasoningExpanded: currentMessage.reasoningExpanded ?? false,
                   }
                 : currentMessage,
             ),
@@ -1271,8 +1284,8 @@ export function ChatClient({
               const event = JSON.parse(line) as StreamEvent;
               console.info("EVENT:", event);
 
-              if (event.type === "status" && !hasReceivedToken) {
-                applyStatus(event.message);
+              if (event.type === "reasoning") {
+                applyReasoning(event.content);
               }
 
               if (event.type === "token") {
@@ -1287,7 +1300,7 @@ export function ChatClient({
                 });
                 replaceSuggestionsFromPacket(event.suggestions ?? []);
                 applyDone(
-                  event.response ?? finalAssistantMessage,
+                  event.response ?? streamedMessage,
                   event.messageId,
                 );
               }
@@ -1310,7 +1323,7 @@ export function ChatClient({
             chatId,
             source: "send",
           });
-          applyDone(finalAssistantMessage, undefined);
+          applyDone(streamedMessage, undefined);
         }
       } catch (sendError) {
         if (sendError instanceof Error && sendError.name === "AbortError") {
@@ -1354,7 +1367,9 @@ export function ChatClient({
       }
     },
     [
-      appendReasoningStep,
+      appendAnswerChunk,
+      appendReasoningChunk,
+      resetStreamBuffers,
       chatId,
       draft,
       isSending,
@@ -1453,6 +1468,16 @@ export function ChatClient({
                 onCopyMessage={(content) => {
                   void copyMessage(content);
                 }}
+                reasoning={
+                  message.role === "assistant" && (message.pending || message.streaming)
+                    ? reasoning
+                    : message.reasoning ?? ""
+                }
+                showReasoning={
+                  message.role === "assistant" && (message.pending || message.streaming)
+                    ? showReasoning
+                    : message.reasoningExpanded ?? false
+                }
               />
             ))
           )}

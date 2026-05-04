@@ -52,6 +52,9 @@ export async function POST(request: NextRequest) {
           if (event.type === "status") {
             console.info("STATUS:", event.message);
           }
+          if (event.type === "reasoning") {
+            console.info("REASONING:", event.content);
+          }
           if (event.type === "token") {
             console.info("TOKEN:", event.content);
           }

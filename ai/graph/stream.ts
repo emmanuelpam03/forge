@@ -2,6 +2,7 @@ import type { TaskSuggestion } from "@/types/tasks";
 
 export type StreamEvent =
   | { type: "status"; message: string }
+  | { type: "reasoning"; content: string }
   | { type: "token"; content: string }
   | {
       type: "placeholder";

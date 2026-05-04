@@ -15,6 +15,7 @@ import {
   classifyQueryIntent,
   type QueryIntentClassification,
 } from "@/ai/graph/classification";
+import { isAnswerStart } from "@/ai/graph/reasoning-split";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -481,7 +482,22 @@ export async function generateResponseNode(state: ChatGraphState) {
     ) as AsyncIterable<string>;
 
     let firstTokenAt: number | null = null;
+    let mode: "pre" | "answer" = "pre";
     for await (const token of tokenStream) {
+      const chunkText = toChunkText(token);
+      if (!chunkText.trim()) {
+        continue;
+      }
+
+      if (mode === "pre" && !isAnswerStart(chunkText)) {
+        graphStreamEventEmitter?.({ type: "reasoning", content: chunkText });
+        continue;
+      }
+
+      if (mode === "pre") {
+        mode = "answer";
+      }
+
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
         console.info("FIRST TOKEN SENT (generateResponseNode)", {
@@ -491,13 +507,9 @@ export async function generateResponseNode(state: ChatGraphState) {
         });
       }
 
-      const chunkText = toChunkText(token);
-      if (!chunkText) {
-        continue;
-      }
       assistantMessage += chunkText;
 
-      // Forward the token to any registered stream listener for this run.
+      // Forward the answer token to any registered stream listener for this run.
       graphStreamEventEmitter?.({ type: "token", content: chunkText });
     }
 
