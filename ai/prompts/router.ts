@@ -3,12 +3,9 @@ import {
   SystemMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import {
-  CHAT_POLICY_PRECEDENCE,
-  CHAT_SYSTEM_PROMPT,
-  SUMMARIZATION_POLICY,
-  WRITING_POLICY,
-} from "@/ai/prompts/system";
+import { SYSTEM_PROMPT } from "@/ai/prompts/system";
+import { SUMMARIZATION_POLICY } from "@/ai/prompts/summarization";
+import { WRITING_POLICY } from "@/ai/prompts/writing";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 
@@ -138,8 +135,7 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   }
 
   const systemPrompt = [
-    CHAT_SYSTEM_PROMPT,
-    CHAT_POLICY_PRECEDENCE,
+    SYSTEM_PROMPT,
     SUMMARIZATION_POLICY,
     WRITING_POLICY,
     context,
