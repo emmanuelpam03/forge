@@ -145,10 +145,14 @@ function MessageBubble({
               <div className="rounded-2xl border border-border/70 bg-muted/20 px-3 py-2.5 text-[13px] text-muted-foreground">
                 <button
                   type="button"
-                  onClick={() => onToggleReasoning?.(message.id, !showReasoning)}
+                  onClick={() =>
+                    onToggleReasoning?.(message.id, !showReasoning)
+                  }
                   className="flex w-full items-center justify-between gap-3 text-left text-[12px] font-medium uppercase tracking-[0.14em] text-muted-foreground transition hover:text-foreground"
                 >
-                  <span>{showReasoning ? "Hide reasoning" : "View reasoning"}</span>
+                  <span>
+                    {showReasoning ? "Hide reasoning" : "View reasoning"}
+                  </span>
                   <span className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground/80">
                     Hidden by default
                   </span>
@@ -800,10 +804,7 @@ export function ChatClient({
                 source: "edit",
               });
               replaceSuggestionsFromPacket(event.suggestions ?? []);
-              applyDone(
-                event.response ?? streamedMessage,
-                event.messageId,
-              );
+              applyDone(event.response ?? streamedMessage, event.messageId);
             }
           } catch (parseError) {
             if (
@@ -1253,7 +1254,8 @@ export function ChatClient({
                     streaming: false,
                     status: undefined,
                     reasoning: streamedReasoning,
-                    reasoningExpanded: currentMessage.reasoningExpanded ?? false,
+                    reasoningExpanded:
+                      currentMessage.reasoningExpanded ?? false,
                   }
                 : currentMessage,
             ),
@@ -1299,10 +1301,7 @@ export function ChatClient({
                   source: "send",
                 });
                 replaceSuggestionsFromPacket(event.suggestions ?? []);
-                applyDone(
-                  event.response ?? streamedMessage,
-                  event.messageId,
-                );
+                applyDone(event.response ?? streamedMessage, event.messageId);
               }
             } catch (parseError) {
               if (
@@ -1469,14 +1468,16 @@ export function ChatClient({
                   void copyMessage(content);
                 }}
                 reasoning={
-                  message.role === "assistant" && (message.pending || message.streaming)
+                  message.role === "assistant" &&
+                  (message.pending || message.streaming)
                     ? reasoning
-                    : message.reasoning ?? ""
+                    : (message.reasoning ?? "")
                 }
                 showReasoning={
-                  message.role === "assistant" && (message.pending || message.streaming)
+                  message.role === "assistant" &&
+                  (message.pending || message.streaming)
                     ? showReasoning
-                    : message.reasoningExpanded ?? false
+                    : (message.reasoningExpanded ?? false)
                 }
               />
             ))
