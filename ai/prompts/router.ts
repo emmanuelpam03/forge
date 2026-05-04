@@ -4,8 +4,7 @@ import {
   type BaseMessage,
 } from "@langchain/core/messages";
 import { CHAT_SYSTEM_PROMPT } from "@/ai/prompts/system";
-import { SUMMARIZATION_POLICY } from "@/ai/prompts/summarization";
-import { WRITING_POLICY } from "@/ai/prompts/writing";
+import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 
@@ -134,49 +133,9 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
       .join(" ");
   }
 
-  const systemPrompt = [
-    CHAT_SYSTEM_PROMPT,
-    SUMMARIZATION_POLICY,
-    WRITING_POLICY,
-    context,
-  ].join("\n\n");
+  const systemPrompt = [CHAT_SYSTEM_PROMPT, context].join("\n\n");
 
   return [new SystemMessage(systemPrompt), new HumanMessage(state.userMessage)];
 }
 
-/**
- * Build a prompt for classifying whether the user message requires fresh data.
- * The classifier should return a JSON object with fields:
- * {"intent": "factual|reasoning|code|creative", "requiresFreshData": true|false, "confidence": "high|medium|low"}
- */
-export function buildFreshnessClassificationMessage(
-  userMessage: string,
-): string {
-  const prompt = `You are a strict router classifier for Forge.
-
-Return JSON ONLY in this exact shape:
-{"intent":"factual|reasoning|code|creative","requiresFreshData":true|false,"confidence":"high|medium|low"}
-Rules:
-- intent = factual for questions about real-world facts, people, places, organizations, products, rankings, prices, events, policies, dates, time-sensitive state, or anything that can become outdated.
-- intent = reasoning for explanation, analysis, comparison, or advice.
-- intent = code for programming, debugging, APIs, scripts, or technical implementation.
-- intent = creative for writing, ideation, styling, naming, or open-ended generation.
-- requiresFreshData = true if the answer depends on real-world state, can change over time, may be outdated since training, or involves positions, prices, rankings, events, incidents, or factual state.
-- CRITICAL: Questions about recent events, incidents, security matters, accidents, disasters, or current happenings ALWAYS require fresh data.
-- CRITICAL: Questions asking "this year" or about recent timeframes ALWAYS require fresh data to get current dates and details.
-- If intent is factual and the answer might be stale, requiresFreshData must be true.
-- confidence should reflect how sure you are in the classification, not whether you know the answer.
-- Do not include explanations, markdown, or extra keys.
-
-Examples:
-- User: "Who is the president of the US?" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
-- User: "Bitcoin price right now" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
-- User: "Mention some incidents of insecurity in Nigeria this year" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
-- User: "What were the major earthquakes in 2024?" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
-- User: "Explain quantum computing" => {"intent":"reasoning","requiresFreshData":false,"confidence":"high"}
-- User: "Write a React button component" => {"intent":"code","requiresFreshData":false,"confidence":"high"}
-
-User message: "${userMessage}"`;
-
-  return prompt;
-}
+export { buildFreshnessClassificationMessage };
