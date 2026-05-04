@@ -59,7 +59,9 @@ function looksFragmentedForRewrite(text: string): boolean {
   );
 }
 
-export async function refineAssistantResponseText(text: string): Promise<string> {
+export async function refineAssistantResponseText(
+  text: string,
+): Promise<string> {
   const normalized = normalizeAssistantResponseText(text);
 
   if (!normalized || !looksFragmentedForRewrite(normalized)) {
