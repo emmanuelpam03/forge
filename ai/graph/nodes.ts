@@ -7,7 +7,10 @@ import {
   extractTextFromModelChunk,
   getChatModelConfig,
 } from "@/ai/models";
-import { buildChatMessages } from "@/ai/prompts/router";
+import {
+  buildChatMessages,
+  buildFreshnessClassificationMessage,
+} from "@/ai/prompts/router";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { MEMORY_EXTRACTION_PROMPT } from "@/ai/prompts/memory";
 import {
@@ -18,7 +21,7 @@ import {
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import {
-  classifyQueryIntent,
+  parseClassificationText,
   type QueryIntentClassification,
 } from "@/ai/graph/classification";
 import type { ChatGraphState } from "@/ai/graph/state";
@@ -59,6 +62,23 @@ function looksLikeProjectLookupQuery(message: string): boolean {
   );
 }
 
+function deriveQueryIntentFromClassification(
+  classifiedIntent: ChatGraphState["classifiedIntent"],
+): QueryIntentClassification {
+  if (!classifiedIntent) {
+    return { needsTools: false, type: "knowledge" };
+  }
+
+  if (classifiedIntent.intent === "factual") {
+    return classifiedIntent.requiresFreshData ||
+      classifiedIntent.confidence !== "high"
+      ? { needsTools: true, type: "real_time" }
+      : { needsTools: false, type: "knowledge" };
+  }
+
+  return { needsTools: false, type: "knowledge" };
+}
+
 function resolveToolPlanForQueryIntent(
   state: ChatGraphState,
   queryIntent: QueryIntentClassification,
@@ -69,21 +89,13 @@ function resolveToolPlanForQueryIntent(
     return [];
   }
 
-  if (queryIntent.type === "calculation") {
-    return ["calculator"];
-  }
-
   if (queryIntent.type === "real_time") {
     return looksLikeDateTimeQuery(message)
       ? ["currentDateTime"]
       : ["webSearch"];
   }
 
-  if (looksLikeProjectLookupQuery(message)) {
-    return ["projectContextLookup"];
-  }
-
-  return ["webSearch"];
+  return [];
 }
 
 function extractCalculatorExpression(message: string): string {
@@ -686,7 +698,8 @@ export async function saveMessagesNode(state: ChatGraphState) {
 export async function planTaskNode(state: ChatGraphState) {
   try {
     const queryIntent =
-      state.queryIntent ?? classifyQueryIntent(state.userMessage);
+      state.queryIntent ??
+      deriveQueryIntentFromClassification(state.classifiedIntent);
     const forcedTool = state.forceTool ?? null;
     const toolsNeeded = forcedTool
       ? [forcedTool]
@@ -745,10 +758,9 @@ export async function planTaskNode(state: ChatGraphState) {
       },
       executionMode: "none",
       intent: state.intent || "knowledge",
-      queryIntent: state.queryIntent ?? {
-        needsTools: false,
-        type: "knowledge",
-      },
+      queryIntent:
+        state.queryIntent ??
+        deriveQueryIntentFromClassification(state.classifiedIntent),
     };
   }
 }
@@ -1021,7 +1033,27 @@ export function generateSuggestions(
  */
 export async function classifyIntentNode(state: ChatGraphState) {
   try {
-    const queryIntent = classifyQueryIntent(state.userMessage);
+    const model = createGeminiModel();
+    const classificationPrompt = buildFreshnessClassificationMessage(
+      state.userMessage,
+    );
+
+    let classifiedIntent = null;
+    try {
+      const response = await model.invoke([
+        new HumanMessage(classificationPrompt),
+      ]);
+      classifiedIntent = parseClassificationText(
+        toTextContent(response.content),
+      );
+    } catch (classificationError) {
+      console.warn(
+        "Intent classification model call failed:",
+        classificationError,
+      );
+    }
+
+    const queryIntent = deriveQueryIntentFromClassification(classifiedIntent);
 
     console.info(
       JSON.stringify({
@@ -1029,13 +1061,15 @@ export async function classifyIntentNode(state: ChatGraphState) {
         chatId: hashIdentifierForLogging(state.chatId),
         runId: hashIdentifierForLogging(state.runId),
         queryIntent,
+        classifiedIntent,
         message: state.userMessage,
       }),
     );
 
     return {
-      intent: queryIntent.type,
+      intent: classifiedIntent?.intent ?? queryIntent.type,
       queryIntent,
+      classifiedIntent,
     };
   } catch (error) {
     console.error("Intent classification failed:", error);
@@ -1045,6 +1079,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
         needsTools: false,
         type: "knowledge",
       },
+      classifiedIntent: null,
     };
   }
 }
