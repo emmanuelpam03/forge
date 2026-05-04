@@ -6,8 +6,28 @@ import {
 import { CHAT_SYSTEM_PROMPT } from "@/ai/prompts/system";
 import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
 import { buildTopicTemplateLayer } from "@/ai/prompts/templates";
+import { PROMPTS } from "@/ai/prompts/v2/promptRegistry";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
+
+function isPromptsV2Enabled(): boolean {
+  return process.env.PROMPTS_V2_ENABLED !== "0";
+}
+
+function resolveSpecialistPrompt(state: ChatGraphState): string {
+  switch (state.taskCategory) {
+    case "coding":
+      return PROMPTS.coding;
+    case "reasoning":
+    case "explanation":
+      return PROMPTS.reasoning;
+    case "planning":
+    case "trading":
+      return PROMPTS.planning;
+    default:
+      return "";
+  }
+}
 
 function formatPreferences(state: ChatGraphState): string {
   if (state.preferences.length === 0) {
@@ -109,9 +129,10 @@ function formatToolPlan(state: ChatGraphState): string {
 }
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
-  const topicTemplateLayer = buildTopicTemplateLayer(
-    state.classifiedIntent?.intent,
-  );
+  const promptsV2Enabled = isPromptsV2Enabled();
+  const topicTemplateLayer = promptsV2Enabled
+    ? resolveSpecialistPrompt(state)
+    : buildTopicTemplateLayer(state.classifiedIntent?.intent);
 
   // Use selected context from engine if available, otherwise fall back to raw snapshots.
   // Tool evidence is always prepended so fresh search results outrank memory.
@@ -137,7 +158,12 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
       .join(" ");
   }
 
-  const systemPrompt = [CHAT_SYSTEM_PROMPT, topicTemplateLayer, context]
+  const systemPrompt = [
+    promptsV2Enabled ? PROMPTS.system : CHAT_SYSTEM_PROMPT,
+    topicTemplateLayer,
+    promptsV2Enabled ? PROMPTS.formatter : "",
+    context,
+  ]
     .filter(Boolean)
     .join("\n\n");
 

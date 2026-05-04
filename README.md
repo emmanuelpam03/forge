@@ -13,6 +13,7 @@ Optional:
 - `GEMINI_MODEL`
 - `TAVILY_API_KEY`
 - `TAVILY_API_BASE_URL`
+- `PROMPTS_V2_ENABLED` to switch the app to the v2 prompt registry (`1` on, `0` off)
 
 ## Getting Started
 

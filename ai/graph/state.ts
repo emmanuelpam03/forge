@@ -18,6 +18,14 @@ export type ClassifiedIntent = {
   confidence: ClassificationConfidence;
 };
 
+export type PromptTaskCategory =
+  | "coding"
+  | "reasoning"
+  | "planning"
+  | "explanation"
+  | "trading"
+  | "general";
+
 export type ChatMessageSnapshot = {
   id: string;
   role: MessageRole;
@@ -94,6 +102,7 @@ export type ChatGraphState = {
   suggestionResponse: string;
   queryIntent: QueryIntentClassification | null;
   classifiedIntent: ClassifiedIntent | null;
+  taskCategory: PromptTaskCategory;
   preResponsePromise?: Promise<void>;
   /**
    * When set, forces the graph to execute a specific tool (e.g. "webSearch").
@@ -230,6 +239,10 @@ export const chatGraphState = Annotation.Root({
     default: () => null,
     reducer: lastValue,
   }),
+  taskCategory: Annotation<PromptTaskCategory>({
+    default: () => "general",
+    reducer: lastValue,
+  }),
   forceTool: Annotation<string | null>({
     default: () => null,
     reducer: lastValue,
@@ -284,5 +297,6 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   suggestionResponse: "",
   queryIntent: null,
   classifiedIntent: input.classifiedIntent ?? null,
+  taskCategory: "general",
   forceTool: input.forceTool ?? null,
 });
