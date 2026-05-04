@@ -28,6 +28,70 @@ import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
 
+export function normalizeAssistantResponseText(text: string): string {
+  const normalized = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\s+([.,;:!?])/g, "$1")
+        .replace(/([.,;:!?])(\S)/g, "$1 $2")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/(\d)\s+(?=\d)/g, "$1")
+        .trim(),
+    )
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return normalized;
+}
+
+function looksFragmentedForRewrite(text: string): boolean {
+  const words = text.match(/\b[\p{L}]+\b/gu) ?? [];
+  const tinyWordCount = words.filter((word) => word.length <= 2).length;
+
+  return (
+    /\b[\p{L}]\s+[\p{L}]\s+[\p{L}]/u.test(text) ||
+    /\b[\p{L}]{2,}\s+[\p{L}]{1,3}\s+[\p{L}]{2,}\b/u.test(text) ||
+    tinyWordCount >= 6
+  );
+}
+
+export async function refineAssistantResponseText(text: string): Promise<string> {
+  const normalized = normalizeAssistantResponseText(text);
+
+  if (!normalized || !looksFragmentedForRewrite(normalized)) {
+    return normalized;
+  }
+
+  try {
+    const model = createGeminiModel();
+    const prompt = `Rewrite the text below so it is clean, readable, and professionally formatted.
+
+Rules:
+- Fix spelling, spacing, punctuation, capitalization, and obvious word breaks.
+- Preserve the original meaning exactly.
+- Preserve paragraph structure, headings, and list structure.
+- Do not add new facts, examples, warnings, or conclusions.
+- Return only the corrected text.
+
+Text:
+${normalized}`;
+
+    const response = await model.invoke([new HumanMessage(prompt)]);
+    const corrected = normalizeAssistantResponseText(
+      toTextContent(response.content),
+    );
+
+    return corrected || normalized;
+  } catch (error) {
+    console.warn("Assistant response refinement failed:", error);
+    return normalized;
+  }
+}
+
 let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
 
 export function setGraphStreamEventEmitter(
@@ -552,6 +616,8 @@ export async function generateResponseNode(state: ChatGraphState) {
       `[CRITICAL] generateResponseNode returned empty message. Chat: ${state.chatId}, RunId: ${state.runId}`,
     );
   }
+
+  assistantMessage = await refineAssistantResponseText(assistantMessage);
 
   const inputTokens = estimateTokens(
     messages

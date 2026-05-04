@@ -22,6 +22,7 @@ import {
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
+  refineAssistantResponseText,
 } from "@/ai/graph/nodes";
 import {
   createGeminiModel,
@@ -252,6 +253,7 @@ export async function runChatGraphStream(
   }
 
   // Generate suggestions only after response streaming is complete.
+  assistantMessage = await refineAssistantResponseText(assistantMessage);
   Object.assign(state, await suggestTaskNode(state));
 
   // Stream validation: log if response is empty
