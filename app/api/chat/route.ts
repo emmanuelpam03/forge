@@ -89,25 +89,9 @@ export async function POST(request: NextRequest) {
                 classifiedIntent: null,
               },
               (event) => {
-                // Track TTFT on first token forwarded
                 if (event.type === "token") {
                   if (firstTokenAt === null) {
                     firstTokenAt = Date.now();
-                    console.info("FIRST TOKEN SENT", {
-                      chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-                      runId: hashIdentifierForLogging(runId),
-                      ttftMs: firstTokenAt - requestStartedAt,
-                    });
-                    console.info(
-                      JSON.stringify({
-                        event: "first_token_forwarded",
-                        chatId: hashIdentifierForLogging(
-                          parsedBody.data.chatId,
-                        ),
-                        runId: hashIdentifierForLogging(runId),
-                        ttftMs: firstTokenAt - requestStartedAt,
-                      }),
-                    );
                   }
 
                   assistantMessage += event.content;

@@ -746,13 +746,6 @@ export function ChatClient({
 
       const applyChunk = (delta: string) => {
         streamedMessage = `${streamedMessage}${delta}`;
-        if (!hasLoggedFirstToken) {
-          hasLoggedFirstToken = true;
-          console.info("FIRST TOKEN RECEIVED", {
-            chatId,
-            source: "edit",
-          });
-        }
         appendAnswerChunk(activeAssistantMessageId, delta);
       };
 
@@ -952,13 +945,6 @@ export function ChatClient({
 
       const applyChunk = (delta: string) => {
         streamedMessage = `${streamedMessage}${delta}`;
-        if (!hasLoggedFirstToken) {
-          hasLoggedFirstToken = true;
-          console.info("FIRST TOKEN RECEIVED", {
-            chatId,
-            source: "regenerate",
-          });
-        }
         appendAnswerChunk(activeAssistantMessageId, delta);
       };
 
@@ -1271,13 +1257,6 @@ export function ChatClient({
 
         const applyChunk = (delta: string) => {
           streamedMessage = `${streamedMessage}${delta}`;
-          if (!hasLoggedFirstToken) {
-            hasLoggedFirstToken = true;
-            console.info("FIRST TOKEN RECEIVED", {
-              chatId,
-              source: "send",
-            });
-          }
           appendAnswerChunk(activeAssistantMessageId, delta);
         };
 
