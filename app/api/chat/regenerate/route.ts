@@ -245,10 +245,16 @@ export async function POST(request: NextRequest) {
               suggestions: result.suggestions ?? [],
             });
 
-            // Post-processing can be slower; keep it after `done` so UI exits
-            // generating state as soon as model output is complete.
-            await persistProgress;
-            await sendBranchList();
+            // Close stream immediately so client doesn't wait
+            safeClose();
+
+            // Post-processing continues in background without blocking stream close
+            persistProgress.catch((error) => {
+              console.error("Failed to persist regenerate progress:", error);
+            });
+            sendBranchList().catch((error) => {
+              console.error("Failed to send branch list:", error);
+            });
           } catch (err) {
             console.error("Regenerate stream failed:", err);
             await prisma.message
@@ -265,9 +271,8 @@ export async function POST(request: NextRequest) {
               messageId: assistantPlaceholder.id,
               suggestions: [],
             });
+            safeClose();
           }
-
-          safeClose();
         })().catch((error) => {
           console.error("Regenerate stream failed:", error);
           safeClose();
