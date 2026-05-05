@@ -106,12 +106,18 @@ function MessageBubble({
   const branchIndex = currentBranchIndex === -1 ? 0 : currentBranchIndex + 1;
 
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex ${isUser ? "justify-end" : message.role === "assistant" ? "justify-center" : "justify-start"}`}
+    >
       <div
-        className={`group relative max-w-[80%] rounded-2xl border px-4 py-3 ${
-          isUser
-            ? "border-primary bg-primary/15 text-foreground"
-            : "border-border bg-card text-foreground"
+        className={`group relative ${
+          message.role === "assistant"
+            ? "w-full max-w-[900px] px-0 py-0 bg-transparent border-0 text-foreground"
+            : `max-w-[80%] rounded-2xl border px-4 py-3 ${
+                isUser
+                  ? "border-primary bg-primary/15 text-foreground"
+                  : "border-border bg-card text-foreground"
+              }`
         }`}
       >
         {isEditing && isUser ? (
