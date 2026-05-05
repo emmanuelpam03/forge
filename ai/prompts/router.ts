@@ -172,6 +172,7 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
 
   const systemPrompt = [
     PROMPTS.system,
+    PROMPTS.tools,
     topicTemplateLayer,
     // Short instruction that tells the formatter which high-level response shape to produce.
     `RESPONSE MODE: ${resolveResponseMode(state)} — Format the answer accordingly (one of: code, factual, reasoning, creative, chat).`,
