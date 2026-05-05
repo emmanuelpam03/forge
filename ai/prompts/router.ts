@@ -3,16 +3,10 @@ import {
   SystemMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import { CHAT_SYSTEM_PROMPT } from "@/ai/prompts/system";
+import { PROMPTS } from "@/ai/prompts/promptRegistry";
 import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
-import { buildTopicTemplateLayer } from "@/ai/prompts/templates";
-import { PROMPTS } from "@/ai/prompts/v2/promptRegistry";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
-
-function isPromptsV2Enabled(): boolean {
-  return process.env.PROMPTS_V2_ENABLED !== "0";
-}
 
 function resolveSpecialistPrompt(state: ChatGraphState): string {
   switch (state.taskCategory) {
@@ -129,10 +123,7 @@ function formatToolPlan(state: ChatGraphState): string {
 }
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
-  const promptsV2Enabled = isPromptsV2Enabled();
-  const topicTemplateLayer = promptsV2Enabled
-    ? resolveSpecialistPrompt(state)
-    : buildTopicTemplateLayer(state.classifiedIntent?.intent);
+  const topicTemplateLayer = resolveSpecialistPrompt(state);
 
   // Use selected context from engine if available, otherwise fall back to raw snapshots.
   // Tool evidence is always prepended so fresh search results outrank memory.
@@ -159,9 +150,9 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   }
 
   const systemPrompt = [
-    promptsV2Enabled ? PROMPTS.system : CHAT_SYSTEM_PROMPT,
+    PROMPTS.system,
     topicTemplateLayer,
-    promptsV2Enabled ? PROMPTS.formatter : "",
+    PROMPTS.formatter,
     context,
   ]
     .filter(Boolean)

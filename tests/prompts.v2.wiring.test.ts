@@ -6,8 +6,8 @@ import test from "node:test";
 import {
   buildTaskCategoryClassificationMessage,
   parseTaskCategory,
-} from "../ai/prompts/v2/classification.ts";
-import { CLASSIFIER_PROMPT } from "../ai/prompts/v2/classifier.prompt.ts";
+} from "../ai/prompts/classification.ts";
+import { CLASSIFIER_PROMPT } from "../ai/prompts/classifier.prompt.ts";
 
 function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -30,12 +30,13 @@ test("v2 classifier message uses classifier prompt contract", () => {
   assert.ok(message.includes(CLASSIFIER_PROMPT));
 });
 
-test("router includes v2 system and formatter layers with feature-flag fallback", () => {
+test("router includes top-level system and formatter layers", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
 
   assert.match(source, /PROMPTS\.system/);
   assert.match(source, /PROMPTS\.formatter/);
-  assert.match(source, /process\.env\.PROMPTS_V2_ENABLED !== "0"/);
+  assert.doesNotMatch(source, /PROMPTS_V2_ENABLED/);
+  assert.doesNotMatch(source, /CHAT_SYSTEM_PROMPT/);
 });
 
 test("graph state defines v2 task category with general default", () => {
@@ -46,10 +47,9 @@ test("graph state defines v2 task category with general default", () => {
   assert.match(source, /default: \(\) => "general"/);
 });
 
-test("classification node emits prompt routing telemetry when v2 is enabled", () => {
+test("classification node emits prompt routing telemetry", () => {
   const source = readWorkspaceFile("ai/graph/nodes.ts");
 
   assert.match(source, /event: "promptRouting\.decision"/);
-  assert.match(source, /promptsV2Enabled/);
   assert.match(source, /specialistPrompt/);
 });

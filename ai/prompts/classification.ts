@@ -1,5 +1,5 @@
 import { CLASSIFIER_PROMPT } from "./classifier.prompt.ts";
-import type { PromptTaskCategory } from "../../graph/state.ts";
+import type { PromptTaskCategory } from "@/ai/graph/state";
 
 const ALLOWED_TASK_CATEGORIES: ReadonlySet<PromptTaskCategory> = new Set([
   "coding",

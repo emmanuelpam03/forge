@@ -27,15 +27,11 @@ import {
 import {
   buildTaskCategoryClassificationMessage,
   parseTaskCategory,
-} from "@/ai/prompts/v2/classification";
-import { PROMPTS } from "@/ai/prompts/v2/promptRegistry";
+} from "@/ai/prompts/classification";
+import { PROMPTS } from "@/ai/prompts/promptRegistry";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
-
-function isPromptsV2Enabled(): boolean {
-  return process.env.PROMPTS_V2_ENABLED !== "0";
-}
 
 export function normalizeAssistantResponseText(text: string): string {
   const commonStopWords = new Set([
@@ -190,8 +186,7 @@ export async function refineAssistantResponseText(
 
   try {
     const model = createGeminiModel();
-    const selfImproveLayer = isPromptsV2Enabled() ? `${PROMPTS.selfImprove}\n\n` : "";
-    const prompt = `${selfImproveLayer}Rewrite the text below so it is clean, readable, and professionally formatted.
+    const prompt = `${PROMPTS.selfImprove}\n\nRewrite the text below so it is clean, readable, and professionally formatted.
 
 Rules:
   - Fix spelling, spacing, punctuation, capitalization, and every obvious word break.
@@ -1228,30 +1223,25 @@ export async function classifyIntentNode(state: ChatGraphState) {
     const classificationPrompt = buildFreshnessClassificationMessage(
       state.userMessage,
     );
-    const promptsV2Enabled = isPromptsV2Enabled();
-    const taskCategoryPrompt = promptsV2Enabled
-      ? buildTaskCategoryClassificationMessage(state.userMessage)
-      : "";
+    const taskCategoryPrompt = buildTaskCategoryClassificationMessage(
+      state.userMessage,
+    );
 
     let classifiedIntent = null;
     let taskCategory = state.taskCategory ?? "general";
     try {
       const [freshnessResponse, taskCategoryResponse] = await Promise.all([
         model.invoke([new HumanMessage(classificationPrompt)]),
-        promptsV2Enabled
-          ? model.invoke([new HumanMessage(taskCategoryPrompt)])
-          : Promise.resolve(null),
+        model.invoke([new HumanMessage(taskCategoryPrompt)]),
       ]);
 
       classifiedIntent = parseClassificationText(
         toTextContent(freshnessResponse.content),
       );
 
-      if (taskCategoryResponse) {
-        taskCategory = parseTaskCategory(
-          toTextContent(taskCategoryResponse.content),
-        );
-      }
+      taskCategory = parseTaskCategory(
+        toTextContent(taskCategoryResponse.content),
+      );
     } catch (classificationError) {
       console.warn(
         "Intent classification model call failed:",
@@ -1269,29 +1259,26 @@ export async function classifyIntentNode(state: ChatGraphState) {
         queryIntent,
         classifiedIntent,
         taskCategory,
-        promptsV2Enabled,
         message: state.userMessage,
       }),
     );
 
-    if (promptsV2Enabled) {
-      console.info(
-        JSON.stringify({
-          event: "promptRouting.decision",
-          chatId: hashIdentifierForLogging(state.chatId),
-          runId: hashIdentifierForLogging(state.runId),
-          taskCategory,
-          specialistPrompt:
-            taskCategory === "coding"
-              ? "coding"
-              : taskCategory === "reasoning" || taskCategory === "explanation"
-                ? "reasoning"
-                : taskCategory === "planning" || taskCategory === "trading"
-                  ? "planning"
-                  : "system",
-        }),
-      );
-    }
+    console.info(
+      JSON.stringify({
+        event: "promptRouting.decision",
+        chatId: hashIdentifierForLogging(state.chatId),
+        runId: hashIdentifierForLogging(state.runId),
+        taskCategory,
+        specialistPrompt:
+          taskCategory === "coding"
+            ? "coding"
+            : taskCategory === "reasoning" || taskCategory === "explanation"
+              ? "reasoning"
+              : taskCategory === "planning" || taskCategory === "trading"
+                ? "planning"
+                : "system",
+      }),
+    );
 
     return {
       intent: classifiedIntent?.intent ?? queryIntent.type,
