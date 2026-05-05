@@ -59,7 +59,10 @@ test("router defines response mode mapping for key categories", () => {
 
   assert.match(source, /case "coding":\s*return "code"/);
   assert.match(source, /case "trading":\s*return "factual"/);
-  assert.match(source, /case "reasoning":\s*case "explanation":\s*return "reasoning"/);
+  assert.match(
+    source,
+    /case "reasoning":\s*case "explanation":\s*return "reasoning"/,
+  );
 });
 
 test("router includes creative fallback and RESPONSE MODE instruction", () => {

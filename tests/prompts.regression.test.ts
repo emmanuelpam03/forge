@@ -30,10 +30,15 @@ test("formatter and specialist prompts remain available at top level", () => {
   assert.ok(PROMPTS.coding.trim().length > 0);
   assert.ok(PROMPTS.reasoning.trim().length > 0);
   assert.ok(PROMPTS.planning.trim().length > 0);
-  assert.match(PROMPTS.formatter, /TOKEN INTEGRITY RULES/);
+  // Formatter should enforce OUTPUT DISCIPLINE, not just describe it
+  assert.match(PROMPTS.formatter, /OUTPUT DISCIPLINE/);
+  assert.match(PROMPTS.formatter, /No filler, preambles/);
+  assert.match(PROMPTS.formatter, /No malformed tokens/);
+  assert.match(PROMPTS.formatter, /No vague hedging/);
+  // Should guide on response modes and code blocks
+  assert.match(PROMPTS.formatter, /RESPONSE MODE MAPPING/);
   assert.match(PROMPTS.formatter, /one command per line/);
-  assert.match(PROMPTS.formatter, /Do not insert spaces before punctuation marks/);
-  assert.match(PROMPTS.formatter, /keep 'Next\.js', not 'Next\. js'/);
+  assert.match(PROMPTS.formatter, /Keep commands copy-paste safe/);
 });
 
 test("intent classifier prompt contract remains strict and token-only", () => {
