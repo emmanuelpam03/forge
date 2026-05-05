@@ -1534,9 +1534,9 @@ export function ChatClient({
         </div>
       </div>
 
-      <div className="relative z-10 border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
-        <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-card px-3 py-2.5">
-          <div className="flex items-end gap-2">
+      <div className="fixed inset-x-0 bottom-6 z-50 pointer-events-none">
+        <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
+          <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
             <textarea
               ref={textareaRef}
               value={draft}
@@ -1547,30 +1547,34 @@ export function ChatClient({
                   void sendMessage();
                 }
               }}
-              placeholder="Message Forge"
+              placeholder="Ask anything"
               rows={1}
               disabled={isSending}
-              className="max-h-40 min-h-6 flex-1 resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              className="max-h-40 min-h-6 w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground px-2 py-1"
             />
-            {isSending ? (
-              <button
-                onClick={stopGeneration}
-                className="rounded-lg bg-destructive/20 p-2 text-destructive transition hover:bg-destructive/30"
-                title="Stop generation"
-              >
-                <Square size={14} />
-              </button>
-            ) : (
-              <button
-                onClick={() => void sendMessage()}
-                disabled={!draft.trim()}
-                className="rounded-lg bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <ArrowUp size={14} />
-              </button>
-            )}
+
+            <div className="flex items-center gap-2">
+              {isSending ? (
+                <button
+                  onClick={stopGeneration}
+                  className="rounded-full bg-destructive/20 p-2 text-destructive transition hover:bg-destructive/30"
+                  title="Stop generation"
+                >
+                  <Square size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => void sendMessage()}
+                  disabled={!draft.trim()}
+                  className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <ArrowUp size={16} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+
+          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground px-3">
             <p>Enter to send. Shift+Enter for a new line.</p>
             {lastUserMessage && error && (
               <button
@@ -1583,7 +1587,7 @@ export function ChatClient({
             )}
           </div>
           {error ? (
-            <p className="mt-2 text-[11px] text-red-400">{error}</p>
+            <p className="mt-2 text-[11px] text-red-400 px-3">{error}</p>
           ) : null}
         </div>
       </div>

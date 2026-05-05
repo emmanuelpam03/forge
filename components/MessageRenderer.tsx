@@ -10,17 +10,20 @@ type MessageRendererProps = {
   isStreaming?: boolean;
 };
 
-export function MessageRenderer({ content, isStreaming }: MessageRendererProps) {
+export function MessageRenderer({
+  content,
+  isStreaming,
+}: MessageRendererProps) {
   const components = useMemo<Components>(
     () => ({
       h1: ({ children }) => (
         <h1
-          className="mb-4 mt-7 first:mt-0"
+          className="mb-6 mt-8 first:mt-0"
           style={{
-            fontSize: "1.6rem",
-            fontWeight: 600,
+            fontSize: "1.8rem",
+            fontWeight: 700,
             letterSpacing: "-0.04em",
-            color: "rgba(255,255,255,0.92)",
+            color: "rgba(255,255,255,0.95)",
             fontFamily: "var(--font-manrope), sans-serif",
           }}
         >
@@ -29,12 +32,12 @@ export function MessageRenderer({ content, isStreaming }: MessageRendererProps) 
       ),
       h2: ({ children }) => (
         <h2
-          className="mb-3 mt-6 first:mt-0"
+          className="mb-4 mt-6 first:mt-0"
           style={{
-            fontSize: "1.25rem",
+            fontSize: "1.3rem",
             fontWeight: 600,
             letterSpacing: "-0.03em",
-            color: "rgba(255,255,255,0.9)",
+            color: "rgba(255,255,255,0.92)",
             fontFamily: "var(--font-manrope), sans-serif",
           }}
         >
@@ -92,8 +95,9 @@ export function MessageRenderer({ content, isStreaming }: MessageRendererProps) 
         <div
           className="mb-4 last:mb-0"
           style={{
-            lineHeight: "1.75",
-            color: "rgba(255,255,255,0.78)",
+            lineHeight: "1.85",
+            color: "rgba(255,255,255,0.82)",
+            fontSize: "1rem",
           }}
         >
           {children}
@@ -128,12 +132,12 @@ export function MessageRenderer({ content, isStreaming }: MessageRendererProps) 
       ),
       blockquote: ({ children }) => (
         <blockquote
-          className="mb-4 px-4 py-3 italic"
+          className="mb-6 px-5 py-4 italic"
           style={{
-            borderLeft: "3px solid rgba(251,191,36,0.4)",
-            background: "rgba(251,191,36,0.04)",
-            borderRadius: "0 10px 10px 0",
-            color: "rgba(255,255,255,0.6)",
+            borderLeft: "4px solid rgba(251,191,36,0.6)",
+            background: "rgba(251,191,36,0.03)",
+            borderRadius: "0 12px 12px 0",
+            color: "rgba(255,255,255,0.75)",
           }}
         >
           {children}
@@ -156,7 +160,9 @@ export function MessageRenderer({ content, isStreaming }: MessageRendererProps) 
         </div>
       ),
       thead: ({ children }) => (
-        <thead style={{ background: "rgba(255,255,255,0.04)" }}>{children}</thead>
+        <thead style={{ background: "rgba(255,255,255,0.04)" }}>
+          {children}
+        </thead>
       ),
       tbody: ({ children }) => (
         <tbody style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
