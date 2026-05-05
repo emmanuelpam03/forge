@@ -208,8 +208,9 @@ export function createGeminiModel() {
       parts: [{ text: msg.content as string }],
     }));
 
-    // Use native streaming with generateContentStream
-    const stream = nativeModel.generateContentStream({
+    // Use native streaming with generateContentStream and return the actual
+    // chunk iterator so callers can forward tokens as they arrive.
+    const stream = await nativeModel.generateContentStream({
       systemInstruction,
       contents,
       generationConfig: {
@@ -217,7 +218,7 @@ export function createGeminiModel() {
       },
     });
 
-    return stream;
+    return stream.stream;
   };
 
   return model;
