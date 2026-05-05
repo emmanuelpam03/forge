@@ -816,7 +816,6 @@ export function ChatClient({
 
           try {
             const event = JSON.parse(line) as StreamEvent;
-            console.info("EVENT:", event);
 
             if (event.type === "reasoning") {
               applyReasoning(event.content);
@@ -1089,7 +1088,6 @@ export function ChatClient({
 
           try {
             const event = JSON.parse(line) as StreamEvent;
-            console.info("EVENT:", event);
 
             if (event.type === "placeholder") {
               applyPlaceholder(event);
@@ -1350,7 +1348,6 @@ export function ChatClient({
 
             try {
               const event = JSON.parse(line) as StreamEvent;
-              console.info("EVENT:", event);
 
               if (event.type === "reasoning") {
                 applyReasoning(event.content);

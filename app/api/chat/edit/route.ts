@@ -80,16 +80,6 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       start(controller) {
         const send = (event: StreamEvent) => {
-          if (event.type === "status") {
-            console.info("STATUS:", event.message);
-          }
-          if (event.type === "token") {
-            console.info("TOKEN:", event.content);
-          }
-          if (event.type === "done") {
-            console.info("DONE");
-          }
-
           controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
         };
 

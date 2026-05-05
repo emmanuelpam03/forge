@@ -149,7 +149,6 @@ export async function runChatGraphStream(
   let outputTokens = 0;
 
   try {
-    console.info("STATUS:", "Writing response...");
     onEvent?.({ type: "status", message: "Generating response..." });
     let firstTokenAt: number | null = null;
 
@@ -208,14 +207,12 @@ export async function runChatGraphStream(
         /^[A-Za-z0-9\(\[]/.test(nextFirst);
       const emitted = needsSpace ? ` ${chunkText}` : chunkText;
       assistantMessage += emitted;
-      console.info("TOKEN:", emitted);
       onEvent?.({ type: "token", content: emitted });
     }
 
     if (!assistantMessage.trim()) {
       assistantMessage =
         "I encountered an issue generating a response. Please try again or rephrase your question.";
-      console.info("TOKEN:", assistantMessage);
       onEvent?.({ type: "token", content: assistantMessage });
     }
 

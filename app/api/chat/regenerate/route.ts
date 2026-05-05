@@ -105,15 +105,7 @@ export async function POST(request: NextRequest) {
             return false;
           }
 
-          if (event.type === "status") {
-            console.info("STATUS:", event.message);
-          }
-          if (event.type === "token") {
-            console.info("TOKEN:", event.content);
-          }
-          if (event.type === "done") {
-            console.info("DONE");
-          }
+          // Verbose event logging removed for cleaner console output
 
           try {
             controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));

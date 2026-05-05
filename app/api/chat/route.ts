@@ -49,18 +49,8 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          if (event.type === "status") {
-            console.info("STATUS:", event.message);
-          }
-          if (event.type === "reasoning") {
-            console.info("REASONING:", event.content);
-          }
-          if (event.type === "token") {
-            console.info("TOKEN:", event.content);
-          }
-          if (event.type === "done") {
-            console.info("DONE");
-          }
+          // Verbose event logging removed for cleaner console output;
+          // use DEBUG_STREAM=1 env var for detailed streaming diagnostics if needed.
 
           try {
             controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
