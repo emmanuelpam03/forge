@@ -23,6 +23,27 @@ function resolveSpecialistPrompt(state: ChatGraphState): string {
   }
 }
 
+function resolveResponseMode(state: ChatGraphState): string {
+  // Map internal task categories / intents to a concise response mode
+  switch (state.taskCategory) {
+    case "coding":
+      return "code";
+    case "reasoning":
+    case "explanation":
+      return "reasoning";
+    case "planning":
+      return "reasoning";
+    case "trading":
+      return "factual";
+    default:
+      // If intent explicitly requests creativity, prefer creative
+      if (state.intent && /creative|story|poem|generate/i.test(state.intent)) {
+        return "creative";
+      }
+      return "chat";
+  }
+}
+
 function formatPreferences(state: ChatGraphState): string {
   if (state.preferences.length === 0) {
     return "No saved preferences.";
@@ -152,6 +173,8 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const systemPrompt = [
     PROMPTS.system,
     topicTemplateLayer,
+    // Short instruction that tells the formatter which high-level response shape to produce.
+    `RESPONSE MODE: ${resolveResponseMode(state)} — Format the answer accordingly (one of: code, factual, reasoning, creative, chat).`,
     PROMPTS.formatter,
     context,
   ]

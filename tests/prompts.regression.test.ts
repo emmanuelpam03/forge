@@ -30,6 +30,10 @@ test("formatter and specialist prompts remain available at top level", () => {
   assert.ok(PROMPTS.coding.trim().length > 0);
   assert.ok(PROMPTS.reasoning.trim().length > 0);
   assert.ok(PROMPTS.planning.trim().length > 0);
+  assert.match(PROMPTS.formatter, /TOKEN INTEGRITY RULES/);
+  assert.match(PROMPTS.formatter, /one command per line/);
+  assert.match(PROMPTS.formatter, /Do not insert spaces before punctuation marks/);
+  assert.match(PROMPTS.formatter, /keep 'Next\.js', not 'Next\. js'/);
 });
 
 test("intent classifier prompt contract remains strict and token-only", () => {
