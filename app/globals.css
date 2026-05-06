@@ -71,12 +71,12 @@
   --popover: oklch(0.998 0.004 75);
   --popover-foreground: oklch(0.18 0.018 60);
 
-  /* Primary — balanced green, the hero accent */
-  --primary: oklch(0.62 0.14 154);
-  --primary-foreground: oklch(0.985 0.01 150);
+  /* Primary — vibrant green accent for light mode */
+  --primary: oklch(0.52 0.16 154);
+  --primary-foreground: oklch(0.98 0.01 150);
   /* Darker primary for CTA buttons */
-  --primary-dark: oklch(0.52 0.14 154);
-  --primary-dark-foreground: oklch(0.985 0.01 150);
+  --primary-dark: oklch(0.44 0.17 154);
+  --primary-dark-foreground: oklch(0.98 0.01 150);
 
   /* Secondary — warm sand */
   --secondary: oklch(0.93 0.018 75);
@@ -84,7 +84,7 @@
 
   /* Muted — light warm grey for backgrounds */
   --muted: oklch(0.935 0.014 78);
-  --muted-foreground: oklch(0.48 0.022 68);
+  --muted-foreground: oklch(0.42 0.025 68);
 
   /* Accent — warm cream hover state */
   --accent: oklch(0.93 0.022 76);
@@ -100,10 +100,10 @@
   --input: oklch(0.955 0.012 78);
 
   /* Focus ring — green */
-  --ring: oklch(0.62 0.14 154);
+  --ring: oklch(0.52 0.16 154);
 
   /* Charts — green family */
-  --chart-1: oklch(0.62 0.14 154);
+  --chart-1: oklch(0.52 0.16 154);
   --chart-2: oklch(0.59 0.13 168);
   --chart-3: oklch(0.68 0.11 142);
   --chart-4: oklch(0.71 0.09 182);
@@ -114,23 +114,23 @@
   /* Sidebar — slightly cooler than page bg, warm white */
   --sidebar: oklch(0.968 0.01 78);
   --sidebar-foreground: oklch(0.18 0.018 60);
-  --sidebar-primary: oklch(0.62 0.14 154);
-  --sidebar-primary-foreground: oklch(0.985 0.01 150);
+  --sidebar-primary: oklch(0.52 0.16 154);
+  --sidebar-primary-foreground: oklch(0.98 0.01 150);
   --sidebar-accent: oklch(0.93 0.022 76);
   --sidebar-accent-foreground: oklch(0.22 0.02 65);
   --sidebar-border: oklch(0.885 0.016 78);
-  --sidebar-ring: oklch(0.62 0.14 154);
+  --sidebar-ring: oklch(0.52 0.16 154);
 
   /* Message content colors — light mode */
   --message-heading: oklch(0.18 0.018 60);
   --message-text: oklch(0.2 0.015 60);
-  --message-link: oklch(0.5 0.13 154);
-  --message-link-hover: oklch(0.44 0.14 154);
-  --message-blockquote-border: oklch(0.62 0.14 154 / 0.5);
-  --message-blockquote-bg: oklch(0.62 0.14 154 / 0.05);
-  --message-code-bg: oklch(0.62 0.14 154 / 0.08);
-  --message-code-border: oklch(0.62 0.14 154 / 0.2);
-  --message-code-text: oklch(0.46 0.12 154);
+  --message-link: oklch(0.42 0.15 154);
+  --message-link-hover: oklch(0.35 0.16 154);
+  --message-blockquote-border: oklch(0.52 0.16 154 / 0.6);
+  --message-blockquote-bg: oklch(0.52 0.16 154 / 0.08);
+  --message-code-bg: oklch(0.52 0.16 154 / 0.1);
+  --message-code-border: oklch(0.52 0.16 154 / 0.25);
+  --message-code-text: oklch(0.35 0.16 154);
   --message-table-border: oklch(0.88 0.018 78);
   --message-table-hover: oklch(0.93 0.015 78);
 }
