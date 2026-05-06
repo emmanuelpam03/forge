@@ -1459,7 +1459,7 @@ export function ChatClient({
         </span>
       </div>
 
-      <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5">
+      <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-40">
         <div className="mx-auto w-full max-w-4xl space-y-4">
           {showSuggestionsPanel ? (
             <div className="space-y-3">

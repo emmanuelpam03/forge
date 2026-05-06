@@ -52,6 +52,7 @@ export default function HomePage() {
 
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSend = async () => {
     const message = input.trim();
@@ -65,6 +66,7 @@ export default function HomePage() {
     }
 
     try {
+      setError("");
       setIsCreatingChat(true);
       const { createChat, updateChat } = await import("@/lib/actions/chats");
 
@@ -98,6 +100,7 @@ export default function HomePage() {
       const description =
         error instanceof Error ? error.message : "Failed to create chat";
 
+      setError(description);
       showFeedback({
         type: "error",
         title: "Error",
@@ -238,110 +241,59 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Input */}
-          <div
-            className="flex items-center gap-3 transition-all duration-200 focus-within:ring-2"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.09)",
-              borderRadius: "14px",
-              padding: "10px 12px",
-              // @ts-ignore
-              "--tw-ring-color": "rgba(251,191,36,0.2)",
-            }}
-            onFocus={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor =
-                "rgba(251,191,36,0.3)";
-              (e.currentTarget as HTMLElement).style.background =
-                "rgba(255,255,255,0.055)";
-            }}
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                (e.currentTarget as HTMLElement).style.borderColor =
-                  "rgba(255,255,255,0.09)";
-                (e.currentTarget as HTMLElement).style.background =
-                  "rgba(255,255,255,0.04)";
-              }
-            }}
-          >
-            <ForgeLogo
-              className="h-4 w-4 shrink-0"
-              style={{ color: "rgba(251,191,36,0.5)" } as React.CSSProperties}
-            />
-
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Message Forge…"
-              disabled={isCreatingChat}
-              className="flex-1 bg-transparent text-[13.5px] text-foreground outline-none"
-              style={{
-                color: "rgba(255,255,255,0.88)",
-              }}
-            />
-
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                className="rounded-lg p-1.5 transition-colors"
-                style={{ color: "rgba(255,255,255,0.3)" }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.color =
-                    "rgba(255,255,255,0.7)";
-                  (e.currentTarget as HTMLElement).style.background =
-                    "rgba(255,255,255,0.06)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.color =
-                    "rgba(255,255,255,0.3)";
-                  (e.currentTarget as HTMLElement).style.background =
-                    "transparent";
-                }}
-              >
-                <Mic size={13} />
-              </button>
-
-              <button
-                onClick={handleSend}
-                disabled={isCreatingChat}
-                className="flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-150"
-                style={
-                  isCreatingChat
-                    ? {
-                        background: "rgba(255,255,255,0.06)",
-                        color: "rgba(255,255,255,0.25)",
-                      }
-                    : input.trim()
-                      ? {
-                          background:
-                            "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                          color: "#1a1208",
-                          boxShadow: "0 2px 8px rgba(251,191,36,0.3)",
-                        }
-                      : {
-                          background: "rgba(255,255,255,0.06)",
-                          color: "rgba(255,255,255,0.25)",
-                        }
-                }
-              >
-                {isCreatingChat ? (
-                  <span
-                    className="block h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
-                    style={{ borderColor: "rgba(255,255,255,0.3)" }}
-                  />
-                ) : (
-                  <ArrowUp size={13} />
-                )}
-              </button>
-            </div>
-          </div>
+          {/* Placeholder for floating input to render below */}
         </div>
 
         {/* Footer */}
         <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.2)" }}>
           Forge can make mistakes. Verify important information.
         </p>
+      </div>
+
+      {/* Floating Input (same as chat page) */}
+      <div className="fixed inset-x-0 bottom-6 z-50 pointer-events-none">
+        <div className="mx-auto w-full max-w-[26rem] px-6 pointer-events-auto">
+          <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
+            <input
+              type="text"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && void handleSend()}
+              placeholder="Ask anything"
+              disabled={isCreatingChat}
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+
+            <div className="flex items-center gap-2">
+              {isCreatingChat ? (
+                <button
+                  className="rounded-full bg-muted/50 p-2 text-muted-foreground cursor-not-allowed"
+                  disabled
+                >
+                  <span
+                    className="block h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
+                    style={{ borderColor: "currentColor" }}
+                  />
+                </button>
+              ) : (
+                <button
+                  onClick={() => void handleSend()}
+                  disabled={!input.trim()}
+                  className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <ArrowUp size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground px-3">
+            <p>Enter to send.</p>
+          </div>
+          {error ? (
+            <p className="mt-2 text-[11px] text-red-400 px-3">{error}</p>
+          ) : null}
+        </div>
       </div>
     </div>
   );
