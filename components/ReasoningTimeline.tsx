@@ -30,9 +30,9 @@ export function ReasoningTimeline({
     <div
       className="overflow-hidden"
       style={{
-        border: "1px solid rgba(255,255,255,0.07)",
+        border: "1px solid var(--border)",
         borderRadius: "14px",
-        background: "rgba(255,255,255,0.02)",
+        background: "var(--card)",
       }}
     >
       {/* Toggle header */}
@@ -41,11 +41,11 @@ export function ReasoningTimeline({
         onClick={() => onExpandedChange?.(!expanded)}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors"
         style={{
-          borderBottom: expanded ? "1px solid rgba(255,255,255,0.06)" : "none",
+          borderBottom: expanded ? "1px solid var(--border)" : "none",
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background =
-            "rgba(255,255,255,0.025)";
+          (e.currentTarget as HTMLElement).style.background = "var(--accent)";
+          (e.currentTarget as HTMLElement).style.opacity = "0.05";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLElement).style.background = "transparent";
@@ -72,16 +72,23 @@ export function ReasoningTimeline({
             style={{
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              color: "rgba(255,255,255,0.4)",
+              color: "var(--foreground)",
+              opacity: 0.5,
             }}
           >
             {expanded ? "Hide reasoning" : "View reasoning"}
           </span>
         </span>
         {expanded ? (
-          <ChevronUp size={13} style={{ color: "rgba(255,255,255,0.3)" }} />
+          <ChevronUp
+            size={13}
+            style={{ color: "var(--foreground)", opacity: 0.3 }}
+          />
         ) : (
-          <ChevronDown size={13} style={{ color: "rgba(255,255,255,0.3)" }} />
+          <ChevronDown
+            size={13}
+            style={{ color: "var(--foreground)", opacity: 0.3 }}
+          />
         )}
       </button>
 
@@ -101,7 +108,7 @@ export function ReasoningTimeline({
                 />
                 <span
                   className="text-[13px]"
-                  style={{ color: "rgba(255,255,255,0.65)" }}
+                  style={{ color: "var(--foreground)" }}
                 >
                   {step}
                 </span>
@@ -111,7 +118,11 @@ export function ReasoningTimeline({
         ) : (
           <p
             className="text-[13px]"
-            style={{ lineHeight: "1.65", color: "rgba(255,255,255,0.55)" }}
+            style={{
+              lineHeight: "1.65",
+              color: "var(--foreground)",
+              opacity: 0.7,
+            }}
           >
             {latestStep}
           </p>

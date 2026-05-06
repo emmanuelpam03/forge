@@ -81,9 +81,6 @@ export default async function ProjectPage({
                     />
                     <span className="truncate">{chat.title}</span>
                   </span>
-                  <p className="mt-1 truncate text-[12px] text-muted-foreground">
-                    {chat.summary || "No summary yet"}
-                  </p>
                 </div>
 
                 <span className="text-[12px] text-muted-foreground">

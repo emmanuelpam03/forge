@@ -14,7 +14,6 @@ export default async function Sidebar() {
   const chatsData: ChatItemData[] = chats.map((c) => ({
     id: c.id,
     title: c.title,
-    summary: c.summary,
   }));
 
   return (

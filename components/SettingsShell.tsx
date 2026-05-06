@@ -45,9 +45,9 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
           <div
             className="sticky top-4"
             style={{
-              border: "1px solid rgba(255,255,255,0.07)",
+              border: "1px solid var(--border)",
               borderRadius: "18px",
-              background: "rgba(255,255,255,0.025)",
+              background: "var(--card)",
               padding: "12px",
             }}
           >
@@ -56,7 +56,8 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                 className="text-[10px] font-semibold uppercase"
                 style={{
                   letterSpacing: "0.16em",
-                  color: "rgba(255,255,255,0.22)",
+                  color: "var(--foreground)",
+                  opacity: 0.4,
                 }}
               >
                 Settings
@@ -65,7 +66,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                 className="mt-1 text-[17px] font-semibold"
                 style={{
                   letterSpacing: "-0.03em",
-                  color: "rgba(255,255,255,0.88)",
+                  color: "var(--foreground)",
                   fontFamily: "var(--font-manrope), sans-serif",
                 }}
               >
@@ -90,28 +91,29 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                         ? {
                             background: "rgba(251,191,36,0.08)",
                             border: "1px solid rgba(251,191,36,0.18)",
-                            color: "rgba(255,255,255,0.92)",
+                            color: "var(--foreground)",
                           }
                         : {
                             background: "transparent",
                             border: "1px solid transparent",
-                            color: "rgba(255,255,255,0.4)",
+                            color: "var(--foreground)",
+                            opacity: 0.5,
                           }
                     }
                     onMouseEnter={(e) => {
                       if (!isActive) {
                         (e.currentTarget as HTMLElement).style.background =
-                          "rgba(255,255,255,0.04)";
-                        (e.currentTarget as HTMLElement).style.color =
-                          "rgba(255,255,255,0.7)";
+                          "var(--accent)";
+                        (e.currentTarget as HTMLElement).style.opacity = "0.8";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
                         (e.currentTarget as HTMLElement).style.background =
                           "transparent";
-                        (e.currentTarget as HTMLElement).style.color =
-                          "rgba(255,255,255,0.4)";
+                        (e.currentTarget as HTMLElement).style.opacity = "0.5";
+                      }
+                    }}
                       }
                     }}
                   >
@@ -132,7 +134,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                     </span>
                     <ChevronRight
                       size={12}
-                      style={{ color: "rgba(255,255,255,0.2)", flexShrink: 0 }}
+                      style={{ color: "var(--foreground)", opacity: 0.2, flexShrink: 0 }}
                     />
                   </Link>
                 );

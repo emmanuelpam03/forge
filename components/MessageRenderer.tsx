@@ -23,7 +23,7 @@ export function MessageRenderer({
             fontSize: "1.8rem",
             fontWeight: 700,
             letterSpacing: "-0.04em",
-            color: "rgba(255,255,255,0.95)",
+            color: "var(--message-heading)",
             fontFamily: "var(--font-manrope), sans-serif",
           }}
         >
@@ -37,7 +37,7 @@ export function MessageRenderer({
             fontSize: "1.3rem",
             fontWeight: 600,
             letterSpacing: "-0.03em",
-            color: "rgba(255,255,255,0.92)",
+            color: "var(--message-heading)",
             fontFamily: "var(--font-manrope), sans-serif",
           }}
         >
@@ -51,7 +51,7 @@ export function MessageRenderer({
             fontSize: "1.05rem",
             fontWeight: 600,
             letterSpacing: "-0.02em",
-            color: "rgba(255,255,255,0.88)",
+            color: "var(--message-heading)",
             fontFamily: "var(--font-manrope), sans-serif",
           }}
         >
@@ -65,7 +65,7 @@ export function MessageRenderer({
             fontSize: "0.95rem",
             fontWeight: 600,
             letterSpacing: "-0.01em",
-            color: "rgba(255,255,255,0.86)",
+            color: "var(--message-heading)",
           }}
         >
           {children}
@@ -74,7 +74,7 @@ export function MessageRenderer({
       h5: ({ children }) => (
         <h5
           className="mb-2 mt-4 text-base font-semibold first:mt-0"
-          style={{ color: "rgba(255,255,255,0.84)" }}
+          style={{ color: "var(--message-heading)" }}
         >
           {children}
         </h5>
@@ -85,7 +85,7 @@ export function MessageRenderer({
           style={{
             textTransform: "uppercase",
             letterSpacing: "0.12em",
-            color: "rgba(255,255,255,0.4)",
+            color: "var(--muted-foreground)",
           }}
         >
           {children}
@@ -96,7 +96,7 @@ export function MessageRenderer({
           className="mb-4 last:mb-0"
           style={{
             lineHeight: "1.85",
-            color: "rgba(255,255,255,0.82)",
+            color: "var(--message-text)",
             fontSize: "1rem",
           }}
         >
@@ -108,7 +108,7 @@ export function MessageRenderer({
           className="mb-4 ml-6 space-y-2"
           style={{
             listStyleType: "disc",
-            color: "rgba(255,255,255,0.78)",
+            color: "var(--message-text)",
           }}
         >
           {children}
@@ -119,7 +119,7 @@ export function MessageRenderer({
           className="mb-4 ml-6 space-y-2"
           style={{
             listStyleType: "decimal",
-            color: "rgba(255,255,255,0.78)",
+            color: "var(--message-text)",
           }}
         >
           {children}
@@ -134,10 +134,10 @@ export function MessageRenderer({
         <blockquote
           className="mb-6 px-5 py-4 italic"
           style={{
-            borderLeft: "4px solid rgba(251,191,36,0.6)",
-            background: "rgba(251,191,36,0.03)",
+            borderLeft: "4px solid var(--message-blockquote-border)",
+            background: "var(--message-blockquote-bg)",
             borderRadius: "0 12px 12px 0",
-            color: "rgba(255,255,255,0.75)",
+            color: "var(--message-text)",
           }}
         >
           {children}
@@ -147,37 +147,37 @@ export function MessageRenderer({
         <div
           className="mb-4 overflow-x-auto"
           style={{
-            border: "1px solid rgba(255,255,255,0.08)",
+            border: "1px solid var(--message-table-border)",
             borderRadius: "12px",
           }}
         >
           <table
             className="w-full border-collapse text-left text-sm"
-            style={{ color: "rgba(255,255,255,0.8)" }}
+            style={{ color: "var(--message-text)" }}
           >
             {children}
           </table>
         </div>
       ),
       thead: ({ children }) => (
-        <thead style={{ background: "rgba(255,255,255,0.04)" }}>
+        <thead style={{ background: "var(--message-table-hover)" }}>
           {children}
         </thead>
       ),
       tbody: ({ children }) => (
-        <tbody style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <tbody style={{ borderTop: "1px solid var(--message-table-border)" }}>
           {children}
         </tbody>
       ),
       tr: ({ children }) => (
         <tr
           style={{
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
+            borderBottom: "1px solid var(--message-table-border)",
             transition: "background 0.1s",
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.background =
-              "rgba(255,255,255,0.025)";
+              "var(--message-table-hover)";
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.background = "transparent";
@@ -192,7 +192,7 @@ export function MessageRenderer({
           style={{
             letterSpacing: "0.06em",
             textTransform: "uppercase",
-            color: "rgba(255,255,255,0.45)",
+            color: "var(--muted-foreground)",
           }}
         >
           {children}
@@ -201,7 +201,7 @@ export function MessageRenderer({
       td: ({ children }) => (
         <td
           className="px-4 py-3 align-top"
-          style={{ color: "rgba(255,255,255,0.72)" }}
+          style={{ color: "var(--message-text)" }}
         >
           {children}
         </td>
@@ -213,15 +213,16 @@ export function MessageRenderer({
           rel="noreferrer"
           className="font-medium underline underline-offset-4 transition-colors"
           style={{
-            color: "rgba(251,191,36,0.85)",
-            textDecorationColor: "rgba(251,191,36,0.3)",
+            color: "var(--message-link)",
+            textDecorationColor: "var(--message-link)",
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "rgba(251,191,36,1)";
+            (e.currentTarget as HTMLElement).style.color =
+              "var(--message-link-hover)";
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.color =
-              "rgba(251,191,36,0.85)";
+              "var(--message-link)";
           }}
         >
           {children}
@@ -241,9 +242,9 @@ export function MessageRenderer({
               {...restProps}
               className="rounded-md px-1.5 py-0.5 font-mono text-[0.875em]"
               style={{
-                background: "rgba(251,191,36,0.08)",
-                border: "1px solid rgba(251,191,36,0.15)",
-                color: "rgba(251,191,36,0.9)",
+                background: "var(--message-code-bg)",
+                border: "1px solid var(--message-code-border)",
+                color: "var(--message-code-text)",
               }}
             >
               {children}
@@ -254,20 +255,17 @@ export function MessageRenderer({
         return <CodeBlock language={language} code={codeText} />;
       },
       hr: () => (
-        <hr
-          className="my-5"
-          style={{ borderColor: "rgba(255,255,255,0.07)" }}
-        />
+        <hr className="my-5" style={{ borderColor: "var(--border)" }} />
       ),
       em: ({ children }) => (
-        <em className="italic" style={{ color: "rgba(255,255,255,0.75)" }}>
+        <em className="italic" style={{ color: "var(--message-text)" }}>
           {children}
         </em>
       ),
       strong: ({ children }) => (
         <strong
           className="font-semibold"
-          style={{ color: "rgba(255,255,255,0.95)" }}
+          style={{ color: "var(--message-heading)" }}
         >
           {children}
         </strong>
@@ -284,7 +282,7 @@ export function MessageRenderer({
       {isStreaming ? (
         <span
           className="ml-0.5 inline-block animate-pulse"
-          style={{ color: "rgba(251,191,36,0.8)" }}
+          style={{ color: "var(--message-link)" }}
         >
           ▍
         </span>

@@ -117,10 +117,23 @@
   --sidebar-accent-foreground: oklch(0.22 0.02 65);
   --sidebar-border: oklch(0.885 0.016 78);
   --sidebar-ring: oklch(0.62 0.15 72);
+
+  /* Message content colors — light mode */
+  --message-heading: oklch(0.18 0.018 60);
+  --message-text: oklch(0.2 0.015 60);
+  --message-link: oklch(0.52 0.14 72);
+  --message-link-hover: oklch(0.45 0.16 70);
+  --message-blockquote-border: oklch(0.62 0.15 72 / 0.5);
+  --message-blockquote-bg: oklch(0.62 0.15 72 / 0.05);
+  --message-code-bg: oklch(0.62 0.15 72 / 0.08);
+  --message-code-border: oklch(0.62 0.15 72 / 0.2);
+  --message-code-text: oklch(0.5 0.13 65);
+  --message-table-border: oklch(0.88 0.018 78);
+  --message-table-hover: oklch(0.93 0.015 78);
 }
 
 /* ─────────────────────────────────────────────
-   DARK MODE — Obsidian × Amber (unchanged)
+   DARK MODE — Obsidian × Amber
 ───────────────────────────────────────────── */
 .dark {
   --background: oklch(0.145 0 0);
@@ -154,6 +167,19 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.72 0.15 72);
+
+  /* Message content colors — dark mode */
+  --message-heading: oklch(0.985 0 0);
+  --message-text: oklch(0.92 0 0);
+  --message-link: oklch(0.72 0.15 72);
+  --message-link-hover: oklch(0.8 0.15 72);
+  --message-blockquote-border: oklch(0.72 0.15 72 / 0.6);
+  --message-blockquote-bg: oklch(0.72 0.15 72 / 0.03);
+  --message-code-bg: oklch(0.72 0.15 72 / 0.08);
+  --message-code-border: oklch(0.72 0.15 72 / 0.2);
+  --message-code-text: oklch(0.72 0.15 72);
+  --message-table-border: oklch(1 0 0 / 10%);
+  --message-table-hover: oklch(1 0 0 / 5%);
 }
 
 @layer base {

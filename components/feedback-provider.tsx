@@ -49,8 +49,8 @@ function feedbackStyles(type: FeedbackType): React.CSSProperties {
     };
   }
   return {
-    background: "rgba(14,12,10,0.97)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: "var(--card)",
+    border: "1px solid var(--border)",
     boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
   };
 }
@@ -58,7 +58,7 @@ function feedbackStyles(type: FeedbackType): React.CSSProperties {
 function accentColor(type: FeedbackType): string {
   if (type === "success") return "rgba(251,191,36,0.9)";
   if (type === "error") return "rgba(239,68,68,0.9)";
-  return "rgba(255,255,255,0.6)";
+  return "var(--sidebar-primary)";
 }
 
 export function FeedbackProvider({ children }: { children: React.ReactNode }) {
@@ -96,14 +96,14 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
               <div>
                 <p
                   className="text-[13px] font-semibold leading-tight"
-                  style={{ color: "rgba(255,255,255,0.92)" }}
+                  style={{ color: "var(--foreground)" }}
                 >
                   {item.title}
                 </p>
                 {item.description ? (
                   <p
                     className="mt-1 text-[12px] leading-snug"
-                    style={{ color: "rgba(255,255,255,0.42)" }}
+                    style={{ color: "var(--foreground)", opacity: 0.6 }}
                   >
                     {item.description}
                   </p>

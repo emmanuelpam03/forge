@@ -42,9 +42,10 @@ const statusStyles: Record<string, React.CSSProperties> = {
     color: "rgba(239,68,68,0.8)",
   },
   canceled: {
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    color: "rgba(255,255,255,0.35)",
+    background: "var(--accent)",
+    border: "1px solid var(--border)",
+    color: "var(--foreground)",
+    opacity: 0.4,
   },
 };
 
@@ -63,9 +64,9 @@ export function TaskSuggestionCard({
     <div
       className="overflow-hidden"
       style={{
-        border: "1px solid rgba(255,255,255,0.08)",
+        border: "1px solid var(--border)",
         borderRadius: "16px",
-        background: "rgba(255,255,255,0.02)",
+        background: "var(--card)",
         boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
       }}
     >
@@ -85,7 +86,11 @@ export function TaskSuggestionCard({
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span
                 className="text-[10px] font-semibold uppercase"
-                style={{ letterSpacing: "0.14em", color: "rgba(255,255,255,0.28)" }}
+                style={{
+                  letterSpacing: "0.14em",
+                  color: "var(--foreground)",
+                  opacity: 0.4,
+                }}
               >
                 Suggested action
               </span>
@@ -106,7 +111,7 @@ export function TaskSuggestionCard({
               className="text-[15px] font-semibold"
               style={{
                 letterSpacing: "-0.02em",
-                color: "rgba(255,255,255,0.9)",
+                color: "var(--foreground)",
                 lineHeight: "1.4",
               }}
             >
@@ -115,14 +120,18 @@ export function TaskSuggestionCard({
 
             <p
               className="mt-2 text-[12.5px]"
-              style={{ color: "rgba(255,255,255,0.45)", lineHeight: "1.6" }}
+              style={{
+                color: "var(--foreground)",
+                opacity: 0.6,
+                lineHeight: "1.6",
+              }}
             >
               {suggestion.action}
             </p>
 
             <p
               className="mt-1 text-[11.5px]"
-              style={{ color: "rgba(255,255,255,0.28)" }}
+              style={{ color: "var(--foreground)", opacity: 0.4 }}
             >
               {formatTaskMeta(suggestion)}
             </p>
@@ -149,7 +158,7 @@ export function TaskSuggestionCard({
         {/* Action buttons */}
         <div
           className="mt-4 flex flex-wrap items-center gap-2 pt-3"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderTop: "1px solid var(--border)" }}
         >
           {status === "approved" ? (
             <button
@@ -158,15 +167,16 @@ export function TaskSuggestionCard({
               disabled={isSubmitting}
               className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[12.5px] font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40"
               style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                color: "rgba(255,255,255,0.7)",
+                background: "var(--accent)",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+                opacity: 0.6,
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLElement).style.opacity = "0.8";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)";
+                (e.currentTarget as HTMLElement).style.opacity = "0.6";
               }}
             >
               <X size={13} />
@@ -180,19 +190,28 @@ export function TaskSuggestionCard({
                 disabled={isSubmitting || isResolved}
                 className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[12.5px] font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.55)",
+                  background: "var(--accent)",
+                  border: "1px solid var(--border)",
+                  color: "var(--foreground)",
+                  opacity: 0.5,
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.06)";
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.2)";
-                  (e.currentTarget as HTMLElement).style.color = "rgba(239,68,68,0.85)";
+                  (e.currentTarget as HTMLElement).style.background =
+                    "rgba(239,68,68,0.06)";
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    "rgba(239,68,68,0.2)";
+                  (e.currentTarget as HTMLElement).style.color =
+                    "rgba(239,68,68,0.85)";
+                  (e.currentTarget as HTMLElement).style.opacity = "1";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
-                  (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.55)";
+                  (e.currentTarget as HTMLElement).style.background =
+                    "var(--accent)";
+                  (e.currentTarget as HTMLElement).style.borderColor =
+                    "var(--border)";
+                  (e.currentTarget as HTMLElement).style.color =
+                    "var(--foreground)";
+                  (e.currentTarget as HTMLElement).style.opacity = "0.5";
                 }}
               >
                 <X size={13} />
@@ -204,7 +223,8 @@ export function TaskSuggestionCard({
                 disabled={isSubmitting || !projectReady || isResolved}
                 className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[12.5px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 style={{
-                  background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                  background:
+                    "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
                   color: "#1a1208",
                   boxShadow: "0 2px 8px rgba(251,191,36,0.25)",
                 }}
