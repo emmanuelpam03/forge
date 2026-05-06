@@ -111,15 +111,17 @@
 
   --radius: 0.625rem;
 
-  /* Sidebar — slightly darker/distinct from page bg, with green accents */
-  --sidebar: oklch(0.94 0.012 78);
+  /* Sidebar — use card color with subtle green tint */
+  --sidebar: oklch(0.962 0.008 78);
   --sidebar-foreground: oklch(0.18 0.018 60);
   --sidebar-primary: oklch(0.52 0.16 154);
   --sidebar-primary-foreground: oklch(0.98 0.01 150);
-  --sidebar-accent: oklch(0.52 0.16 154 / 0.12);
+  --sidebar-accent: oklch(0.52 0.16 154 / 0.08);
   --sidebar-accent-foreground: oklch(0.52 0.16 154);
   --sidebar-border: oklch(0.88 0.016 78);
   --sidebar-ring: oklch(0.52 0.16 154);
+  /* Active row background — lighter, slightly transparent */
+  --sidebar-active: oklch(0.52 0.16 154 / 0.12);
 
   /* Message content colors — light mode */
   --message-heading: oklch(0.18 0.018 60);
@@ -165,14 +167,15 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.155 0 0);
+  --sidebar: oklch(0.195 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.72 0.14 154);
   --sidebar-primary-foreground: oklch(0.12 0.015 154);
-  --sidebar-accent: oklch(0.72 0.14 154 / 0.08);
+  --sidebar-accent: oklch(0.72 0.14 154 / 0.1);
   --sidebar-accent-foreground: oklch(0.72 0.14 154);
-  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-border: oklch(1 0 0 / 15%);
   --sidebar-ring: oklch(0.72 0.14 154);
+  --sidebar-active: oklch(0.72 0.14 154 / 0.08);
 
   /* Message content colors — dark mode */
   --message-heading: oklch(0.985 0 0);

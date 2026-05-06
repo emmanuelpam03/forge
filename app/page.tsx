@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { ArrowUp, Mic, Bookmark, Layers, Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFeedback } from "@/components/feedback-provider";
@@ -49,6 +49,23 @@ const FEATURE_CARDS = [
 export default function HomePage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
+
+  const [greeting, setGreeting] = useState("Hello");
+  const [userName, setUserName] = useState("there");
+
+  // Compute greeting and try to read a stored user name
+  useEffect(() => {
+    try {
+      const name = localStorage.getItem("userName");
+      if (name) setUserName(name);
+    } catch (e) {
+      /* ignore */
+    }
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Morning");
+    else if (hour < 18) setGreeting("Afternoon");
+    else setGreeting("Evening");
+  }, []);
 
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
@@ -172,7 +189,7 @@ export default function HomePage() {
                 fontFamily: "var(--font-manrope), sans-serif",
               }}
             >
-              What will you build today?
+              {greeting.toUpperCase() + ", " + userName}
             </h1>
 
             <p
@@ -282,6 +299,11 @@ export default function HomePage() {
                   <ArrowUp size={16} />
                 </button>
               )}
+            </div>
+            <div className="text-center mt-2">
+              <div className="text-sm font-semibold text-foreground">
+                {greeting.toUpperCase()}, {userName}
+              </div>
             </div>
           </div>
 

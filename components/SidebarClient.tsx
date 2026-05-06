@@ -38,14 +38,14 @@ export type ChatItemData = {
 // ─── Shared style tokens ──────────────────────────────────────────────────────
 
 const sidebarItemBase =
-  "group flex items-center justify-between rounded-xl px-2.5 py-2 text-sm font-medium transition-all duration-150 cursor-pointer";
+  "group flex items-center justify-between rounded-2xl px-2.5 py-2 text-sm font-medium transition-[background-color,border-color,color,opacity,transform,box-shadow] duration-200 ease-out cursor-pointer";
 
 const sidebarItemActive = {
-  background: "var(--sidebar-accent)",
+  background: "var(--sidebar-active)",
   borderWidth: "1px",
   borderStyle: "solid",
-  borderColor: "var(--sidebar-accent)",
-  color: "var(--sidebar-accent-foreground)",
+  borderColor: "var(--sidebar-border)",
+  color: "var(--sidebar-primary-foreground)",
 };
 
 const sidebarItemInactive = {
@@ -54,7 +54,7 @@ const sidebarItemInactive = {
   borderStyle: "solid",
   borderColor: "transparent",
   color: "var(--sidebar-foreground)",
-  opacity: "0.5",
+  opacity: "0.72",
 };
 
 // ─── ProjectItem ──────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ function ProjectItem({
 
   if (isRenaming) {
     return (
-      <div className="flex items-center gap-2 rounded-xl px-2.5 py-2">
+      <div className="flex items-center gap-2 rounded-2xl px-2.5 py-2">
         <Folder
           size={14}
           className="shrink-0"
@@ -133,7 +133,6 @@ function ProjectItem({
       </div>
     );
   }
-
   return (
     <div className="relative">
       <Link
@@ -153,8 +152,11 @@ function ProjectItem({
             }}
           />
           <span
-            className="truncate font-semibold"
-            style={{ letterSpacing: "-0.01em" }}
+            className="block truncate text-base font-semibold leading-tight"
+            style={{
+              letterSpacing: "-0.01em",
+              color: "var(--sidebar-foreground)",
+            }}
           >
             {project.name}
           </span>
@@ -164,10 +166,14 @@ function ProjectItem({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setMenuOpen(!menuOpen);
+            setMenuOpen((v) => !v);
           }}
-          className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-          style={{ color: "var(--sidebar-foreground)", opacity: 0.4 }}
+          className="rounded-lg p-1 opacity-0 transition-[opacity,transform,color] duration-200 ease-out group-hover:opacity-100"
+          style={{
+            color: "var(--sidebar-foreground)",
+            opacity: 0.42,
+            cursor: "pointer",
+          }}
         >
           <MoreHorizontal size={12} />
         </button>
@@ -188,7 +194,7 @@ function ProjectItem({
               setIsRenaming(true);
               setMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-colors"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-[background-color,color,transform] duration-150 ease-out"
             style={{ color: "var(--foreground)" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background =
@@ -201,21 +207,20 @@ function ProjectItem({
             <Pencil size={11} />
             Rename
           </button>
+
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.preventDefault();
-              void handleDelete();
+              await handleDelete();
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-colors"
-            style={{ color: "var(--destructive)" }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-[background-color,color,transform] duration-150 ease-out"
+            style={{ color: "var(--foreground)" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background =
-                `var(--destructive)`;
-              (e.currentTarget as HTMLElement).style.opacity = "0.1";
+                "rgba(239,68,68,0.06)";
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.background = "transparent";
-              (e.currentTarget as HTMLElement).style.opacity = "1";
             }}
           >
             <Trash2 size={11} />
@@ -226,7 +231,6 @@ function ProjectItem({
     </div>
   );
 }
-
 // ─── ChatItem ─────────────────────────────────────────────────────────────────
 
 function ChatItem({
@@ -284,7 +288,7 @@ function ChatItem({
 
   if (isRenaming) {
     return (
-      <div className="flex items-start gap-2 rounded-xl px-2.5 py-2">
+      <div className="flex items-start gap-2 rounded-2xl px-2.5 py-2">
         <MessageSquare
           size={14}
           className="mt-0.5 shrink-0"
@@ -316,6 +320,23 @@ function ChatItem({
           ...(active ? sidebarItemActive : sidebarItemInactive),
           borderBottomColor: "var(--border)",
           marginBottom: "4px",
+          cursor: "pointer",
+        }}
+        onMouseEnter={(e) => {
+          if (!active) {
+            (e.currentTarget as HTMLElement).style.background =
+              "var(--sidebar-accent)";
+            (e.currentTarget as HTMLElement).style.borderColor =
+              "var(--sidebar-border)";
+            (e.currentTarget as HTMLElement).style.opacity = "1";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!active) {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.borderColor = "transparent";
+            (e.currentTarget as HTMLElement).style.opacity = "0.9";
+          }
         }}
       >
         <span className="flex min-w-0 gap-2">
@@ -346,8 +367,12 @@ function ChatItem({
             e.stopPropagation();
             setMenuOpen(!menuOpen);
           }}
-          className="rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-          style={{ color: "var(--sidebar-foreground)", opacity: 0.4 }}
+          className="rounded-lg p-1 opacity-0 transition-[opacity,transform,color] duration-200 ease-out group-hover:opacity-100"
+          style={{
+            color: "var(--sidebar-foreground)",
+            opacity: 0.42,
+            cursor: "pointer",
+          }}
         >
           <MoreHorizontal size={12} />
         </button>
@@ -368,7 +393,7 @@ function ChatItem({
               setIsRenaming(true);
               setMenuOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-colors"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-[background-color,color,transform] duration-150 ease-out"
             style={{ color: "var(--foreground)" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background =
@@ -386,7 +411,7 @@ function ChatItem({
               e.preventDefault();
               void handleDelete();
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-colors"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] transition-[background-color,color,transform] duration-150 ease-out"
             style={{ color: "var(--destructive)" }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background =
@@ -476,8 +501,8 @@ export function SidebarClient({
       className="flex h-screen shrink-0 flex-col transition-[width] duration-200"
       style={{
         width: collapsed ? "64px" : "15rem",
-        background: "var(--sidebar)",
-        borderRight: "1px solid var(--border)",
+        background: "var(--card)",
+        borderRight: "1px solid var(--sidebar-border)",
       }}
     >
       {/* ── Top bar ── */}
@@ -486,58 +511,44 @@ export function SidebarClient({
           <button
             type="button"
             onClick={() => setCollapsed(false)}
-            className="flex h-9 w-full items-center justify-center rounded-xl transition-colors"
-            style={{
-              background: "var(--accent)",
-              border: "1px solid var(--border)",
-              color: "var(--sidebar-foreground)",
-              opacity: 0.4,
-            }}
-            aria-label="Expand sidebar"
+            className="flex h-9 w-full items-center justify-center rounded-2xl"
           >
             <ChevronRight size={13} />
           </button>
         ) : (
-          <div className="flex items-center justify-between gap-1">
-            <button
-              type="button"
-              onClick={() => setCollapsed((v) => !v)}
-              className="rounded-lg p-2 transition-colors"
-              style={{ color: "var(--sidebar-foreground)", opacity: 0.4 }}
-              aria-label="Collapse sidebar"
-            >
-              <ChevronLeft size={13} />
-            </button>
-
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-2">
+                <img
+                  src="/file.svg"
+                  alt="forge"
+                  className="h-8 w-8 rounded-md"
+                />
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--sidebar-foreground)" }}
+                >
+                  forge
+                </span>
+              </Link>
               <button
                 type="button"
-                onClick={handleOpenSearch}
-                className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
-                style={{
-                  background: "var(--accent)",
-                  border: "1px solid var(--border)",
-                  color: "var(--sidebar-foreground)",
-                  opacity: 0.4,
-                }}
-                title="Search"
+                onClick={() => setCollapsed((v) => !v)}
+                className="rounded-2xl p-2"
               >
+                <ChevronLeft size={13} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button onClick={handleOpenSearch} className="h-8 w-8 rounded-xl">
                 <Search size={12} />
               </button>
-
               <button
                 onClick={handleCreateChat}
-                className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-all hover:opacity-95 active:scale-[0.98]"
-                style={{
-                  background: "#16a34a",
-                  color: "var(--primary-foreground)",
-                  letterSpacing: "-0.01em",
-                  boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-                }}
-                title="New Chat"
+                className="rounded-2xl px-3 py-2"
               >
-                <Plus size={11} strokeWidth={2.5} />
-                <span>New Chat</span>
+                <Plus size={11} />
               </button>
             </div>
           </div>
@@ -551,7 +562,7 @@ export function SidebarClient({
             <div className="group relative">
               <button
                 onClick={handleCreateChat}
-                className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:opacity-95 active:scale-[0.97]"
+                className="flex h-9 w-9 items-center justify-center rounded-2xl transition-[background-color,color,opacity,transform,box-shadow] duration-200 ease-out hover:opacity-95 active:scale-[0.97] cursor-pointer"
                 style={{
                   background: "#16a34a",
                   color: "var(--primary-foreground)",
@@ -577,12 +588,12 @@ export function SidebarClient({
               <button
                 type="button"
                 onClick={handleOpenSearch}
-                className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-2xl transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
                 style={{
                   background: "var(--accent)",
                   border: "1px solid var(--border)",
                   color: "var(--sidebar-foreground)",
-                  opacity: 0.4,
+                  opacity: 0.52,
                 }}
                 title="Search"
               >
@@ -604,12 +615,12 @@ export function SidebarClient({
               <button
                 type="button"
                 onClick={() => setRecentsOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+                className="flex h-9 w-9 items-center justify-center rounded-2xl transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
                 style={{
                   background: "var(--accent)",
                   border: "1px solid var(--border)",
                   color: "var(--sidebar-foreground)",
-                  opacity: 0.4,
+                  opacity: 0.52,
                 }}
                 title="Recents"
               >
@@ -644,7 +655,7 @@ export function SidebarClient({
                         <Link
                           key={chat.id}
                           href={`/c/${chat.id}`}
-                          className="block rounded-xl px-2.5 py-2 transition-colors"
+                          className="block rounded-2xl px-2.5 py-2 transition-[background-color,border-color,transform] duration-150 ease-out"
                           style={
                             pathname === `/c/${chat.id}`
                               ? {
@@ -706,8 +717,12 @@ export function SidebarClient({
                 <button
                   type="button"
                   onClick={handleCreateProject}
-                  className="rounded-lg p-1 opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{ color: "var(--sidebar-foreground)", opacity: 0.4 }}
+                  className="rounded-lg p-1 opacity-0 transition-[opacity,transform,color] duration-200 ease-out group-hover:opacity-100"
+                  style={{
+                    color: "var(--sidebar-foreground)",
+                    opacity: 0.42,
+                    cursor: "pointer",
+                  }}
                   title="Create project"
                 >
                   <Plus size={11} />
@@ -716,8 +731,8 @@ export function SidebarClient({
                 <button
                   type="button"
                   onClick={() => setProjectsOpen((v) => !v)}
-                  className="rounded-lg p-1"
-                  style={{ color: "var(--sidebar-foreground)", opacity: 0.5 }}
+                  className="rounded-lg p-1 transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
+                  style={{ color: "var(--sidebar-foreground)", opacity: 0.64 }}
                 >
                   <ChevronDown
                     size={11}
@@ -734,8 +749,8 @@ export function SidebarClient({
                     (_, i) => (
                       <div
                         key={`project-skeleton-${i}`}
-                        className="h-8 animate-pulse rounded-xl"
-                        style={{ background: "var(--accent)", opacity: 0.1 }}
+                        className="h-8 animate-pulse rounded-2xl"
+                        style={{ background: "var(--muted)", opacity: 0.12 }}
                       />
                     ),
                   )
@@ -752,8 +767,11 @@ export function SidebarClient({
                   ))
                 ) : (
                   <div
-                    className="rounded-xl px-2.5 py-2 text-[12px]"
-                    style={{ color: "var(--sidebar-foreground)", opacity: 0.4 }}
+                    className="rounded-2xl px-2.5 py-2 text-[12px]"
+                    style={{
+                      color: "var(--sidebar-foreground)",
+                      opacity: 0.48,
+                    }}
                   >
                     No projects yet
                   </div>
@@ -789,8 +807,8 @@ export function SidebarClient({
                     (_, i) => (
                       <div
                         key={`chat-skeleton-${i}`}
-                        className="h-11 animate-pulse rounded-xl"
-                        style={{ background: "var(--accent)", opacity: 0.1 }}
+                        className="h-11 animate-pulse rounded-2xl"
+                        style={{ background: "var(--muted)", opacity: 0.12 }}
                       />
                     ),
                   )
@@ -809,8 +827,11 @@ export function SidebarClient({
                   ))
                 ) : (
                   <div
-                    className="rounded-xl px-2.5 py-2 text-[12px]"
-                    style={{ color: "var(--sidebar-foreground)", opacity: 0.4 }}
+                    className="rounded-2xl px-2.5 py-2 text-[12px]"
+                    style={{
+                      color: "var(--sidebar-foreground)",
+                      opacity: 0.48,
+                    }}
                   >
                     No chats yet
                   </div>
@@ -828,8 +849,8 @@ export function SidebarClient({
               <ModeToggle />
               <Link
                 href="/settings"
-                className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors"
-                style={{ color: "var(--sidebar-foreground)", opacity: 0.5 }}
+                className="flex flex-1 items-center gap-2 rounded-2xl px-3 py-2 text-[12.5px] transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
+                style={{ color: "var(--sidebar-foreground)", opacity: 0.68 }}
               >
                 <Settings size={13} />
                 Settings
