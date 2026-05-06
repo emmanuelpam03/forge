@@ -66,7 +66,6 @@ function ProjectItem({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(project.name);
   const [menuOpen, setMenuOpen] = useState(false);
-  const router = useRouter();
 
   const handleRename = async () => {
     const trimmed = newName.trim();
@@ -526,9 +525,8 @@ export function SidebarClient({
                 onClick={handleCreateChat}
                 className="flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-all hover:opacity-95 active:scale-[0.98]"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                  color: "#1a1208",
+                  background: "#16a34a",
+                  color: "var(--primary-foreground)",
                   letterSpacing: "-0.01em",
                   boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
                 }}
@@ -551,9 +549,8 @@ export function SidebarClient({
                 onClick={handleCreateChat}
                 className="flex h-9 w-9 items-center justify-center rounded-xl transition-all hover:opacity-95 active:scale-[0.97]"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                  color: "#1a1208",
+                  background: "#16a34a",
+                  color: "var(--primary-foreground)",
                   boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
                 }}
                 title="New Chat"

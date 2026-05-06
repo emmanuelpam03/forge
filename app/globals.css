@@ -49,10 +49,10 @@
 }
 
 /* ─────────────────────────────────────────────
-   LIGHT MODE — Warm Parchment × Amber
+  LIGHT MODE — Warm Parchment × Green
    Background: warm off-white, like aged paper
    Foreground: deep warm ink, not pure black
-   Primary: rich amber (#d97706 territory)
+  Primary: balanced green accent
    Surfaces: cream whites with warm undertones
    Borders: soft warm sand
 ───────────────────────────────────────────── */
@@ -71,9 +71,12 @@
   --popover: oklch(0.998 0.004 75);
   --popover-foreground: oklch(0.18 0.018 60);
 
-  /* Primary — rich amber, the hero accent */
-  --primary: oklch(0.62 0.15 72);
-  --primary-foreground: oklch(0.99 0.005 80);
+  /* Primary — balanced green, the hero accent */
+  --primary: oklch(0.62 0.14 154);
+  --primary-foreground: oklch(0.985 0.01 150);
+  /* Darker primary for CTA buttons */
+  --primary-dark: oklch(0.52 0.14 154);
+  --primary-dark-foreground: oklch(0.985 0.01 150);
 
   /* Secondary — warm sand */
   --secondary: oklch(0.93 0.018 75);
@@ -96,44 +99,44 @@
   /* Input field background */
   --input: oklch(0.955 0.012 78);
 
-  /* Focus ring — amber */
-  --ring: oklch(0.62 0.15 72);
+  /* Focus ring — green */
+  --ring: oklch(0.62 0.14 154);
 
-  /* Charts — warm amber family */
-  --chart-1: oklch(0.62 0.15 72);
-  --chart-2: oklch(0.64 0.13 55);
-  --chart-3: oklch(0.67 0.11 95);
-  --chart-4: oklch(0.7 0.1 45);
-  --chart-5: oklch(0.58 0.12 85);
+  /* Charts — green family */
+  --chart-1: oklch(0.62 0.14 154);
+  --chart-2: oklch(0.59 0.13 168);
+  --chart-3: oklch(0.68 0.11 142);
+  --chart-4: oklch(0.71 0.09 182);
+  --chart-5: oklch(0.55 0.13 132);
 
   --radius: 0.625rem;
 
   /* Sidebar — slightly cooler than page bg, warm white */
   --sidebar: oklch(0.968 0.01 78);
   --sidebar-foreground: oklch(0.18 0.018 60);
-  --sidebar-primary: oklch(0.62 0.15 72);
-  --sidebar-primary-foreground: oklch(0.99 0.005 80);
+  --sidebar-primary: oklch(0.62 0.14 154);
+  --sidebar-primary-foreground: oklch(0.985 0.01 150);
   --sidebar-accent: oklch(0.93 0.022 76);
   --sidebar-accent-foreground: oklch(0.22 0.02 65);
   --sidebar-border: oklch(0.885 0.016 78);
-  --sidebar-ring: oklch(0.62 0.15 72);
+  --sidebar-ring: oklch(0.62 0.14 154);
 
   /* Message content colors — light mode */
   --message-heading: oklch(0.18 0.018 60);
   --message-text: oklch(0.2 0.015 60);
-  --message-link: oklch(0.52 0.14 72);
-  --message-link-hover: oklch(0.45 0.16 70);
-  --message-blockquote-border: oklch(0.62 0.15 72 / 0.5);
-  --message-blockquote-bg: oklch(0.62 0.15 72 / 0.05);
-  --message-code-bg: oklch(0.62 0.15 72 / 0.08);
-  --message-code-border: oklch(0.62 0.15 72 / 0.2);
-  --message-code-text: oklch(0.5 0.13 65);
+  --message-link: oklch(0.5 0.13 154);
+  --message-link-hover: oklch(0.44 0.14 154);
+  --message-blockquote-border: oklch(0.62 0.14 154 / 0.5);
+  --message-blockquote-bg: oklch(0.62 0.14 154 / 0.05);
+  --message-code-bg: oklch(0.62 0.14 154 / 0.08);
+  --message-code-border: oklch(0.62 0.14 154 / 0.2);
+  --message-code-text: oklch(0.46 0.12 154);
   --message-table-border: oklch(0.88 0.018 78);
   --message-table-hover: oklch(0.93 0.015 78);
 }
 
 /* ─────────────────────────────────────────────
-   DARK MODE — Obsidian × Amber
+  DARK MODE — Obsidian × Green
 ───────────────────────────────────────────── */
 .dark {
   --background: oklch(0.145 0 0);
@@ -142,8 +145,11 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.72 0.15 72);
-  --primary-foreground: oklch(0.12 0.02 65);
+  --primary: oklch(0.72 0.14 154);
+  --primary-foreground: oklch(0.12 0.015 154);
+  /* Darker primary for CTA buttons in dark mode */
+  --primary-dark: oklch(0.62 0.14 154);
+  --primary-dark-foreground: oklch(0.12 0.015 154);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -153,31 +159,31 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.72 0.15 72);
-  --chart-1: oklch(0.72 0.15 72);
+  --ring: oklch(0.72 0.14 154);
+  --chart-1: oklch(0.72 0.14 154);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.118 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.72 0.15 72);
-  --sidebar-primary-foreground: oklch(0.12 0.02 65);
+  --sidebar-primary: oklch(0.72 0.14 154);
+  --sidebar-primary-foreground: oklch(0.12 0.015 154);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.72 0.15 72);
+  --sidebar-ring: oklch(0.72 0.14 154);
 
   /* Message content colors — dark mode */
   --message-heading: oklch(0.985 0 0);
   --message-text: oklch(0.92 0 0);
-  --message-link: oklch(0.72 0.15 72);
-  --message-link-hover: oklch(0.8 0.15 72);
-  --message-blockquote-border: oklch(0.72 0.15 72 / 0.6);
-  --message-blockquote-bg: oklch(0.72 0.15 72 / 0.03);
-  --message-code-bg: oklch(0.72 0.15 72 / 0.08);
-  --message-code-border: oklch(0.72 0.15 72 / 0.2);
-  --message-code-text: oklch(0.72 0.15 72);
+  --message-link: oklch(0.72 0.14 154);
+  --message-link-hover: oklch(0.8 0.12 154);
+  --message-blockquote-border: oklch(0.72 0.14 154 / 0.6);
+  --message-blockquote-bg: oklch(0.72 0.14 154 / 0.03);
+  --message-code-bg: oklch(0.72 0.14 154 / 0.08);
+  --message-code-border: oklch(0.72 0.14 154 / 0.2);
+  --message-code-text: oklch(0.72 0.14 154);
   --message-table-border: oklch(1 0 0 / 10%);
   --message-table-hover: oklch(1 0 0 / 5%);
 }

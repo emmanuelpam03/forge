@@ -113,19 +113,12 @@ export default function HomePage() {
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-background">
-      {/* Layered ambient glows */}
+      {/* Subtle ambient glow — matches chat page */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 70% 50% at 50% 60%, rgba(251,191,36,0.045) 0%, transparent 65%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 40% 30% at 20% 20%, rgba(251,191,36,0.025) 0%, transparent 60%)",
+            "radial-gradient(ellipse 55% 45% at 60% 40%, rgba(16,163,127,0.08) 0%, transparent 70%)",
         }}
       />
 
@@ -134,7 +127,7 @@ export default function HomePage() {
         className="pointer-events-none absolute inset-0 opacity-[0.018]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)",
+            "linear-gradient(color-mix(in oklab, var(--foreground) 18%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in oklab, var(--foreground) 18%, transparent) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
@@ -146,12 +139,12 @@ export default function HomePage() {
             className="flex h-12 w-12 items-center justify-center rounded-2xl"
             style={{
               background:
-                "linear-gradient(135deg, rgba(251,191,36,0.18) 0%, rgba(251,191,36,0.06) 100%)",
+                "linear-gradient(135deg, color-mix(in oklab, var(--primary) 28%, transparent) 0%, color-mix(in oklab, var(--primary) 10%, transparent) 100%)",
               boxShadow:
-                "0 0 0 1px rgba(251,191,36,0.22), 0 8px 32px rgba(251,191,36,0.1)",
+                "0 0 0 1px color-mix(in oklab, var(--primary) 32%, transparent), 0 8px 32px color-mix(in oklab, var(--primary) 16%, transparent)",
             }}
           >
-            <ForgeLogo className="h-6 w-6 text-amber-400" />
+            <ForgeLogo className="h-6 w-6 text-primary" />
           </div>
         </div>
 
@@ -160,11 +153,12 @@ export default function HomePage() {
           className="flex w-full max-w-[26rem] flex-col gap-6"
           style={{
             background:
-              "linear-gradient(160deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 100%)",
-            border: "1px solid rgba(255,255,255,0.075)",
+              "linear-gradient(160deg, color-mix(in oklab, var(--card) 96%, transparent) 0%, color-mix(in oklab, var(--card) 90%, transparent) 100%)",
+            border:
+              "1px solid color-mix(in oklab, var(--border) 80%, transparent)",
             borderRadius: "20px",
             boxShadow:
-              "0 1px 0 rgba(255,255,255,0.06) inset, 0 32px 64px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.4)",
+              "0 1px 0 color-mix(in oklab, var(--card-foreground) 6%, transparent) inset, 0 20px 48px color-mix(in oklab, var(--foreground) 10%, transparent), 0 0 0 1px color-mix(in oklab, var(--foreground) 12%, transparent)",
             padding: "28px",
             backdropFilter: "blur(12px)",
           }}
@@ -183,7 +177,7 @@ export default function HomePage() {
 
             <p
               className="max-w-[17rem] text-[13px] leading-[1.7]"
-              style={{ color: "rgba(255,255,255,0.38)" }}
+              style={{ color: "var(--muted-foreground)" }}
             >
               Think, create, research, and organize — all in one workspace.
             </p>
@@ -196,32 +190,36 @@ export default function HomePage() {
                 key={id}
                 className="group flex flex-col items-center gap-2.5 text-left transition-all duration-200"
                 style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  background:
+                    "color-mix(in oklab, var(--card) 94%, var(--primary) 6%)",
+                  border:
+                    "1px solid color-mix(in oklab, var(--border) 78%, transparent)",
                   borderRadius: "14px",
                   padding: "12px 10px",
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.background =
-                    "rgba(251,191,36,0.06)";
+                    "color-mix(in oklab, var(--primary) 9%, var(--card))";
                   (e.currentTarget as HTMLElement).style.borderColor =
-                    "rgba(251,191,36,0.25)";
+                    "color-mix(in oklab, var(--primary) 38%, transparent)";
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLElement).style.background =
-                    "rgba(255,255,255,0.03)";
+                    "color-mix(in oklab, var(--card) 94%, var(--primary) 6%)";
                   (e.currentTarget as HTMLElement).style.borderColor =
-                    "rgba(255,255,255,0.07)";
+                    "color-mix(in oklab, var(--border) 78%, transparent)";
                 }}
               >
                 <span
                   className="flex h-8 w-8 items-center justify-center rounded-xl"
                   style={{
-                    background: "rgba(251,191,36,0.1)",
-                    border: "1px solid rgba(251,191,36,0.18)",
+                    background:
+                      "color-mix(in oklab, var(--primary) 16%, transparent)",
+                    border:
+                      "1px solid color-mix(in oklab, var(--primary) 28%, transparent)",
                   }}
                 >
-                  <Icon size={14} className="text-amber-400" />
+                  <Icon size={14} className="text-primary" />
                 </span>
 
                 <span
@@ -233,7 +231,7 @@ export default function HomePage() {
 
                 <span
                   className="text-center text-[10.5px] leading-snug"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
+                  style={{ color: "var(--muted-foreground)" }}
                 >
                   {description}
                 </span>
@@ -245,7 +243,7 @@ export default function HomePage() {
         </div>
 
         {/* Footer */}
-        <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+        <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
           Forge can make mistakes. Verify important information.
         </p>
       </div>

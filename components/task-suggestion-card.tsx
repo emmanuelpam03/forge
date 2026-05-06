@@ -27,9 +27,9 @@ function formatTaskMeta(suggestion: TaskSuggestion) {
 
 const statusStyles: Record<string, React.CSSProperties> = {
   pending: {
-    background: "rgba(251,191,36,0.08)",
-    border: "1px solid rgba(251,191,36,0.2)",
-    color: "rgba(251,191,36,0.85)",
+    background: "rgba(22,163,74,0.08)",
+    border: "1px solid rgba(22,163,74,0.2)",
+    color: "rgba(22,163,74,0.85)",
   },
   approved: {
     background: "rgba(34,197,94,0.08)",
@@ -75,7 +75,7 @@ export function TaskSuggestionCard({
         className="h-px w-full"
         style={{
           background:
-            "linear-gradient(90deg, rgba(251,191,36,0.35) 0%, transparent 60%)",
+            "linear-gradient(90deg, rgba(22,163,74,0.35) 0%, transparent 60%)",
         }}
       />
 
@@ -98,9 +98,9 @@ export function TaskSuggestionCard({
                 className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase"
                 style={{
                   letterSpacing: "0.08em",
-                  background: "rgba(251,191,36,0.1)",
-                  border: "1px solid rgba(251,191,36,0.2)",
-                  color: "rgba(251,191,36,0.85)",
+                  background: "rgba(22,163,74,0.1)",
+                  border: "1px solid rgba(22,163,74,0.2)",
+                  color: "rgba(22,163,74,0.85)",
                 }}
               >
                 {suggestion.taskType}
@@ -139,7 +139,7 @@ export function TaskSuggestionCard({
             {!projectReady ? (
               <p
                 className="mt-2.5 text-[12px]"
-                style={{ color: "rgba(251,191,36,0.65)" }}
+                style={{ color: "rgba(22,163,74,0.7)" }}
               >
                 Attach this chat to a project before accepting tasks.
               </p>
@@ -223,10 +223,9 @@ export function TaskSuggestionCard({
                 disabled={isSubmitting || !projectReady || isResolved}
                 className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-[12.5px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                  color: "#1a1208",
-                  boxShadow: "0 2px 8px rgba(251,191,36,0.25)",
+                  background: "var(--primary-dark)",
+                  color: "var(--primary-dark-foreground)",
+                  boxShadow: "0 2px 8px rgba(22,163,74,0.25)",
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.opacity = "0.88";

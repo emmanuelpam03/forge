@@ -28,14 +28,14 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
   return (
     <div
       className="relative h-full overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
-      style={{ background: "rgb(10,9,8)" }}
+      style={{ background: "var(--background)" }}
     >
       {/* Ambient glow */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(251,191,36,0.04) 0%, transparent 65%)",
+            "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.04) 0%, transparent 65%)",
         }}
       />
 
@@ -89,8 +89,8 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                     style={
                       isActive
                         ? {
-                            background: "rgba(251,191,36,0.08)",
-                            border: "1px solid rgba(251,191,36,0.18)",
+                            background: "rgba(22,163,74,0.08)",
+                            border: "1px solid rgba(22,163,74,0.18)",
                             color: "var(--foreground)",
                           }
                         : {
@@ -114,15 +114,13 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                         (e.currentTarget as HTMLElement).style.opacity = "0.5";
                       }
                     }}
-                      }
-                    }}
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
                       <Icon
                         size={13}
                         className="shrink-0"
                         style={{
-                          color: isActive ? "rgba(251,191,36,0.8)" : "inherit",
+                          color: isActive ? "rgba(22,163,74,0.8)" : "inherit",
                         }}
                       />
                       <span
@@ -134,7 +132,11 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                     </span>
                     <ChevronRight
                       size={12}
-                      style={{ color: "var(--foreground)", opacity: 0.2, flexShrink: 0 }}
+                      style={{
+                        color: "var(--foreground)",
+                        opacity: 0.2,
+                        flexShrink: 0,
+                      }}
                     />
                   </Link>
                 );

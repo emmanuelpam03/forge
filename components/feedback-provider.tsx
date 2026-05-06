@@ -36,27 +36,27 @@ function createId() {
 function feedbackStyles(type: FeedbackType): React.CSSProperties {
   if (type === "success") {
     return {
-      background: "rgba(14,12,10,0.97)",
-      border: "1px solid rgba(251,191,36,0.3)",
-      boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(251,191,36,0.1)",
+      background: "var(--card)",
+      border: "1px solid rgba(22,163,74,0.3)",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.22), 0 0 0 1px rgba(22,163,74,0.1)",
     };
   }
   if (type === "error") {
     return {
-      background: "rgba(14,12,10,0.97)",
+      background: "var(--card)",
       border: "1px solid rgba(239,68,68,0.35)",
-      boxShadow: "0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(239,68,68,0.1)",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.22), 0 0 0 1px rgba(239,68,68,0.1)",
     };
   }
   return {
     background: "var(--card)",
     border: "1px solid var(--border)",
-    boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.22)",
   };
 }
 
 function accentColor(type: FeedbackType): string {
-  if (type === "success") return "rgba(251,191,36,0.9)";
+  if (type === "success") return "var(--primary-dark)";
   if (type === "error") return "rgba(239,68,68,0.9)";
   return "var(--sidebar-primary)";
 }

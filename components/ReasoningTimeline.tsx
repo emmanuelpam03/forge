@@ -59,7 +59,7 @@ export function ReasoningTimeline({
                 key={i}
                 className="h-1.5 w-1.5 rounded-full"
                 style={{
-                  background: "rgba(251,191,36,0.5)",
+                  background: "rgba(16,185,129,0.5)",
                   animation: expanded
                     ? "none"
                     : `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
@@ -83,17 +83,17 @@ export function ReasoningTimeline({
           <ChevronUp
             size={13}
             style={{ color: "var(--foreground)", opacity: 0.3 }}
-          />
-        ) : (
-          <ChevronDown
-            size={13}
-            style={{ color: "var(--foreground)", opacity: 0.3 }}
-          />
-        )}
-      </button>
-
-      {/* Content */}
-      <div className="px-4 py-3">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{
+                            background: "rgba(22,163,74,0.5)",
+                            animation: expanded
+                              ? "none"
+                              : `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+                          }}
+                        />
         {expanded ? (
           <ol className="space-y-3">
             {shownSteps.map((step, index) => (
@@ -104,7 +104,7 @@ export function ReasoningTimeline({
               >
                 <span
                   className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: "rgba(251,191,36,0.5)" }}
+                  style={{ background: "rgba(16,185,129,0.5)" }}
                 />
                 <span
                   className="text-[13px]"
@@ -131,5 +131,7 @@ export function ReasoningTimeline({
     </div>
   );
 }
-
-export default ReasoningTimeline;
+                          <span
+                            className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ background: "rgba(22,163,74,0.5)" }}
+                          />
