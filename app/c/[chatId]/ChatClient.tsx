@@ -1534,7 +1534,7 @@ export function ChatClient({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-6 z-50 pointer-events-none">
+      <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
           <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
             <textarea

@@ -251,7 +251,7 @@ export default function HomePage() {
       </div>
 
       {/* Floating Input (same as chat page) */}
-      <div className="fixed inset-x-0 bottom-6 z-50 pointer-events-none">
+      <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-[26rem] px-6 pointer-events-auto">
           <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
             <input
