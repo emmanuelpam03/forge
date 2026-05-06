@@ -42,13 +42,17 @@ const sidebarItemBase =
 
 const sidebarItemActive = {
   background: "var(--sidebar-accent)",
-  border: "1px solid var(--sidebar-accent)",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "var(--sidebar-accent)",
   color: "var(--sidebar-accent-foreground)",
 };
 
 const sidebarItemInactive = {
   background: "transparent",
-  border: "1px solid transparent",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "transparent",
   color: "var(--sidebar-foreground)",
   opacity: "0.5",
 };
@@ -310,7 +314,7 @@ function ChatItem({
         className={sidebarItemBase}
         style={{
           ...(active ? sidebarItemActive : sidebarItemInactive),
-          borderBottom: "1px solid var(--border)",
+          borderBottomColor: "var(--border)",
           marginBottom: "4px",
         }}
       >
