@@ -1565,10 +1565,9 @@ export function ChatClient({
             </button>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-2 py-1">
-                <span className="text-xs text-muted-foreground">Claude</span>
-                <ChevronDown size={14} className="text-muted-foreground" />
-              </div>
+              <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
+                <ChevronDown size={16} />
+              </button>
 
               {isSending ? (
                 <button

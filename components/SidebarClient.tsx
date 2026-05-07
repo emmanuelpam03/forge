@@ -730,11 +730,11 @@ export function SidebarClient({
             <div className="group mb-2 flex w-full items-center justify-between px-1">
               <span style={sectionLabel}>Projects</span>
 
-              <div className="flex items-center gap-0.5">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={handleCreateProject}
-                  className="rounded-lg p-1 opacity-0 transition-[opacity,transform,color] duration-200 ease-out group-hover:opacity-100"
+                  className="rounded-lg p-1.5 opacity-0 transition-[opacity,transform,color] duration-200 ease-out group-hover:opacity-100"
                   style={{
                     color: "var(--sidebar-foreground)",
                     opacity: 0.42,
@@ -742,17 +742,17 @@ export function SidebarClient({
                   }}
                   title="Create project"
                 >
-                  <Plus size={11} />
+                  <Plus size={16} />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setProjectsOpen((v) => !v)}
-                  className="rounded-lg p-1 transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
+                  className="rounded-lg p-1.5 transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
                   style={{ color: "var(--sidebar-foreground)", opacity: 0.64 }}
                 >
                   <ChevronDown
-                    size={11}
+                    size={16}
                     className={`transition-transform duration-200 ${!projectsOpen ? "-rotate-90" : ""}`}
                   />
                 </button>
