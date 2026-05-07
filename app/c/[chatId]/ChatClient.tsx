@@ -57,6 +57,17 @@ type ChatClientProps = {
   initialMessage?: string;
 };
 
+type ModelOption = {
+  id: string;
+  label: string;
+};
+
+const MODEL_OPTIONS: ModelOption[] = [
+  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
+  { id: "gpt-4.1", label: "GPT-4.1" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+];
+
 function MessageBubble({
   message,
   onStartEdit,
@@ -304,10 +315,19 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState(
+    MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
+  );
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
+
+  const selectedModel =
+    MODEL_OPTIONS.find((model) => model.id === selectedModelId) ??
+    MODEL_OPTIONS[0];
 
   const hasMessages = messages.length > 0;
   const hasSuggestions = suggestions.length > 0;
@@ -383,6 +403,35 @@ export function ChatClient({
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [draft]);
+
+  useEffect(() => {
+    if (!isModelMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        modelMenuRef.current &&
+        !modelMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsModelMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsModelMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isModelMenuOpen]);
 
   const stopGeneration = () => {
     if (!abortControllerRef.current) {
@@ -727,7 +776,12 @@ export function ChatClient({
       const response = await fetch("/api/chat/edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId, messageId, newContent }),
+        body: JSON.stringify({
+          chatId,
+          messageId,
+          newContent,
+          model: selectedModelId,
+        }),
         signal: abortControllerRef.current.signal,
       });
 
@@ -925,7 +979,11 @@ export function ChatClient({
       const response = await fetch("/api/chat/regenerate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId, assistantMessageId }),
+        body: JSON.stringify({
+          chatId,
+          assistantMessageId,
+          model: selectedModelId,
+        }),
         signal: abortControllerRef.current.signal,
       });
 
@@ -1234,6 +1292,7 @@ export function ChatClient({
           body: JSON.stringify({
             chatId,
             message,
+            model: selectedModelId,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -1423,6 +1482,7 @@ export function ChatClient({
       chatId,
       draft,
       isSending,
+      selectedModelId,
       showFeedback,
       updateAssistantMessage,
       replaceSuggestionsFromPacket,
@@ -1565,15 +1625,61 @@ export function ChatClient({
             </button>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                title="Select model"
-                aria-label="Select model"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-2 text-[12px] font-medium text-muted-foreground shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              >
-                <span>Claude</span>
-                <ChevronDown size={16} />
-              </button>
+              <div className="relative" ref={modelMenuRef}>
+                <button
+                  type="button"
+                  title="Select model"
+                  aria-label="Select model"
+                  aria-expanded={isModelMenuOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setIsModelMenuOpen((value) => !value)}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-2 text-[12px] font-medium text-muted-foreground shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                >
+                  <span className="truncate">{selectedModel.label}</span>
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform duration-200 ${
+                      isModelMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {isModelMenuOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 bottom-full mb-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover p-1 shadow-xl"
+                  >
+                    {MODEL_OPTIONS.map((option) => {
+                      const isActive = option.id === selectedModelId;
+
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={isActive}
+                          onClick={() => {
+                            setSelectedModelId(option.id);
+                            setIsModelMenuOpen(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-foreground ${
+                            isActive
+                              ? "bg-accent text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          <span>{option.label}</span>
+                          {isActive ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                              Active
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
 
               {isSending ? (
                 <button
