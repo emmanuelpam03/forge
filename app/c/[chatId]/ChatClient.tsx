@@ -1565,7 +1565,8 @@ export function ChatClient({
             </button>
 
             <div className="flex items-center gap-2">
-              <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
+              <button className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition hover:text-foreground hover:bg-accent/70">
+                <span>Claude</span>
                 <ChevronDown size={16} />
               </button>
 
