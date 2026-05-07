@@ -244,6 +244,26 @@
     font: inherit;
   }
 
+  button:not(:disabled) {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease,
+      filter 160ms ease;
+  }
+
+  button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -16px rgb(0 0 0 / 0.35);
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(0);
+  }
+
   *::-webkit-scrollbar {
     display: none;
   }
