@@ -507,7 +507,10 @@ export function SidebarClient({
       }}
     >
       {/* ── Top bar ── */}
-      <div className="p-2" style={{ borderBottom: "1px solid var(--border)" }}>
+      <div
+        className="p-2 pb-3"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
         {collapsed ? (
           <button
             type="button"
@@ -517,18 +520,19 @@ export function SidebarClient({
             <ChevronRight size={13} />
           </button>
         ) : (
-          <div className="flex items-center justify-between gap-2">
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-sidebar-accent border border-sidebar-border">
-                <ForgeLogo className="h-5 w-5 text-sidebar-foreground" />
-              </span>
-              <span
-                className="text-sm font-semibold tracking-[-0.02em]"
-                style={{ color: "var(--sidebar-foreground)" }}
-              >
-                Forge
-              </span>
-            </Link>
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <Link href="/" className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-sidebar-accent border border-sidebar-border">
+                  <ForgeLogo className="h-5 w-5 text-sidebar-foreground" />
+                </span>
+                <span
+                  className="text-sm font-semibold tracking-[-0.02em]"
+                  style={{ color: "var(--sidebar-foreground)" }}
+                >
+                  Forge
+                </span>
+              </Link>
               <button
                 type="button"
                 onClick={() => setCollapsed((v) => !v)}
@@ -536,16 +540,32 @@ export function SidebarClient({
               >
                 <ChevronLeft size={13} />
               </button>
+            </div>
 
-            <div className="flex items-center gap-2">
-              <button onClick={handleOpenSearch} className="h-8 w-8 rounded-xl">
-                <Search size={12} />
-              </button>
+            <div className="flex w-full gap-2">
               <button
                 onClick={handleCreateChat}
-                className="rounded-2xl px-3 py-2"
+                className="flex-1 rounded-2xl px-3 py-2 flex items-center justify-center"
+                style={{
+                  background: "var(--primary)",
+                  color: "var(--primary-foreground)",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                }}
               >
-                <Plus size={11} />
+                <Plus size={14} className="mr-1.5" />
+                New chat
+              </button>
+              <button
+                onClick={handleOpenSearch}
+                className="h-10 w-10 rounded-2xl flex items-center justify-center"
+                style={{
+                  background: "var(--accent)",
+                  border: "1px solid var(--border)",
+                  color: "var(--sidebar-foreground)",
+                }}
+              >
+                <Search size={14} />
               </button>
             </div>
           </div>

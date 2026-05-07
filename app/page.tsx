@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import { ArrowUp, Bookmark, Layers, Globe } from "lucide-react";
+import { ArrowUp, Bookmark, Layers, Globe, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFeedback } from "@/components/feedback-provider";
 
@@ -263,6 +263,10 @@ export default function HomePage() {
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
           <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
+            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
+              <Plus size={18} />
+            </button>
+
             <input
               type="text"
               value={input}
@@ -272,6 +276,10 @@ export default function HomePage() {
               disabled={isCreatingChat}
               className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             />
+
+            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
+              <Mic size={18} />
+            </button>
 
             <div className="flex items-center gap-2">
               {isCreatingChat ? (
@@ -293,11 +301,6 @@ export default function HomePage() {
                   <ArrowUp size={16} />
                 </button>
               )}
-            </div>
-            <div className="text-center mt-2">
-              <div className="text-sm font-semibold text-foreground">
-                {greetingText.toUpperCase()}, {userName}
-              </div>
             </div>
           </div>
 

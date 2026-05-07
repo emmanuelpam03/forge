@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -11,6 +12,8 @@ import {
   RotateCcw,
   Sparkles,
   Square,
+  Mic,
+  Plus,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
 import { TaskSuggestionCard } from "@/components/task-suggestion-card";
@@ -1537,6 +1540,10 @@ export function ChatClient({
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
           <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
+            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
+              <Plus size={18} />
+            </button>
+
             <textarea
               ref={textareaRef}
               value={draft}
@@ -1553,7 +1560,16 @@ export function ChatClient({
               className="max-h-40 min-h-6 w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground px-2 py-1"
             />
 
+            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
+              <Mic size={18} />
+            </button>
+
             <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2 py-1">
+                <span className="text-xs text-muted-foreground">Claude</span>
+                <ChevronDown size={14} className="text-muted-foreground" />
+              </div>
+
               {isSending ? (
                 <button
                   onClick={stopGeneration}
