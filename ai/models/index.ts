@@ -69,8 +69,7 @@ export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
   }
 
   // Use override provider if provided, otherwise read from env
-  const provider =
-    override?.provider ||
+  const provider = override?.provider ||  
     (process.env.AI_MODEL_PROVIDER?.trim().toLowerCase() === "ollama"
       ? "ollama"
       : "google-genai");
@@ -78,20 +77,14 @@ export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
   if (provider === "ollama") {
     return {
       provider,
-      model:
-        override?.model ||
-        process.env.OLLAMA_MODEL?.trim() ||
-        DEFAULT_OLLAMA_MODEL,
+      model: override?.model || process.env.OLLAMA_MODEL?.trim() || DEFAULT_OLLAMA_MODEL,
       baseUrl: process.env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL,
     };
   }
 
   return {
     provider,
-    model:
-      override?.model ||
-      process.env.GEMINI_MODEL?.trim() ||
-      DEFAULT_GEMINI_MODEL,
+    model: override?.model || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
   };
 }
 
