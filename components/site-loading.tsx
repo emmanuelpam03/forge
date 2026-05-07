@@ -1,8 +1,9 @@
 type SiteLoadingVariant =
   | "app"
+  | "chatpage"
+  | "projectpage"
   | "marketing"
   | "auth"
-  | "chat"
   | "projects"
   | "settings"
   | "search"
@@ -10,8 +11,8 @@ type SiteLoadingVariant =
   | "skills";
 
 const skeletonPulse = {
-  background: "var(--accent)",
-  opacity: 0.1,
+  background: "var(--muted)",
+  opacity: 0.6,
   borderRadius: "10px",
 };
 
@@ -34,7 +35,7 @@ function AppSkeleton() {
   return (
     <div
       className="flex h-full w-full overflow-hidden"
-      style={{ background: "rgb(10,9,8)" }}
+      style={{ background: "var(--background)" }}
     >
       {/* Sidebar skeleton */}
       <aside
@@ -45,13 +46,25 @@ function AppSkeleton() {
         }}
       >
         <div
-          className="p-2"
+          className="p-2 pb-3"
           style={{ borderBottom: "1px solid var(--border)" }}
         >
-          <SkeletonBlock
-            className="h-9 w-full"
-            style={{ borderRadius: "12px" }}
-          />
+          <div className="flex flex-col gap-2.5">
+            <SkeletonBlock
+              className="h-9 w-full"
+              style={{ borderRadius: "12px" }}
+            />
+            <div className="flex w-full gap-2">
+              <SkeletonBlock
+                className="flex-1 h-10"
+                style={{ borderRadius: "12px" }}
+              />
+              <SkeletonBlock
+                className="h-10 w-10"
+                style={{ borderRadius: "12px" }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="px-3 pb-1 pt-4">
@@ -146,43 +159,111 @@ function AppSkeleton() {
   );
 }
 
-function SectionSkeleton({
-  title,
-  blocks = 3,
-}: {
-  title: string;
-  blocks?: number;
-}) {
+function ProjectPageSkeleton() {
   return (
     <div
-      className="flex h-full w-full items-center justify-center p-6"
-      style={{ background: "rgb(10,9,8)" }}
+      className="flex-1 overflow-hidden p-6"
+      style={{ background: "var(--background)" }}
     >
-      <div
-        className="w-full max-w-5xl p-6"
-        style={{
-          border: "1px solid var(--border)",
-          borderRadius: "20px",
-          background: "var(--card)",
-        }}
-      >
-        <SkeletonBlock
-          className="h-3 w-20 mb-3"
-          style={{ borderRadius: "4px" }}
-        />
-        <SkeletonBlock className="h-7 w-64 mb-2" />
-        <SkeletonBlock
-          className="h-4 w-80 mb-6"
-          style={{ borderRadius: "6px" }}
-        />
-        <div className="grid gap-3">
-          {Array.from({ length: blocks }).map((_, i) => (
+      <div className="mx-auto h-full w-full max-w-5xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 mb-8">
+          <div className="flex-1">
             <SkeletonBlock
-              key={`${title}-${i}`}
-              className="h-20"
-              style={{ borderRadius: "14px" }}
+              className="h-3 w-20 mb-2"
+              style={{ borderRadius: "4px" }}
             />
+            <SkeletonBlock className="h-8 w-64" />
+          </div>
+          <div className="flex items-center gap-3">
+            <SkeletonBlock
+              className="h-10 w-72"
+              style={{ borderRadius: "20px" }}
+            />
+            <SkeletonBlock
+              className="h-10 w-24"
+              style={{ borderRadius: "8px" }}
+            />
+          </div>
+        </div>
+
+        {/* Badge */}
+        <SkeletonBlock
+          className="w-48 h-6 mb-4"
+          style={{ borderRadius: "20px" }}
+        />
+
+        {/* Table header */}
+        <div className="grid grid-cols-[minmax(280px,1fr)_150px] gap-4 px-3 mb-2">
+          <SkeletonBlock className="h-3 w-16" style={{ borderRadius: "4px" }} />
+          <SkeletonBlock className="h-3 w-16" style={{ borderRadius: "4px" }} />
+        </div>
+
+        {/* Table rows */}
+        <div className="border border-border rounded-2xl overflow-hidden">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={`row-${i}`}
+              className={`grid grid-cols-[minmax(280px,1fr)_150px] items-center px-3 py-3 ${
+                i !== 4 ? "border-b border-border" : ""
+              }`}
+            >
+              <SkeletonBlock className="h-4 w-48" />
+              <SkeletonBlock className="h-4 w-32" />
+            </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatPageSkeleton() {
+  return (
+    <div
+      className="flex-1 overflow-hidden p-6"
+      style={{ background: "var(--background)" }}
+    >
+      <div className="mx-auto flex h-full w-full max-w-5xl flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-0 py-4 mb-5">
+          <div>
+            <SkeletonBlock
+              className="h-2.5 w-12 mb-2"
+              style={{ borderRadius: "4px" }}
+            />
+            <SkeletonBlock className="h-6 w-40" />
+          </div>
+          <SkeletonBlock
+            className="h-6 w-32"
+            style={{ borderRadius: "20px" }}
+          />
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 space-y-4 overflow-y-auto">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={`msg-${i}`}
+              className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}
+            >
+              <div className="max-w-sm">
+                <SkeletonBlock className="h-24 rounded-2xl" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Input */}
+        <div className="mt-6">
+          <div className="rounded-full bg-card/90 border border-border px-4 py-3 backdrop-blur">
+            <div className="flex items-center gap-3">
+              <SkeletonBlock className="h-5 w-5 rounded-full" />
+              <SkeletonBlock className="flex-1 h-6" />
+              <SkeletonBlock className="h-5 w-5 rounded-full" />
+              <SkeletonBlock className="h-8 w-8 rounded-full" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -193,20 +274,20 @@ function SearchSkeleton() {
   return (
     <div
       className="relative h-full overflow-hidden"
-      style={{ background: "rgb(10,9,8)" }}
+      style={{ background: "var(--background)" }}
     >
       <div
         className="absolute inset-0"
-        style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(8px)" }}
+        style={{ background: "rgba(0,0,0,0.3)", backdropFilter: "blur(8px)" }}
       />
       <div className="absolute inset-0 flex items-start justify-center pt-16">
         <div
-          className="mx-4 w-full max-w-[30rem] overflow-hidden"
+          className="mx-4 w-full max-w-125 overflow-hidden"
           style={{
             borderRadius: "18px",
             border: "1px solid var(--border)",
             background: "var(--card)",
-            boxShadow: "0 32px 64px rgba(0,0,0,0.6)",
+            boxShadow: "0 32px 64px rgba(0,0,0,0.3)",
           }}
         >
           <div
@@ -247,7 +328,7 @@ function AuthSkeleton() {
   return (
     <div
       className="flex min-h-[calc(100vh-2rem)] items-center justify-center p-6"
-      style={{ background: "rgb(10,9,8)" }}
+      style={{ background: "var(--background)" }}
     >
       <div
         className="w-full max-w-md p-6"
@@ -276,13 +357,57 @@ function AuthSkeleton() {
   );
 }
 
+function SectionSkeleton({
+  title,
+  blocks = 3,
+}: {
+  title: string;
+  blocks?: number;
+}) {
+  return (
+    <div
+      className="flex h-full w-full items-center justify-center p-6"
+      style={{ background: "var(--background)" }}
+    >
+      <div
+        className="w-full max-w-5xl p-6"
+        style={{
+          border: "1px solid var(--border)",
+          borderRadius: "20px",
+          background: "var(--card)",
+        }}
+      >
+        <SkeletonBlock
+          className="h-3 w-20 mb-3"
+          style={{ borderRadius: "4px" }}
+        />
+        <SkeletonBlock className="h-7 w-64 mb-2" />
+        <SkeletonBlock
+          className="h-4 w-80 mb-6"
+          style={{ borderRadius: "6px" }}
+        />
+        <div className="grid gap-3">
+          {Array.from({ length: blocks }).map((_, i) => (
+            <SkeletonBlock
+              key={`${title}-${i}`}
+              className="h-20"
+              style={{ borderRadius: "14px" }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SiteLoading({ variant }: { variant: SiteLoadingVariant }) {
   if (variant === "app") return <AppSkeleton />;
+  if (variant === "chatpage") return <ChatPageSkeleton />;
+  if (variant === "projectpage") return <ProjectPageSkeleton />;
   if (variant === "search") return <SearchSkeleton />;
   if (variant === "auth") return <AuthSkeleton />;
   if (variant === "marketing")
     return <SectionSkeleton title="marketing" blocks={4} />;
-  if (variant === "chat") return <SectionSkeleton title="chat" blocks={5} />;
   if (variant === "projects")
     return <SectionSkeleton title="projects" blocks={4} />;
   if (variant === "settings")
