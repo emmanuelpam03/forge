@@ -6,6 +6,7 @@ import {
   createGeminiModel,
   extractTextFromModelChunk,
   getChatModelConfig,
+  type ModelOverride,
 } from "@/ai/models";
 import {
   buildChatMessages,
@@ -28,7 +29,6 @@ import {
   buildTaskCategoryClassificationMessage,
   parseTaskCategory,
 } from "@/ai/prompts/classification";
-import { PROMPTS } from "@/ai/prompts/promptRegistry";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -179,54 +179,6 @@ export function normalizeAssistantResponseText(text: string): string {
   return normalized;
 }
 
-function looksFragmentedForRewrite(text: string): boolean {
-  const words = text.match(/\b[\p{L}]+\b/gu) ?? [];
-  const tinyWordCount = words.filter((word) => word.length <= 2).length;
-
-  return (
-    /\b[\p{L}]\s+[\p{L}]\s+[\p{L}]/u.test(text) ||
-    /\b[\p{L}]{2,}\s+[\p{L}]{1,3}\s+[\p{L}]{2,}\b/u.test(text) ||
-    tinyWordCount >= 6
-  );
-}
-
-export async function refineAssistantResponseText(
-  text: string,
-): Promise<string> {
-  const normalized = normalizeAssistantResponseText(text);
-
-  if (!normalized || !looksFragmentedForRewrite(normalized)) {
-    return normalized;
-  }
-
-  try {
-    const model = createGeminiModel();
-    const prompt = `${PROMPTS.selfImprove}\n\nRewrite the text below so it is clean, readable, and professionally formatted.
-
-Rules:
-  - Fix spelling, spacing, punctuation, capitalization, and every obvious word break.
-- Preserve the original meaning exactly.
-- Preserve paragraph structure, headings, and list structure.
-- Do not add new facts, examples, warnings, or conclusions.
-  - Do not preserve broken words, extra spaces, or awkward line breaks.
-  - If a heading or sentence is malformed, repair it into standard English.
-- Return only the corrected text.
-
-Text:
-${normalized}`;
-
-    const response = await model.invoke([new HumanMessage(prompt)]);
-    const corrected = normalizeAssistantResponseText(
-      toTextContent(response.content),
-    );
-
-    return corrected || normalized;
-  } catch (error) {
-    console.warn("Assistant response refinement failed:", error);
-    return normalized;
-  }
-}
-
 let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
 
 export function setGraphStreamEventEmitter(
@@ -340,7 +292,7 @@ function buildToolArgs(
   }
 
   if (toolName === "summarizeText") {
-    return { text: message, maxSentences: 3 };
+    return { text: message, maxSentences: 5 };
   }
 
   if (toolName === "projectContextLookup") {
@@ -644,8 +596,13 @@ export async function generateResponseNode(state: ChatGraphState) {
 
     return { combined: `${prev}${next}`, emitted: next };
   }
-  const model = createGeminiModel();
-  const modelConfig = getChatModelConfig();
+  const override: ModelOverride = {
+    model: state.modelUsed || undefined,
+    provider:
+      (state.provider as "google-genai" | "ollama" | undefined) || undefined,
+  };
+  const model = createGeminiModel(override);
+  const modelConfig = getChatModelConfig(override);
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   let assistantMessage = "";
@@ -655,9 +612,9 @@ export async function generateResponseNode(state: ChatGraphState) {
   // streaming is required for low TTFT.
   try {
     let tokenStream: AsyncIterable<unknown>;
-    const modelConfig = getChatModelConfig();
 
-    if (modelConfig.provider === "ollama") {
+    const modelConfigInTry = modelConfig;
+    if (modelConfigInTry.provider === "ollama") {
       // For Ollama, use the stream() method for real token streaming
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tokenStream = (model as any).stream(messages as BaseMessage[]);
@@ -746,7 +703,7 @@ export async function generateResponseNode(state: ChatGraphState) {
     );
   }
 
-  assistantMessage = await refineAssistantResponseText(assistantMessage);
+  assistantMessage = normalizeAssistantResponseText(assistantMessage);
 
   const inputTokens = estimateTokens(
     messages
@@ -878,6 +835,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
   return {
     traceId: state.traceId,
     assistantMessageId: persistedAssistantMessageId,
+    userMessageId: createdUserMessageId,
   };
 }
 

@@ -63,9 +63,8 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
-  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  { id: "gpt-oss:120b", label: "GPT-OSS 120B" },
+  { id: "gemma-4-31b-it", label: "Gemma 4 31B IT" },
 ];
 
 function MessageBubble({
@@ -118,6 +117,7 @@ function MessageBubble({
       : null;
   const hasBranches = branchOptions.length > 1;
   const branchIndex = currentBranchIndex === -1 ? 0 : currentBranchIndex + 1;
+  const canCopyMessage = Boolean(onCopyMessage && message.content.trim());
 
   return (
     <div
@@ -135,27 +135,28 @@ function MessageBubble({
         }`}
       >
         {isEditing && isUser ? (
-          <div className="space-y-2">
+          <div className="min-w-[min(100%,48rem)] rounded-[28px] border border-border/80 bg-card/95 px-6 py-5 shadow-2xl shadow-black/20 backdrop-blur-sm">
             <textarea
+              autoFocus
               value={editingContent ?? message.content}
               onChange={(e) => setEditingContent(e.target.value)}
-              className="w-full resize-none rounded-md border bg-transparent p-2 text-sm"
+              className="min-h-[5rem] w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/70"
               rows={3}
             />
-            <div className="flex gap-2">
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                onClick={onCancelEdit}
+                className="rounded-full bg-[#1f1f1f] px-5 py-2 text-sm font-semibold text-foreground transition hover:bg-[#2a2a2a]"
+              >
+                Cancel
+              </button>
               <button
                 onClick={() =>
                   onSaveEdit(message.id, editingContent ?? message.content)
                 }
-                className="rounded bg-primary px-3 py-1 text-sm text-primary-foreground"
+                className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111111] transition hover:bg-white/90"
               >
                 Send
-              </button>
-              <button
-                onClick={onCancelEdit}
-                className="rounded border px-3 py-1 text-sm"
-              >
-                Cancel
               </button>
             </div>
           </div>
@@ -217,7 +218,7 @@ function MessageBubble({
         {message.role === "assistant" &&
         !message.pending &&
         !message.streaming ? (
-          <div className="mt-3 flex items-center gap-2 text-muted-foreground">
+          <div className="mt-3 flex items-center gap-2 text-muted-foreground opacity-100 transition group-hover:opacity-100">
             {hasBranches ? (
               <div className="flex items-center gap-1 text-muted-foreground">
                 <button
@@ -272,24 +273,37 @@ function MessageBubble({
         ) : null}
 
         {isUser && !isEditing ? (
-          <button
-            onClick={() => onStartEdit(message)}
-            aria-label="Edit"
-            title="Edit"
-            tabIndex={0}
-            className="absolute right-2 -bottom-6 hidden p-1 transition group-hover:block focus:block pointer-events-auto"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              className="text-muted-foreground fill-current"
-              aria-hidden="true"
+          <div className="absolute right-3 -bottom-10 hidden items-center gap-1 rounded-full border border-border/70 bg-background/90 px-2 py-1 shadow-lg shadow-black/15 backdrop-blur group-hover:flex group-focus-within:flex">
+            {canCopyMessage ? (
+              <button
+                type="button"
+                onClick={() => onCopyMessage?.(message.content)}
+                className="rounded-full p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                aria-label="Copy prompt"
+                title="Copy prompt"
+              >
+                <Copy size={13} />
+              </button>
+            ) : null}
+            <button
+              onClick={() => onStartEdit(message)}
+              aria-label="Edit prompt"
+              title="Edit prompt"
+              tabIndex={0}
+              className="rounded-full p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
             >
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                className="fill-current"
+                aria-hidden="true"
+              >
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
+              </svg>
+            </button>
+          </div>
         ) : null}
       </div>
     </div>
@@ -812,7 +826,11 @@ export function ChatClient({
         appendAnswerChunk(activeAssistantMessageId, delta);
       };
 
-      const applyDone = (content: string, persistedMessageId?: string) => {
+      const applyDone = (
+        content: string,
+        persistedMessageId?: string,
+        persistedUserMessageId?: string,
+      ) => {
         const finalContent = (content || streamedMessage || "").trim();
         const nextAssistantMessageId =
           persistedMessageId && persistedMessageId.trim().length > 0
@@ -851,7 +869,12 @@ export function ChatClient({
                   reasoning: streamedReasoning,
                   reasoningExpanded: currentMessage.reasoningExpanded ?? false,
                 }
-              : currentMessage,
+              : persistedUserMessageId && currentMessage.id === messageId
+                ? {
+                    ...currentMessage,
+                    id: persistedUserMessageId,
+                  }
+                : currentMessage,
           ),
         );
         finalizeStreamState(nextAssistantMessageId, "edit");
@@ -884,7 +907,11 @@ export function ChatClient({
                 source: "edit",
               });
               replaceSuggestionsFromPacket(event.suggestions ?? []);
-              applyDone(event.response ?? streamedMessage, event.messageId);
+              applyDone(
+                event.response ?? streamedMessage,
+                event.messageId,
+                event.userMessageId,
+              );
             }
           } catch (parseError) {
             if (
@@ -1328,7 +1355,11 @@ export function ChatClient({
           appendAnswerChunk(activeAssistantMessageId, delta);
         };
 
-        const applyDone = (content: string, persistedMessageId?: string) => {
+        const applyDone = (
+          content: string,
+          persistedMessageId?: string,
+          persistedUserMessageId?: string,
+        ) => {
           const finalContent = (content || streamedMessage || "").trim();
           const nextAssistantMessageId =
             persistedMessageId && persistedMessageId.trim().length > 0
@@ -1368,7 +1399,12 @@ export function ChatClient({
                     reasoningExpanded:
                       currentMessage.reasoningExpanded ?? false,
                   }
-                : currentMessage,
+                : persistedUserMessageId && currentMessage.id === userMessageId
+                  ? {
+                      ...currentMessage,
+                      id: persistedUserMessageId,
+                    }
+                  : currentMessage,
             ),
           );
           finalizeStreamState(nextAssistantMessageId, "send");
@@ -1411,7 +1447,11 @@ export function ChatClient({
                   source: "send",
                 });
                 replaceSuggestionsFromPacket(event.suggestions ?? []);
-                applyDone(event.response ?? streamedMessage, event.messageId);
+                applyDone(
+                  event.response ?? streamedMessage,
+                  event.messageId,
+                  event.userMessageId,
+                );
               }
             } catch (parseError) {
               if (

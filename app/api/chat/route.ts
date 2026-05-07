@@ -8,6 +8,8 @@ export const runtime = "nodejs";
 const chatRequestSchema = z.object({
   chatId: z.string().min(1),
   message: z.string().min(1),
+  model: z.string().optional(),
+  provider: z.enum(["google-genai", "ollama"]).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -87,6 +89,8 @@ export async function POST(request: NextRequest) {
                 assistantMessageId,
                 forceTool: null,
                 classifiedIntent: null,
+                model: parsedBody.data.model,
+                provider: parsedBody.data.provider,
               },
               (event) => {
                 if (event.type === "token") {
@@ -138,6 +142,9 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               messageId: finalPersistedMessageId ?? assistantMessageId,
+              userMessageId:
+                (result as { userMessageId?: string | null }).userMessageId ??
+                undefined,
               response: finalMessage,
               suggestions: result.suggestions ?? [],
             });

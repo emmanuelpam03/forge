@@ -25,6 +25,11 @@ export type ChatModelConfig =
       baseUrl: string;
     };
 
+export type ModelOverride = {
+  model?: string;
+  provider?: ChatModelProvider;
+};
+
 // Native client for true streaming when Gemini is selected.
 let nativeClient: GoogleGenerativeAI | null = null;
 
@@ -39,7 +44,58 @@ function getNativeClient(): GoogleGenerativeAI {
   return nativeClient;
 }
 
-export function getChatModelConfig(): ChatModelConfig {
+/**
+ * Infer provider from model name if provider is not explicitly specified.
+ * Models starting with "gemini" map to google-genai; others default to ollama.
+ */
+function inferProviderFromModel(modelName: string): ChatModelProvider {
+  if (modelName.toLowerCase().startsWith("gemini")) {
+    return "google-genai";
+  }
+  return "ollama";
+}
+
+/**
+ * Get chat model configuration with support for optional overrides.
+ * If override is provided with model/provider, it takes precedence over env vars.
+ */
+export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
+  // If override model is provided but provider is not, infer provider from model name
+  if (override?.model && !override?.provider) {
+    override = {
+      ...override,
+      provider: inferProviderFromModel(override.model),
+    };
+  }
+
+  // Use override provider if provided, otherwise read from env
+  const provider =
+    override?.provider ||
+    (process.env.AI_MODEL_PROVIDER?.trim().toLowerCase() === "ollama"
+      ? "ollama"
+      : "google-genai");
+
+  if (provider === "ollama") {
+    return {
+      provider,
+      model:
+        override?.model ||
+        process.env.OLLAMA_MODEL?.trim() ||
+        DEFAULT_OLLAMA_MODEL,
+      baseUrl: process.env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL,
+    };
+  }
+
+  return {
+    provider,
+    model:
+      override?.model ||
+      process.env.GEMINI_MODEL?.trim() ||
+      DEFAULT_GEMINI_MODEL,
+  };
+}
+
+export function getChatModelConfig_OLD(): ChatModelConfig {
   const provider =
     process.env.AI_MODEL_PROVIDER?.trim().toLowerCase() === "ollama"
       ? "ollama"
@@ -146,16 +202,16 @@ export function extractTextFromModelChunk(chunk: unknown): string {
   return "";
 }
 
-export function createGeminiModel() {
+export function createGeminiModel(override?: ModelOverride) {
   assertLangSmithConfig();
-  const config = getChatModelConfig();
+  const config = getChatModelConfig(override);
 
   if (config.provider === "ollama") {
     const apiKey = process.env.OLLAMA_API_KEY?.trim();
     const ollamaOpts: ConstructorParameters<typeof ChatOllama>[0] = {
       baseUrl: config.baseUrl,
       model: config.model,
-      temperature: 0.6,
+      temperature: 0.7,
       maxRetries: 2,
       ...(apiKey
         ? {
@@ -177,7 +233,7 @@ export function createGeminiModel() {
   const model = new ChatGoogleGenerativeAI({
     apiKey,
     model: config.model,
-    temperature: 0.6,
+    temperature: 0.7,
     maxRetries: 2,
   });
 
@@ -214,7 +270,7 @@ export function createGeminiModel() {
       systemInstruction,
       contents,
       generationConfig: {
-        temperature: 0.6,
+        temperature: 0.7,
       },
     });
 
@@ -224,6 +280,9 @@ export function createGeminiModel() {
   return model;
 }
 
-export function createGeminiToolModel(tools: DynamicStructuredTool[]) {
-  return createGeminiModel().bindTools(tools);
+export function createGeminiToolModel(
+  tools: DynamicStructuredTool[],
+  override?: ModelOverride,
+) {
+  return createGeminiModel(override).bindTools(tools);
 }

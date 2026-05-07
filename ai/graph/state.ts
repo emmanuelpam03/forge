@@ -260,7 +260,10 @@ export type ChatGraphInput = Pick<
   | "branchId"
   | "assistantMessageId"
   | "skipUserCreate"
->;
+> & {
+  model?: string;
+  provider?: string;
+};
 
 export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   chatId: input.chatId,

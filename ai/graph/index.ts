@@ -22,12 +22,13 @@ import {
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
-  refineAssistantResponseText,
+  normalizeAssistantResponseText,
 } from "@/ai/graph/nodes";
 import {
   createGeminiModel,
   extractTextFromModelChunk,
   getChatModelConfig,
+  type ModelOverride,
 } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router";
 import type { StreamEvent } from "./stream";
@@ -129,8 +130,12 @@ export async function runChatGraphStream(
 ) {
   const state = await runGraphPreResponse(input, onEvent);
 
-  const model = createGeminiModel();
-  const modelConfig = getChatModelConfig();
+  const override: ModelOverride = {
+    model: input.model,
+    provider: input.provider as "google-genai" | "ollama" | undefined,
+  };
+  const model = createGeminiModel(override);
+  const modelConfig = getChatModelConfig(override);
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   console.info("PRE-RESPONSE_MS", {
@@ -250,7 +255,7 @@ export async function runChatGraphStream(
   }
 
   // Generate suggestions only after response streaming is complete.
-  assistantMessage = await refineAssistantResponseText(assistantMessage);
+  assistantMessage = await normalizeAssistantResponseText(assistantMessage);
   Object.assign(state, await suggestTaskNode(state));
 
   // Stream validation: log if response is empty

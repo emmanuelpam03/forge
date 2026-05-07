@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 const regenRequestSchema = z.object({
   chatId: z.string().min(1),
   assistantMessageId: z.string().min(1),
+  model: z.string().optional(),
+  provider: z.enum(["google-genai", "ollama"]).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -175,6 +177,8 @@ export async function POST(request: NextRequest) {
                 branchId,
                 assistantMessageId: assistantPlaceholder.id,
                 skipUserCreate: true,
+                model: parsed.data.model,
+                provider: parsed.data.provider,
               },
               (event) => {
                 if (event.type === "token") {

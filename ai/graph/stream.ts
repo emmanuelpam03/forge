@@ -24,6 +24,7 @@ export type StreamEvent =
   | {
       type: "done";
       messageId?: string;
+      userMessageId?: string;
       response?: string;
       suggestions?: TaskSuggestion[];
     };

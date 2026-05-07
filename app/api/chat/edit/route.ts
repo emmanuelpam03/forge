@@ -10,6 +10,8 @@ const editRequestSchema = z.object({
   chatId: z.string().min(1),
   messageId: z.string().min(1),
   newContent: z.string().min(1),
+  model: z.string().optional(),
+  provider: z.enum(["google-genai", "ollama"]).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -126,6 +128,8 @@ export async function POST(request: NextRequest) {
                 parentMessageId: newUserMessage.id,
                 branchId,
                 skipUserCreate: true,
+                model: parsed.data.model,
+                provider: parsed.data.provider,
               },
               (event) => {
                 if (event.type === "token") {
