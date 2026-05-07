@@ -16,6 +16,7 @@ import {
   Trash2,
   Pencil,
 } from "lucide-react";
+import ForgeLogo from "./ForgeLogo";
 import { useFeedback } from "./feedback-provider";
 import { ModeToggle } from "./mode-toggle";
 import {
@@ -516,21 +517,18 @@ export function SidebarClient({
             <ChevronRight size={13} />
           </button>
         ) : (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Link href="/" className="flex items-center gap-2">
-                <img
-                  src="/file.svg"
-                  alt="forge"
-                  className="h-8 w-8 rounded-md"
-                />
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--sidebar-foreground)" }}
-                >
-                  forge
-                </span>
-              </Link>
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/" className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-sidebar-accent border border-sidebar-border">
+                <ForgeLogo className="h-5 w-5 text-sidebar-foreground" />
+              </span>
+              <span
+                className="text-sm font-semibold tracking-[-0.02em]"
+                style={{ color: "var(--sidebar-foreground)" }}
+              >
+                Forge
+              </span>
+            </Link>
               <button
                 type="button"
                 onClick={() => setCollapsed((v) => !v)}
@@ -538,7 +536,6 @@ export function SidebarClient({
               >
                 <ChevronLeft size={13} />
               </button>
-            </div>
 
             <div className="flex items-center gap-2">
               <button onClick={handleOpenSearch} className="h-8 w-8 rounded-xl">

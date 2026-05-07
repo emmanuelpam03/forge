@@ -78,7 +78,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
     <FeedbackContext.Provider value={value}>
       {children}
 
-      <div className="pointer-events-none fixed right-4 top-4 z-[120] flex w-[min(92vw,340px)] flex-col gap-2">
+      <div className="pointer-events-none fixed right-4 top-4 z-120 flex w-[min(92vw,340px)] flex-col gap-2">
         {items.map((item) => (
           <div
             key={item.id}

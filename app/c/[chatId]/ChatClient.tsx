@@ -112,7 +112,7 @@ function MessageBubble({
       <div
         className={`group relative ${
           message.role === "assistant"
-            ? "w-full max-w-[900px] px-0 py-0 bg-transparent border-0 text-foreground"
+            ? "w-full max-w-225 px-0 py-0 bg-transparent border-0 text-foreground"
             : `max-w-[80%] rounded-2xl border px-4 py-3 ${
                 isUser
                   ? "border-primary bg-primary/15 text-foreground"

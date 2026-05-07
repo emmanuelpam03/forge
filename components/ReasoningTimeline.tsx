@@ -83,55 +83,49 @@ export function ReasoningTimeline({
           <ChevronUp
             size={13}
             style={{ color: "var(--foreground)", opacity: 0.3 }}
-                      {[0, 1, 2].map((i) => (
-                        <span
-                          key={i}
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{
-                            background: "rgba(22,163,74,0.5)",
-                            animation: expanded
-                              ? "none"
-                              : `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-                          }}
-                        />
-        {expanded ? (
-          <ol className="space-y-3">
-            {shownSteps.map((step, index) => (
-              <li
-                key={`${step}-${index}`}
-                className="flex items-start gap-3"
-                style={{ lineHeight: "1.6" }}
-              >
-                <span
-                  className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: "rgba(16,185,129,0.5)" }}
-                />
-                <span
-                  className="text-[13px]"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  {step}
-                </span>
-              </li>
-            ))}
-          </ol>
+          />
         ) : (
-          <p
-            className="text-[13px]"
-            style={{
-              lineHeight: "1.65",
-              color: "var(--foreground)",
-              opacity: 0.7,
-            }}
-          >
-            {latestStep}
-          </p>
+          <ChevronDown
+            size={13}
+            style={{ color: "var(--foreground)", opacity: 0.3 }}
+          />
         )}
-      </div>
+      </button>
+
+      {/* Content area */}
+      {expanded ? (
+        <ol className="space-y-3 px-4 py-3">
+          {shownSteps.map((step, index) => (
+            <li
+              key={`${step}-${index}`}
+              className="flex items-start gap-3"
+              style={{ lineHeight: "1.6" }}
+            >
+              <span
+                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: "rgba(16,185,129,0.5)" }}
+              />
+              <span
+                className="text-[13px]"
+                style={{ color: "var(--foreground)" }}
+              >
+                {step}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p
+          className="px-4 py-3 text-[13px]"
+          style={{
+            lineHeight: "1.65",
+            color: "var(--foreground)",
+            opacity: 0.7,
+          }}
+        >
+          {latestStep}
+        </p>
+      )}
     </div>
   );
 }
-                          <span
-                            className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{ background: "rgba(22,163,74,0.5)" }}
-                          />

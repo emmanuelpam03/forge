@@ -132,7 +132,7 @@ export default function SearchPage() {
 
       {/* Search Modal */}
       <div className="absolute inset-0 flex items-start justify-center pt-16 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-[500px] mx-4 rounded-2xl border border-border bg-popover shadow-lg overflow-hidden">
+        <div className="pointer-events-auto w-full max-w-125 mx-4 rounded-2xl border border-border bg-popover shadow-lg overflow-hidden">
           {/* Search Input */}
           <div className="flex items-center gap-3 border-b border-border px-4 py-3">
             <Search size={18} className="text-muted-foreground shrink-0" />
@@ -192,7 +192,7 @@ export default function SearchPage() {
                 {filteredChats.length > 0 && (
                   <div>
                     <div className="sticky top-0 bg-popover/80 backdrop-blur-sm border-b border-border px-4 py-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                         Chats
                       </p>
                     </div>
@@ -224,7 +224,7 @@ export default function SearchPage() {
                 {filteredProjects.length > 0 && (
                   <div>
                     <div className="sticky top-0 bg-popover/80 backdrop-blur-sm border-b border-border px-4 py-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                         Projects
                       </p>
                     </div>

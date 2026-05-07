@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, type CSSProperties } from "react";
-import { ArrowUp, Mic, Bookmark, Layers, Globe } from "lucide-react";
+import { useState, type CSSProperties } from "react";
+import { ArrowUp, Bookmark, Layers, Globe } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFeedback } from "@/components/feedback-provider";
 
@@ -50,22 +50,16 @@ export default function HomePage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
 
-  const [greeting, setGreeting] = useState("Hello");
-  const [userName, setUserName] = useState("there");
-
-  // Compute greeting and try to read a stored user name
-  useEffect(() => {
+  const hour = new Date().getHours();
+  const greetingText =
+    hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+  const [userName] = useState(() => {
     try {
-      const name = localStorage.getItem("userName");
-      if (name) setUserName(name);
-    } catch (e) {
-      /* ignore */
+      return localStorage.getItem("userName") ?? "there";
+    } catch {
+      return "there";
     }
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Morning");
-    else if (hour < 18) setGreeting("Afternoon");
-    else setGreeting("Evening");
-  }, []);
+  });
 
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
@@ -167,7 +161,7 @@ export default function HomePage() {
 
         {/* Main Card */}
         <div
-          className="flex w-full max-w-[26rem] flex-col gap-6"
+          className="flex w-full max-w-104 flex-col gap-6"
           style={{
             background:
               "linear-gradient(160deg, color-mix(in oklab, var(--card) 96%, transparent) 0%, color-mix(in oklab, var(--card) 90%, transparent) 100%)",
@@ -189,11 +183,11 @@ export default function HomePage() {
                 fontFamily: "var(--font-manrope), sans-serif",
               }}
             >
-              {greeting.toUpperCase() + ", " + userName}
+              {greetingText.toUpperCase() + ", " + userName}
             </h1>
 
             <p
-              className="max-w-[17rem] text-[13px] leading-[1.7]"
+              className="max-w-68 text-[13px] leading-[1.7]"
               style={{ color: "var(--muted-foreground)" }}
             >
               Think, create, research, and organize — all in one workspace.
@@ -302,7 +296,7 @@ export default function HomePage() {
             </div>
             <div className="text-center mt-2">
               <div className="text-sm font-semibold text-foreground">
-                {greeting.toUpperCase()}, {userName}
+                {greetingText.toUpperCase()}, {userName}
               </div>
             </div>
           </div>
