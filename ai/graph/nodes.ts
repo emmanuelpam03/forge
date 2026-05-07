@@ -109,7 +109,6 @@ export function normalizeAssistantResponseText(text: string): string {
 
       const currentLower = current.toLowerCase();
       const nextLower = next.toLowerCase();
-      const afterNextLower = afterNext?.toLowerCase() ?? "";
 
       const mergeTwoTokens =
         (!commonStopWords.has(currentLower) &&
@@ -127,7 +126,23 @@ export function normalizeAssistantResponseText(text: string): string {
         next.length <= 3 &&
         afterNext.length >= 3;
 
+      const mergeThreeShortTokens =
+        afterNextIsWord &&
+        current.length <= 3 &&
+        next.length <= 3 &&
+        afterNext.length >= 3 &&
+        !commonStopWords.has(currentLower) &&
+        !commonStopWords.has(nextLower) &&
+        !commonStopWords.has(afterNext.toLowerCase()) &&
+        current.length + next.length + afterNext.length <= 12;
+
       if (mergeThreeTokens) {
+        repaired.push(`${current}${next}${afterNext}`);
+        index += 2;
+        continue;
+      }
+
+      if (mergeThreeShortTokens) {
         repaired.push(`${current}${next}${afterNext}`);
         index += 2;
         continue;
@@ -238,12 +253,6 @@ function getToolStatusMessage(toolName: string): string {
 
 function looksLikeDateTimeQuery(message: string): boolean {
   return /\b(time|timezone|date|day of week|calendar)\b/i.test(message);
-}
-
-function looksLikeProjectLookupQuery(message: string): boolean {
-  return /\b(project|workspace|this chat|this conversation|previous decision|prior decision|earlier discussion|history|what did we decide)\b/i.test(
-    message,
-  );
 }
 
 function deriveQueryIntentFromClassification(
