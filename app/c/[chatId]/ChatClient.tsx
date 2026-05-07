@@ -60,11 +60,12 @@ type ChatClientProps = {
 type ModelOption = {
   id: string;
   label: string;
+  provider: "google-genai" | "ollama";
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
-  { id: "gpt-oss:120b", label: "GPT-OSS 120B" },
-  { id: "gemma-4-31b-it", label: "Gemma 4 31B IT" },
+  { id: "gpt-oss:120b", label: "GPT-OSS 120B", provider: "ollama" },
+  { id: "gemma-4-31b-it", label: "Gemma 4 31B IT", provider: "google-genai" },
 ];
 
 function MessageBubble({
@@ -77,12 +78,10 @@ function MessageBubble({
   onCancelEdit,
   onRegenerate,
   onSwitchBranch,
-  onToggleReasoning,
   onCopyMessage,
   reasoning,
   showReasoning,
 }: {
-  message: ChatMessage;
   onStartEdit: (m: ChatMessage) => void;
   isEditing: boolean;
   editingContent: string | null;
@@ -795,6 +794,7 @@ export function ChatClient({
           messageId,
           newContent,
           model: selectedModelId,
+          provider: selectedModel.provider,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1010,6 +1010,7 @@ export function ChatClient({
           chatId,
           assistantMessageId,
           model: selectedModelId,
+          provider: selectedModel.provider,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1320,6 +1321,7 @@ export function ChatClient({
             chatId,
             message,
             model: selectedModelId,
+            provider: selectedModel.provider,
           }),
           signal: abortControllerRef.current.signal,
         });
