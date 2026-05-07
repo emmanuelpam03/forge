@@ -1565,7 +1565,12 @@ export function ChatClient({
             </button>
 
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition hover:text-foreground hover:bg-accent/70">
+              <button
+                type="button"
+                title="Select model"
+                aria-label="Select model"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-2 text-[12px] font-medium text-muted-foreground shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              >
                 <span>Claude</span>
                 <ChevronDown size={16} />
               </button>
