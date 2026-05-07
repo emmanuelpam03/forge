@@ -319,7 +319,6 @@ function ChatItem({
         className={sidebarItemBase}
         style={{
           ...(active ? sidebarItemActive : sidebarItemInactive),
-          borderBottomColor: "var(--border)",
           marginBottom: "4px",
           cursor: "pointer",
         }}
