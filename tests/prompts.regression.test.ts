@@ -39,17 +39,17 @@ test("layered prompts remain available at top level", () => {
   assert.match(PROMPTS.safety, /TRUTHFULNESS/);
 });
 
-test("intent classifier prompt contract remains strict and token-only", () => {
+test("intent classifier prompt contract emits structured routing JSON", () => {
   const message = buildIntentClassificationMessage(
     "Help me write a React component",
   );
 
-  assert.match(
-    message,
-    /Classify the user's message into exactly ONE category:/,
-  );
-  assert.match(message, /Return ONLY the lowercase category token\./);
-  assert.match(message, /If uncertain, return "chat"\./);
+  assert.match(message, /You are a strict intent router for Forge\./);
+  assert.match(message, /Return JSON ONLY in this exact shape:/);
+  assert.match(message, /"intent":"\.\.\."/);
+  assert.match(message, /"difficulty":"\.\.\."/);
+  assert.match(message, /"tool_usage":\["\.\.\."\]/);
+  assert.match(message, /"multi_intent":\["\.\.\."\]/);
   assert.match(message, /User message: "Help me write a React component"/);
 });
 
@@ -65,6 +65,16 @@ test("freshness classifier prompt contract enforces exact JSON shape", () => {
     /Do not include explanations, markdown, or extra keys\./,
   );
   assert.match(message, /User message: "Bitcoin price right now"/);
+});
+
+test("intent prompt keeps low-token structured routing scope", () => {
+  const message = buildIntentClassificationMessage("Explain hooks simply");
+
+  assert.match(message, /difficulty/);
+  assert.match(message, /verbosity/);
+  assert.match(message, /audience_level/);
+  assert.match(message, /response_mode/);
+  assert.match(message, /memory_relevance/);
 });
 
 test("router keeps backward-compatible freshness export contract", () => {

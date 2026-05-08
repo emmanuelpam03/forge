@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent.ts";
 import {
   parseClassificationText,
   shouldForceWebSearchFromClassification,
-} from "@/ai/graph/classification";
+} from "@/ai/graph/classification.ts";
 
 const factualQueries = [
   "Who is the current president of the United States?",
@@ -15,7 +16,7 @@ const factualQueries = [
 ];
 
 for (const query of factualQueries) {
-  const promptPath = resolve(process.cwd(), "ai/prompts/router.ts");
+  const promptPath = resolve(process.cwd(), "ai/prompts/intent.ts");
   const promptSource = readFileSync(promptPath, "utf8");
 
   assert.ok(
@@ -24,9 +25,15 @@ for (const query of factualQueries) {
   );
   assert.ok(
     promptSource.includes(
-      "requiresFreshData = true if the answer depends on real-world state",
+      "requiresFreshData = true if the answer depends on changing real-world state or could be stale.",
     ),
     `fresh-data rule missing for: ${query}`,
+  );
+
+  assert.ok(
+    buildFreshnessClassificationMessage(query).includes(
+      "Return JSON ONLY in this exact shape",
+    ),
   );
 
   const forcedClassification = parseClassificationText(

@@ -2,13 +2,14 @@ import { SYSTEM_PROMPT } from "./system.prompt.ts";
 import { SAFETY_PROMPT } from "./safety.prompt.ts";
 import { CLASSIFIER_PROMPT } from "./classifier.prompt.ts";
 import { TOOLS_PROMPT } from "./tools.prompt.ts";
-import { FORMATTER_PROMPT } from "./formatter.prompt.ts";
+import { FORMATTER_PROMPT, buildFormatterPrompt } from "./formatter.prompt.ts";
 import { CODING_PROMPT } from "./coding.prompt.ts";
 import { REASONING_PROMPT } from "./reasoning.prompt.ts";
 import { PLANNING_PROMPT } from "./planning.prompt.ts";
 import { SELF_IMPROVE_PROMPT } from "./self_improve.prompt.ts";
 import { buildModePrompt } from "./mode.prompt.ts";
 import type { PromptBehaviorControls } from "./control.types.ts";
+import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "./control.types.ts";
 import type { PromptTaskCategory } from "@/ai/graph/state";
 
 export type PromptLayerKey =
@@ -130,8 +131,12 @@ export function getModePrompt(controls: PromptBehaviorControls): string {
   return buildModePrompt(controls);
 }
 
-export function getFormatterPrompt(): string {
-  return FORMATTING_PROMPTS.default.content;
+export function getFormatterPrompt(controls?: PromptBehaviorControls): string {
+  // If controls are provided, build a controls-aware formatter prompt.
+  if (controls) return buildFormatterPrompt(controls);
+
+  // Fallback: return legacy formatter prompt content with default behavior.
+  return buildFormatterPrompt(DEFAULT_PROMPT_BEHAVIOR_CONTROLS);
 }
 
 export function getMasterPrompt(): string {

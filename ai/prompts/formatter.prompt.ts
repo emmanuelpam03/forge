@@ -35,3 +35,21 @@ SANITIZATION
 - Ensure markdown is balanced and valid.
 - Final output should be publication-ready with zero typos or spacing corruption.
 `;
+
+import type { PromptBehaviorControls } from "./control.types.ts";
+
+export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
+  // Small, high-priority header that communicates selected formatting profile
+  // and audience/verbosity so the model can tailor the rest of the formatter
+  // guidance that follows.
+  const header =
+    `FORMATTER PROFILE: ${controls.formatting}\n` +
+    `Preferred verbosity: ${controls.verbosity}\n` +
+    `Audience level: ${controls.audience}\n` +
+    `Response mode hint: ${controls.responseMode}\n\n`;
+
+  // Keep the rich legacy formatter guidance after the small header to avoid
+  // invalidating downstream expectations while making the formatter
+  // responsive to classifier outputs.
+  return header + FORMATTER_PROMPT;
+}

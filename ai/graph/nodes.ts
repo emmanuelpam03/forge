@@ -8,10 +8,7 @@ import {
   getChatModelConfig,
   type ModelOverride,
 } from "@/ai/models";
-import {
-  buildChatMessages,
-  buildFreshnessClassificationMessage,
-} from "@/ai/prompts/router.ts";
+import { buildChatMessages } from "@/ai/prompts/router.ts";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { MEMORY_EXTRACTION_PROMPT } from "@/ai/prompts/memory";
 import {
@@ -23,12 +20,10 @@ import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import {
   parseClassificationText,
+  deriveLegacyIntentFromStructured,
   type QueryIntentClassification,
-} from "@/ai/graph/classification";
-import {
-  buildTaskCategoryClassificationMessage,
-  parseTaskCategory,
-} from "@/ai/prompts/classification";
+} from "@/ai/graph/classification.ts";
+import { buildIntentClassificationMessage } from "@/ai/prompts/intent.ts";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 
@@ -784,28 +779,52 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
 export async function classifyIntentNode(state: ChatGraphState) {
   try {
     const model = createGeminiModel();
-    const classificationPrompt = buildFreshnessClassificationMessage(
-      state.userMessage,
-    );
-    const taskCategoryPrompt = buildTaskCategoryClassificationMessage(
+    const classificationPrompt = buildIntentClassificationMessage(
       state.userMessage,
     );
 
     let classifiedIntent = null;
+    let structuredIntent = null;
     let taskCategory = state.taskCategory ?? "general";
     try {
-      const [freshnessResponse, taskCategoryResponse] = await Promise.all([
-        model.invoke([new HumanMessage(classificationPrompt)]),
-        model.invoke([new HumanMessage(taskCategoryPrompt)]),
+      const response = await model.invoke([
+        new HumanMessage(classificationPrompt),
       ]);
+      const parsed = parseClassificationText(toTextContent(response.content));
 
-      classifiedIntent = parseClassificationText(
-        toTextContent(freshnessResponse.content),
+      structuredIntent = parsed.structured ?? null;
+      classifiedIntent = deriveLegacyIntentFromStructured(
+        structuredIntent ??
+          parsed.structured ?? {
+            intent: "casual conversation",
+            difficulty: "medium",
+            verbosity: "balanced",
+            audienceLevel: "intermediate",
+            toolUsage: [],
+            responseMode: "chat",
+            confidence: "low",
+            memoryRelevance: false,
+            reasoningDepth: "standard",
+            multiIntent: [],
+          },
       );
 
-      taskCategory = parseTaskCategory(
-        toTextContent(taskCategoryResponse.content),
-      );
+      taskCategory =
+        structuredIntent?.intent === "coding" ||
+        structuredIntent?.intent === "debugging" ||
+        structuredIntent?.intent === "automation tasks"
+          ? "coding"
+          : structuredIntent?.intent === "planning"
+            ? "planning"
+            : structuredIntent?.intent === "teaching" ||
+                structuredIntent?.intent === "analysis" ||
+                structuredIntent?.intent === "comparison" ||
+                structuredIntent?.intent === "summarization"
+              ? "reasoning"
+              : structuredIntent?.intent === "architecture" ||
+                  structuredIntent?.intent === "system design"
+                ? "explanation"
+                : "general";
     } catch (classificationError) {
       console.warn(
         "Intent classification model call failed:",
@@ -814,6 +833,20 @@ export async function classifyIntentNode(state: ChatGraphState) {
     }
 
     const queryIntent = deriveQueryIntentFromClassification(classifiedIntent);
+    const promptBehavior = structuredIntent
+      ? {
+          responseMode: structuredIntent.responseMode,
+          verbosity: structuredIntent.verbosity,
+          audience: structuredIntent.audienceLevel,
+          teachingDepth: structuredIntent.reasoningDepth,
+          formatting:
+            structuredIntent.responseMode === "code"
+              ? "stepwise"
+              : structuredIntent.responseMode === "compare"
+                ? "table-first"
+                : "default",
+        }
+      : undefined;
 
     console.info(
       JSON.stringify({
@@ -822,6 +855,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
         runId: hashIdentifierForLogging(state.runId),
         queryIntent,
         classifiedIntent,
+        structuredIntent,
         taskCategory,
         message: state.userMessage,
       }),
@@ -848,7 +882,19 @@ export async function classifyIntentNode(state: ChatGraphState) {
       intent: classifiedIntent?.intent ?? queryIntent.type,
       queryIntent,
       classifiedIntent,
+      structuredIntent,
       taskCategory,
+      responseMode: structuredIntent?.responseMode ?? "auto",
+      verbosityLevel: structuredIntent?.verbosity ?? "auto",
+      audienceLevel: structuredIntent?.audienceLevel ?? "auto",
+      teachingDepth: structuredIntent?.reasoningDepth ?? "auto",
+      formattingProfile:
+        structuredIntent?.responseMode === "code"
+          ? "stepwise"
+          : structuredIntent?.responseMode === "compare"
+            ? "table-first"
+            : "auto",
+      promptBehavior,
     };
   } catch (error) {
     console.error("Intent classification failed:", error);
@@ -859,7 +905,14 @@ export async function classifyIntentNode(state: ChatGraphState) {
         type: "knowledge",
       },
       classifiedIntent: null,
+      structuredIntent: null,
       taskCategory: "general",
+      responseMode: "auto",
+      verbosityLevel: "auto",
+      audienceLevel: "auto",
+      teachingDepth: "auto",
+      formattingProfile: "auto",
+      promptBehavior: undefined,
     };
   }
 }

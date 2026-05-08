@@ -1,7 +1,8 @@
 import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
-import type { QueryIntentClassification } from "@/ai/graph/classification";
+import type { QueryIntentClassification } from "@/ai/graph/classification.ts";
+import type { StructuredIntentClassification } from "@/ai/graph/classification.ts";
 import type {
   AudienceLevel,
   FormattingProfile,
@@ -106,6 +107,7 @@ export type ChatGraphState = {
   synthesisNote: string;
   queryIntent: QueryIntentClassification | null;
   classifiedIntent: ClassifiedIntent | null;
+  structuredIntent: StructuredIntentClassification | null;
   taskCategory: PromptTaskCategory;
   responseMode?: ResponseMode | "auto";
   verbosityLevel?: VerbosityLevel | "auto";
@@ -237,6 +239,10 @@ export const chatGraphState = Annotation.Root({
     default: () => null,
     reducer: lastValue,
   }),
+  structuredIntent: Annotation<StructuredIntentClassification | null>({
+    default: () => null,
+    reducer: lastValue,
+  }),
   taskCategory: Annotation<PromptTaskCategory>({
     default: () => "general",
     reducer: lastValue,
@@ -319,6 +325,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   synthesisNote: "",
   queryIntent: null,
   classifiedIntent: input.classifiedIntent ?? null,
+  structuredIntent: null,
   taskCategory: "general",
   responseMode: "auto",
   verbosityLevel: "auto",

@@ -325,9 +325,11 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       id: "formatter-default",
       layer: "formatting",
       priority: 75,
-      content: getFormatterPrompt(),
+      content: getFormatterPrompt(controls),
       directives: {
-        "format.output": "readable-clean-structured",
+        "format.output": controls.formatting,
+        "response.verbosity": controls.verbosity,
+        "response.audience": controls.audience,
       },
     },
     {

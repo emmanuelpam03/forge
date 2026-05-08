@@ -103,3 +103,24 @@ test("graph state includes prompt behavior control fields", () => {
     /promptBehavior: Annotation<PromptBehaviorControls \| undefined>/,
   );
 });
+
+test("formatter prompt reflects PromptBehaviorControls from classifier", async () => {
+  const { getFormatterPrompt } =
+    await import("../ai/prompts/promptRegistry.ts");
+
+  const controls = {
+    responseMode: "code",
+    verbosity: "concise",
+    audience: "beginner",
+    teachingDepth: "minimal",
+    formatting: "stepwise",
+  };
+
+  const prompt = getFormatterPrompt(controls);
+
+  // Header injected by buildFormatterPrompt
+  assert.match(prompt, /FORMATTER PROFILE: stepwise/);
+  assert.match(prompt, /Preferred verbosity: concise/);
+  assert.match(prompt, /Audience level: beginner/);
+  assert.match(prompt, /Response mode hint: code/);
+});
