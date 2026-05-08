@@ -9,6 +9,7 @@ import {
 } from "@/ai/prompts/composer";
 import {
   getFormatterPrompt,
+  getHumanizationPrompt,
   getMasterPrompt,
   getModePrompt,
   getSafetyPrompt,
@@ -16,6 +17,7 @@ import {
   getToolsPrompt,
 } from "@/ai/prompts/promptRegistry";
 import { getSeniorEngineerPrompt } from "@/ai/prompts/promptRegistry";
+import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import {
   DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
   type AudienceLevel,
@@ -352,6 +354,7 @@ function buildMemoryInjection(state: ChatGraphState): string {
 
 function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const controls = state.promptBehavior ?? resolveBehaviorControls(state);
+  const humanizationEnabled = shouldUseHumanizationMode(state.userMessage);
 
   // Log anonymized teaching depth choice for ML feedback
   logTeachingDepthTelemetry(state, controls.teachingDepth);
@@ -433,6 +436,18 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "task.category": state.taskCategory,
       },
       enabled: taskPrompt.trim().length > 0,
+    },
+    {
+      id: "humanization-explicit",
+      layer: "humanization",
+      priority: 78,
+      content: getHumanizationPrompt(),
+      directives: {
+        "response.humanization": humanizationEnabled
+          ? "explicit-request"
+          : "disabled",
+      },
+      enabled: humanizationEnabled,
     },
     {
       id: "formatter-default",

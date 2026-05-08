@@ -25,6 +25,7 @@ test("system prompt exposes the canonical master foundation", () => {
 test("layered prompts remain available at top level", () => {
   assert.ok(PROMPTS.safety.trim().length > 0);
   assert.ok(PROMPTS.formatter.trim().length > 0);
+  assert.ok(PROMPTS.humanization.trim().length > 0);
   assert.ok(PROMPTS.classifier.trim().length > 0);
   assert.ok(PROMPTS.coding.trim().length > 0);
   assert.ok(PROMPTS.reasoning.trim().length > 0);
@@ -35,6 +36,9 @@ test("layered prompts remain available at top level", () => {
   assert.match(PROMPTS.formatter, /RESPONSE MODE MAPPING/);
   assert.match(PROMPTS.formatter, /one command per line/);
   assert.match(PROMPTS.formatter, /Keep commands copy-paste safe/);
+  assert.match(PROMPTS.humanization, /ANTI-ROBOTIC RULES/);
+  assert.match(PROMPTS.humanization, /ACTIVATION/);
+  assert.match(PROMPTS.humanization, /Do not apply globally/);
   assert.match(PROMPTS.safety, /SAFETY BOUNDARY/);
   assert.match(PROMPTS.safety, /TRUTHFULNESS/);
 });
@@ -193,6 +197,25 @@ test("router supports auto persona for coding and explicit overrides", () => {
   assert.match(source, /state\.taskCategory === "coding"/);
   assert.match(source, /resolvedPersonaRole/);
   assert.match(source, /persona-senior-engineer/);
+});
+
+test("router wires explicit-only humanization prompt activation", () => {
+  const source = readWorkspaceFile("ai/prompts/router.ts");
+
+  assert.match(source, /shouldUseHumanizationMode/);
+  assert.match(source, /humanizationEnabled/);
+  assert.match(source, /id: "humanization-explicit"/);
+  assert.match(source, /layer: "humanization"/);
+  assert.match(source, /enabled: humanizationEnabled/);
+  assert.match(source, /response\.humanization/);
+});
+
+test("nodes apply sanitizer only for explicit humanization mode", () => {
+  const source = readWorkspaceFile("ai/graph/nodes.ts");
+
+  assert.match(source, /humanizeAssistantResponseText/);
+  assert.match(source, /sanitizeAssistantOutput/);
+  assert.match(source, /shouldUseHumanizationMode\(state\.userMessage\)/);
 });
 
 test("chat API accepts persona opt-in payload", () => {

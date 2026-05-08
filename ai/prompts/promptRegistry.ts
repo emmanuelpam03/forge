@@ -9,6 +9,7 @@ import { PLANNING_PROMPT } from "./planning.prompt.ts";
 import { SELF_IMPROVE_PROMPT } from "./self_improve.prompt.ts";
 import { buildModePrompt } from "./mode.prompt.ts";
 import { SENIOR_ENGINEER_PROMPT } from "./senior-engineer.prompt.ts";
+import { HUMANIZATION_PROMPT } from "./humanization.prompt.ts";
 import type { PromptBehaviorControls } from "./control.types.ts";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "./control.types.ts";
 import type { PromptTaskCategory } from "@/ai/graph/state";
@@ -17,6 +18,7 @@ export type PromptLayerKey =
   | "foundation"
   | "safety"
   | "mode"
+  | "humanization"
   | "task"
   | "formatting"
   | "utility";
@@ -70,6 +72,16 @@ const TASK_PROMPTS = {
   },
 } as const satisfies Record<string, PromptRegistryEntry>;
 
+const HUMANIZATION_PROMPTS = {
+  explicit: {
+    id: "humanization.explicit.v1",
+    layer: "humanization",
+    version: "1.0.0",
+    content: HUMANIZATION_PROMPT,
+    tags: ["tone", "rewrite", "natural-language"],
+  },
+} as const satisfies Record<string, PromptRegistryEntry>;
+
 const FORMATTING_PROMPTS = {
   default: {
     id: "format.default.v2",
@@ -108,6 +120,7 @@ export const PROMPT_REGISTRY = {
     layer: "mode",
     version: "1.0.0",
   },
+  humanization: HUMANIZATION_PROMPTS,
   task: TASK_PROMPTS,
   formatting: FORMATTING_PROMPTS,
   utility: UTILITY_PROMPTS,
@@ -144,6 +157,10 @@ export function getSeniorEngineerPrompt(): string {
   return SENIOR_ENGINEER_PROMPT;
 }
 
+export function getHumanizationPrompt(): string {
+  return HUMANIZATION_PROMPTS.explicit.content;
+}
+
 export function getMasterPrompt(): string {
   return FOUNDATION_PROMPTS.master.content;
 }
@@ -162,6 +179,7 @@ export const PROMPTS = {
   classifier: UTILITY_PROMPTS.classifier.content,
   tools: getToolsPrompt(),
   formatter: getFormatterPrompt(),
+  humanization: getHumanizationPrompt(),
   coding: TASK_PROMPTS.coding.content,
   reasoning: TASK_PROMPTS.reasoning.content,
   planning: TASK_PROMPTS.planning.content,

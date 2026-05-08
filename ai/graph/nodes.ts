@@ -24,6 +24,8 @@ import {
   type QueryIntentClassification,
 } from "@/ai/graph/classification.ts";
 import { buildIntentClassificationMessage } from "@/ai/prompts/intent.ts";
+import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
+import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
@@ -42,6 +44,20 @@ export function normalizeAssistantResponseText(text: string): string {
     .replace(/([.,;:!?])(\S)/g, "$1 $2")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function humanizeAssistantResponseText(
+  text: string,
+  shouldHumanize: boolean,
+): string {
+  const normalized = normalizeAssistantResponseText(text);
+
+  if (!shouldHumanize) {
+    return normalized;
+  }
+
+  const sanitized = sanitizeAssistantOutput(normalized);
+  return sanitized || normalized;
 }
 
 let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
@@ -376,7 +392,10 @@ export async function generateResponseNode(state: ChatGraphState) {
     );
   }
 
-  assistantMessage = normalizeAssistantResponseText(assistantMessage);
+  assistantMessage = humanizeAssistantResponseText(
+    assistantMessage,
+    shouldUseHumanizationMode(state.userMessage),
+  );
 
   const inputTokens = estimateTokens(
     messages

@@ -9,6 +9,7 @@ import {
 } from "../ai/prompts/classification.ts";
 import type { PromptBehaviorControls } from "../ai/prompts/control.types.ts";
 import { CLASSIFIER_PROMPT } from "../ai/prompts/classifier.prompt.ts";
+import { shouldUseHumanizationMode } from "../ai/prompts/humanization.prompt.ts";
 
 function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -39,6 +40,16 @@ test("router composes layered master and formatter prompts", () => {
   assert.match(source, /getFormatterPrompt/);
   assert.match(source, /layer: "master-system"/);
   assert.match(source, /layer: "formatting"/);
+});
+
+test("composer includes dedicated humanization layer ordering", () => {
+  const source = readWorkspaceFile("ai/prompts/composer.ts");
+
+  assert.match(source, /\| "humanization"/);
+  assert.match(
+    source,
+    /"mode",\s*\n\s*"persona",\s*\n\s*"humanization",\s*\n\s*"task"/,
+  );
 });
 
 test("graph state defines v2 task category with general default", () => {
@@ -126,4 +137,20 @@ test("formatter prompt reflects PromptBehaviorControls from classifier", async (
   assert.match(prompt, /Audience level: beginner/);
   assert.match(prompt, /Response mode hint: code/);
   assert.match(prompt, /Persona mode: auto/);
+});
+
+test("humanization trigger only activates on explicit requests", () => {
+  assert.equal(
+    shouldUseHumanizationMode("Please humanize this message."),
+    true,
+  );
+  assert.equal(
+    shouldUseHumanizationMode("Can you make this less robotic?"),
+    true,
+  );
+  assert.equal(
+    shouldUseHumanizationMode("Refactor this TypeScript function"),
+    false,
+  );
+  assert.equal(shouldUseHumanizationMode(""), false);
 });

@@ -2,6 +2,8 @@ export type PromptLayer =
   | "master-system"
   | "safety"
   | "mode"
+  | "persona"
+  | "humanization"
   | "task"
   | "formatting"
   | "runtime-context"
@@ -45,6 +47,8 @@ const PIPELINE_ORDER: PromptLayer[] = [
   "master-system",
   "safety",
   "mode",
+  "persona",
+  "humanization",
   "task",
   "formatting",
   "runtime-context",
