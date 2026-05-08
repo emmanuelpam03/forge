@@ -42,6 +42,8 @@ type ChatMessage = {
   reasoning?: string;
   reasoningExpanded?: boolean;
   error?: string;
+  suggestions?: TaskSuggestion[];
+  suggestionResponse?: string;
 };
 
 type SuggestionState = TaskSuggestion & {
@@ -79,6 +81,9 @@ function MessageBubble({
   onRegenerate,
   onSwitchBranch,
   onCopyMessage,
+  onAcceptSuggestion,
+  onRejectSuggestion,
+  onCancelSuggestion,
   reasoning,
   showReasoning,
 }: {
@@ -92,6 +97,9 @@ function MessageBubble({
   onSwitchBranch?: (messageId: string, branch: BranchOption) => void;
   onToggleReasoning?: (messageId: string, expanded: boolean) => void;
   onCopyMessage?: (content: string) => void;
+  onAcceptSuggestion?: (suggestion: SuggestionState) => void;
+  onRejectSuggestion?: (suggestionId: string) => void;
+  onCancelSuggestion?: (suggestion: SuggestionState) => void;
   reasoning: string;
   showReasoning: boolean;
 }) {
@@ -830,6 +838,8 @@ export function ChatClient({
         content: string,
         persistedMessageId?: string,
         persistedUserMessageId?: string,
+        suggestionResponse?: string,
+        persistedSuggestions?: TaskSuggestion[],
       ) => {
         const finalContent = (content || streamedMessage || "").trim();
         const nextAssistantMessageId =
@@ -868,6 +878,10 @@ export function ChatClient({
                   status: undefined,
                   reasoning: streamedReasoning,
                   reasoningExpanded: currentMessage.reasoningExpanded ?? false,
+                  suggestionResponse:
+                    suggestionResponse ?? currentMessage.suggestionResponse,
+                  suggestions:
+                    persistedSuggestions ?? currentMessage.suggestions ?? [],
                 }
               : persistedUserMessageId && currentMessage.id === messageId
                 ? {
@@ -911,6 +925,8 @@ export function ChatClient({
                 event.response ?? streamedMessage,
                 event.messageId,
                 event.userMessageId,
+                event.suggestionResponse,
+                event.suggestions,
               );
             }
           } catch (parseError) {
@@ -1082,7 +1098,12 @@ export function ChatClient({
         );
       };
 
-      const applyDone = (content: string, persistedMessageId?: string) => {
+      const applyDone = (
+        content: string,
+        persistedMessageId?: string,
+        suggestionResponse?: string,
+        persistedSuggestions?: TaskSuggestion[],
+      ) => {
         const finalContent = (content || streamedMessage || "").trim();
         const nextAssistantMessageId =
           persistedMessageId && persistedMessageId.trim().length > 0
@@ -1138,6 +1159,10 @@ export function ChatClient({
                   status: undefined,
                   reasoning: streamedReasoning,
                   reasoningExpanded: currentMessage.reasoningExpanded ?? false,
+                  suggestionResponse:
+                    suggestionResponse ?? currentMessage.suggestionResponse,
+                  suggestions:
+                    persistedSuggestions ?? currentMessage.suggestions ?? [],
                 }
               : currentMessage,
           ),
@@ -1193,7 +1218,12 @@ export function ChatClient({
                   source: "regenerate",
                 });
                 replaceSuggestionsFromPacket(event.suggestions ?? []);
-                applyDone(event.response ?? streamedMessage, event.messageId);
+                applyDone(
+                  event.response ?? streamedMessage,
+                  event.messageId,
+                  event.suggestionResponse,
+                  event.suggestions,
+                );
               }
             }
           } catch (parseError) {
@@ -1361,6 +1391,8 @@ export function ChatClient({
           content: string,
           persistedMessageId?: string,
           persistedUserMessageId?: string,
+          suggestionResponse?: string,
+          persistedSuggestions?: TaskSuggestion[],
         ) => {
           const finalContent = (content || streamedMessage || "").trim();
           const nextAssistantMessageId =
@@ -1400,6 +1432,10 @@ export function ChatClient({
                     reasoning: streamedReasoning,
                     reasoningExpanded:
                       currentMessage.reasoningExpanded ?? false,
+                    suggestionResponse:
+                      suggestionResponse ?? currentMessage.suggestionResponse,
+                    suggestions:
+                      persistedSuggestions ?? currentMessage.suggestions ?? [],
                   }
                 : persistedUserMessageId && currentMessage.id === userMessageId
                   ? {
@@ -1453,6 +1489,8 @@ export function ChatClient({
                   event.response ?? streamedMessage,
                   event.messageId,
                   event.userMessageId,
+                  event.suggestionResponse,
+                  event.suggestions,
                 );
               }
             } catch (parseError) {
@@ -1632,6 +1670,9 @@ export function ChatClient({
                     ? showReasoning
                     : (message.reasoningExpanded ?? false)
                 }
+                onAcceptSuggestion={(sugg) => void acceptSuggestion(sugg)}
+                onRejectSuggestion={(id) => rejectSuggestion(id)}
+                onCancelSuggestion={(sugg) => void cancelTask(sugg)}
               />
             ))
           )}

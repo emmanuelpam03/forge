@@ -163,6 +163,9 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               messageId: result.assistantMessageId ?? undefined,
+              suggestionResponse:
+                (result as { suggestionResponse?: string | null })
+                  .suggestionResponse ?? undefined,
               response: finalMessage,
               suggestions: result.suggestions ?? [],
             });

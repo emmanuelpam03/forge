@@ -145,6 +145,9 @@ export async function POST(request: NextRequest) {
               userMessageId:
                 (result as { userMessageId?: string | null }).userMessageId ??
                 undefined,
+              suggestionResponse:
+                (result as { suggestionResponse?: string | null })
+                  .suggestionResponse ?? undefined,
               response: finalMessage,
               suggestions: result.suggestions ?? [],
             });

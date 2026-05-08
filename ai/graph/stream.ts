@@ -26,5 +26,6 @@ export type StreamEvent =
       messageId?: string;
       userMessageId?: string;
       response?: string;
+      suggestionResponse?: string;
       suggestions?: TaskSuggestion[];
     };
