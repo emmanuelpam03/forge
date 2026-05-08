@@ -15,6 +15,7 @@ import {
   getTaskPrompt,
   getToolsPrompt,
 } from "@/ai/prompts/promptRegistry";
+import { getSeniorEngineerPrompt } from "@/ai/prompts/promptRegistry";
 import {
   DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
   type AudienceLevel,
@@ -359,6 +360,32 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const runtimeContext = buildRuntimeContext(state);
   const memoryInjection = buildMemoryInjection(state);
 
+  // Detect whether the user's message requires senior-engineer persona
+  function requiresSeniorEngineer(state: ChatGraphState): boolean {
+    const msg = state.userMessage || "";
+    if (!msg) return false;
+
+    // Explicit opt-ins
+    if (
+      /\b(senior engineer|software engineering mode|act as a senior|act as a senior engineer)\b/i.test(
+        msg,
+      )
+    ) {
+      return true;
+    }
+
+    // Architectural or production-grade keywords that imply senior-level reasoning
+    if (
+      /\b(architecture|architecture review|scalab|scalability|performance|security|production-grade|deploy|db migration|refactor|code review|audit|observability|backpressure|connection pool)\b/i.test(
+        msg,
+      )
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
   return [
     {
       id: "master-system",
@@ -392,6 +419,19 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.teachingDepth": controls.teachingDepth,
         "response.formatting": controls.formatting,
       },
+    },
+    // Persona layer: senior engineer guidance when required by request
+    {
+      id: "persona-senior-engineer",
+      layer: "persona",
+      priority: 84,
+      content: requiresSeniorEngineer(state) ? getSeniorEngineerPrompt() : "",
+      directives: {
+        "persona.role": requiresSeniorEngineer(state)
+          ? "senior-engineer"
+          : "none",
+      },
+      enabled: requiresSeniorEngineer(state),
     },
     {
       id: "tools-policy",

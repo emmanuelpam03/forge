@@ -8,6 +8,7 @@ import { REASONING_PROMPT } from "./reasoning.prompt.ts";
 import { PLANNING_PROMPT } from "./planning.prompt.ts";
 import { SELF_IMPROVE_PROMPT } from "./self_improve.prompt.ts";
 import { buildModePrompt } from "./mode.prompt.ts";
+import { SENIOR_ENGINEER_PROMPT } from "./senior-engineer.prompt.ts";
 import type { PromptBehaviorControls } from "./control.types.ts";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "./control.types.ts";
 import type { PromptTaskCategory } from "@/ai/graph/state";
@@ -139,6 +140,10 @@ export function getFormatterPrompt(controls?: PromptBehaviorControls): string {
   return buildFormatterPrompt(DEFAULT_PROMPT_BEHAVIOR_CONTROLS);
 }
 
+export function getSeniorEngineerPrompt(): string {
+  return SENIOR_ENGINEER_PROMPT;
+}
+
 export function getMasterPrompt(): string {
   return FOUNDATION_PROMPTS.master.content;
 }
@@ -160,5 +165,6 @@ export const PROMPTS = {
   coding: TASK_PROMPTS.coding.content,
   reasoning: TASK_PROMPTS.reasoning.content,
   planning: TASK_PROMPTS.planning.content,
+  seniorEngineer: SENIOR_ENGINEER_PROMPT,
   selfImprove: UTILITY_PROMPTS.selfImprove.content,
 };

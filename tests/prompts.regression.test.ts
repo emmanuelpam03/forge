@@ -131,6 +131,12 @@ test("mode prompt maps teaching depth to instruction sets", () => {
   assert.match(source, /Teaching depth: \${controls\.teachingDepth}/);
 });
 
+test("senior-engineer persona prompt is available and registered", () => {
+  assert.ok(PROMPTS.seniorEngineer.trim().length > 0);
+  assert.match(PROMPTS.seniorEngineer, /SOFTWARE ENGINEERING MODE/);
+  assert.match(PROMPTS.seniorEngineer, /RESPONSE STRUCTURE/);
+});
+
 test("router includes improved auto-detection for teaching depth", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
 
@@ -147,6 +153,15 @@ test("router includes improved auto-detection for teaching depth", () => {
   assert.match(source, /topic_hash/);
   assert.match(source, /chosen_depth/);
   assert.match(source, /inferred_audience/);
+});
+
+test("router can detect senior-engineer triggers", () => {
+  const source = readWorkspaceFile("ai/prompts/router.ts");
+  assert.match(
+    source,
+    /senior engineer|software engineering mode|act as a senior engineer/,
+  );
+  assert.match(source, /persona-senior-engineer/);
 });
 
 test("classifier prompt recognizes explanation as a teaching category", () => {
