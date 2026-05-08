@@ -29,6 +29,7 @@ import {
   buildTaskCategoryClassificationMessage,
   parseTaskCategory,
 } from "@/ai/prompts/classification";
+import { SUGGESTION_GENERATION_PROMPT } from "@/ai/prompts/suggestions";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
@@ -303,7 +304,7 @@ function buildToolArgs(
 }
 
 function hasOngoingIntent(message: string): boolean {
-  return /\b(track|monitor|remind(?: me)?|notify me|alert me|follow up|follow-up|schedule|check in|keep an eye on)\b/i.test(
+  return /\b(track|monitor|remind(?: me)?|notify me|alert me|follow up|follow-up|schedule|check in|keep an eye on|log|record|measure|weigh)\b/i.test(
     message,
   );
 }
@@ -356,11 +357,21 @@ function inferTaskSuggestionFromMessage(
   }
 
   const hasActionIntent =
-    /\b(remind me|set (a )?reminder|track|monitor|notify me|alert me|follow up|schedule|check)\b/i.test(
+    /\b(remind me|set (a )?reminder|track|monitor|notify me|alert me|follow up|schedule|check|log|record|measure|weigh)\b/i.test(
       trimmed,
     );
 
-  if (!hasActionIntent) {
+  const hasRecurringIntent =
+    /\b(every|each|daily|weekly|monthly|before each|after each)\b/i.test(
+      trimmed,
+    );
+
+  const hasFitnessContext =
+    /\b(workout|training|exercise|lifting|gym|weigh|weight|measurement|measurements|bodyweight|progress)\b/i.test(
+      trimmed,
+    );
+
+  if (!hasActionIntent && !(hasRecurringIntent && hasFitnessContext)) {
     return null;
   }
 
@@ -374,7 +385,9 @@ function inferTaskSuggestionFromMessage(
           ? "notify_user"
           : /\b(follow up)\b/i.test(trimmed)
             ? "follow_up"
-            : "schedule_task";
+            : /\b(log|record|measure|weigh)\b/i.test(trimmed)
+              ? "track_measurement"
+              : "schedule_task";
 
   const conditionalMatch = trimmed.match(/\b(if|when)\b(.+)/i);
   const scheduleMatch = trimmed.match(
@@ -1124,10 +1137,49 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
 
 export async function suggestTaskNode(state: ChatGraphState) {
   try {
-    const suggestions = generateSuggestions(
+    const override: ModelOverride =
+      state.modelUsed || state.provider
+        ? {
+            model: state.modelUsed || undefined,
+            provider:
+              state.provider === "google-genai" || state.provider === "ollama"
+                ? state.provider
+                : undefined,
+          }
+        : {};
+
+    const model = createGeminiModel(override);
+    const contextText = buildSuggestionContext(state);
+    const prompt = SUGGESTION_GENERATION_PROMPT.replace(
+      /"\{USER_MESSAGE\}"/g,
       state.userMessage,
-      state.assistantMessage,
-    );
+    )
+      .replace(/\{INTENT\}/g, state.intent || state.taskCategory || "general")
+      .replace(/\{CONTEXT\}/g, contextText);
+
+    let suggestionResponse = "";
+    let suggestions: TaskSuggestion[] = [];
+
+    try {
+      const response = await model.invoke([new HumanMessage(prompt)]);
+      const parsed = parseStructuredAssistantOutput(
+        toTextContent(response.content),
+      );
+      suggestionResponse = parsed.response;
+      suggestions = parsed.suggestions;
+    } catch (modelError) {
+      console.warn(
+        "Prompt-based task suggestion generation failed:",
+        modelError,
+      );
+    }
+
+    if (suggestions.length === 0) {
+      suggestions = generateSuggestions(
+        state.userMessage,
+        state.assistantMessage,
+      );
+    }
 
     console.info(
       JSON.stringify({
@@ -1143,19 +1195,40 @@ export async function suggestTaskNode(state: ChatGraphState) {
       return {
         suggestion: null,
         suggestions: [],
-        suggestionResponse: "",
+        suggestionResponse,
       };
     }
 
     return {
       suggestion: suggestions[0] ?? null,
       suggestions,
-      suggestionResponse: "",
+      suggestionResponse,
     };
   } catch (error) {
     console.error("Task suggestion generation failed:", error);
     return { suggestion: null, suggestions: [], suggestionResponse: "" };
   }
+}
+
+function buildSuggestionContext(state: ChatGraphState): string {
+  const sections = state.selectedContext?.sections ?? [];
+
+  if (sections.length > 0) {
+    return sections
+      .map((section) => `## ${section.name}\n${section.content}`)
+      .join("\n\n");
+  }
+
+  const recentTurns = state.previousMessages
+    .slice(-6)
+    .map((message) => `${message.role}: ${message.content}`)
+    .join("\n");
+
+  if (recentTurns.trim()) {
+    return recentTurns;
+  }
+
+  return "No additional context.";
 }
 
 export function generateSuggestions(
