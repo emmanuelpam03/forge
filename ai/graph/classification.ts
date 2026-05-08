@@ -155,6 +155,21 @@ function normalizeMultiIntent(value: unknown): string[] {
     .filter((item) => KNOWN_INTENTS.has(item));
 }
 
+const STRUCTURED_SCHEMA_MARKERS = [
+  "response_mode",
+  "reasoning_depth",
+  "audience_level",
+  "tool_usage",
+  "multi_intent",
+  "memory_relevance",
+] as const;
+
+function hasStructuredSchemaMarkers(parsed: Record<string, unknown>): boolean {
+  return STRUCTURED_SCHEMA_MARKERS.some((key) =>
+    Object.prototype.hasOwnProperty.call(parsed, key),
+  );
+}
+
 export function normalizeClassificationIntent(
   value: string | undefined | null,
 ): ClassificationIntent {
@@ -254,7 +269,7 @@ export function parseStructuredIntentClassification(
             ? parsed.audienceLevel
             : null,
       ),
-      toolUsage: normalizeToolUsage(parsed.tool_usage),
+      toolUsage: normalizeToolUsage(parsed.tool_usage ?? parsed.toolUsage),
       responseMode: normalizeResponseMode(
         typeof parsed.response_mode === "string"
           ? parsed.response_mode
@@ -304,9 +319,10 @@ export function parseClassificationText(
   text: string,
 ): ClassifiedIntent & { structured?: StructuredIntentClassification } {
   const structured = parseStructuredIntentClassification(text);
+  let parsed: Record<string, unknown> | null = null;
 
   try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
+    parsed = JSON.parse(text) as Record<string, unknown>;
     if (
       typeof parsed.intent === "string" &&
       (parsed.requiresFreshData !== undefined ||
@@ -334,11 +350,9 @@ export function parseClassificationText(
   return {
     ...legacy,
     structured:
-      structured.intent === "casual conversation" &&
-      structured.toolUsage.length === 0 &&
-      structured.confidence === "low"
-        ? deriveStructuredFromLegacy(legacy)
-        : structured,
+      parsed && hasStructuredSchemaMarkers(parsed)
+        ? structured
+        : deriveStructuredFromLegacy(legacy),
   };
 }
 
