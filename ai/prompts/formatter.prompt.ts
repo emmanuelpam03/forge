@@ -66,6 +66,7 @@ export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
     `Preferred verbosity: ${controls.verbosity}\n` +
     `Audience level: ${controls.audience}\n` +
     `Response mode hint: ${controls.responseMode}\n` +
+    `Persona mode: ${controls.persona}\n` +
     `Teaching depth: ${controls.teachingDepth}\n\n`;
 
   // Keep the rich legacy formatter guidance after the small header to avoid

@@ -125,4 +125,5 @@ test("formatter prompt reflects PromptBehaviorControls from classifier", async (
   assert.match(prompt, /Preferred verbosity: concise/);
   assert.match(prompt, /Audience level: beginner/);
   assert.match(prompt, /Response mode hint: code/);
+  assert.match(prompt, /Persona mode: auto/);
 });

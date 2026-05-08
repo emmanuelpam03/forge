@@ -121,12 +121,11 @@ function resolveTeachingDepth(state: ChatGraphState): TeachingDepth {
   // This provides intelligent escalation based on inferred skill level
   const inferredAudience = resolveAudienceLevel(state);
   if (inferredAudience === "beginner") {
-    return "deep"; // Beginners benefit from more detailed, progressive explanations
+    return "minimal"; // Beginners benefit from simple language and concrete analogies
   }
   if (inferredAudience === "expert") {
     return "deep"; // Experts prefer deep, edge-case focused content
   }
-
   // Default for intermediate audience
   return "standard";
 }

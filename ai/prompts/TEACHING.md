@@ -134,19 +134,6 @@ User sees: Clear, progressive, well-structured explanation
 
 The system infers teaching depth from user message keywords and audience level:
 
-```typescript
-// Explicit deep-depth keywords → DEEP
-/explain|why|how|walk me through|teach me|break down|reasoning|intuition|conceptual/
-
-// Explicit minimal-depth keywords → MINIMAL
-/just answer|no explanation|brief|tl;?dr|quick|one-liner/
-
-// Audience mapping (when no explicit keywords)
-beginner → DEEP (beginners benefit from detailed, progressive content)
-intermediate → STANDARD (default)
-expert → DEEP (experts prefer edge cases and optimization)
-```
-
 ## Progressive Disclosure Markers
 
 Use these text markers to signal optional or advanced content:
@@ -225,25 +212,6 @@ Teaching depth adapts to topic category:
 ## Telemetry & ML Feedback
 
 The system logs anonymized teaching choices for ML feedback training:
-
-```typescript
-{
-  timestamp: "2024-05-08T14:23:00Z",
-  topic_hash: "javascript_closure:567:45",  // Weak hash (not re-identifiable)
-  chosen_depth: "deep",
-  inferred_audience: "expert",
-  responseMode: "teach"
-}
-```
-
-**How it's used:**
-
-1. Aggregated to detect patterns: "Expert users on JavaScript topics prefer 'deep' 70% of the time"
-2. Feedback to improve auto-detection thresholds
-3. Identify under-served audiences or topics
-4. No personally identifiable information (PII) is logged
-
-**Privacy:** Hashing is intentionally weak (not cryptographically secure) to prevent re-identification while allowing pattern analysis.
 
 ## Implementation Examples
 
