@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
+import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,11 @@ const chatRequestSchema = z.object({
   message: z.string().min(1),
   model: z.string().optional(),
   provider: z.enum(["google-genai", "ollama"]).optional(),
+  promptBehavior: z
+    .object({
+      persona: z.enum(["auto", "none", "senior-engineer"]),
+    })
+    .optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -91,6 +97,12 @@ export async function POST(request: NextRequest) {
                 classifiedIntent: null,
                 model: parsedBody.data.model,
                 provider: parsedBody.data.provider,
+                promptBehavior: parsedBody.data.promptBehavior
+                  ? {
+                      ...DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
+                      persona: parsedBody.data.promptBehavior.persona,
+                    }
+                  : undefined,
               },
               (event) => {
                 if (event.type === "token") {

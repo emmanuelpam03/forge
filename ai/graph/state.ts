@@ -288,6 +288,7 @@ export type ChatGraphInput = Pick<
   | "branchId"
   | "assistantMessageId"
   | "skipUserCreate"
+  | "promptBehavior"
 > & {
   model?: string;
   provider?: string;
@@ -332,6 +333,6 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   audienceLevel: "auto",
   teachingDepth: "auto",
   formattingProfile: "auto",
-  promptBehavior: undefined,
+  promptBehavior: input.promptBehavior,
   forceTool: input.forceTool ?? null,
 });

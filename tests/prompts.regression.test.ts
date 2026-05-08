@@ -39,6 +39,27 @@ test("layered prompts remain available at top level", () => {
   assert.match(PROMPTS.safety, /TRUTHFULNESS/);
 });
 
+test("coding prompt enforces senior-engineer instructions", () => {
+  const source = readWorkspaceFile("ai/prompts/coding.prompt.ts");
+
+  assert.match(source, /SOFTWARE ENGINEERING MODE/);
+  assert.match(source, /audit it before changing anything/);
+  assert.match(source, /Forge must behave like a senior software engineer/);
+  assert.match(source, /FRAMEWORK AWARENESS/);
+  assert.match(source, /RESPONSE STRUCTURE/);
+  assert.match(source, /Explanation:/);
+  assert.match(source, /Architecture:/);
+  assert.match(source, /Implementation:/);
+  assert.match(source, /Optimization:/);
+  assert.match(source, /Edge cases:/);
+  assert.match(source, /root cause analysis/);
+  assert.match(source, /reproduction analysis/);
+  assert.match(source, /scalability, modularity, performance, and security/);
+  assert.match(source, /beginner coding help/);
+  assert.match(source, /advanced engineering discussions/);
+  assert.match(source, /production-grade coding assistance/);
+});
+
 test("intent classifier prompt contract emits structured routing JSON", () => {
   const message = buildIntentClassificationMessage(
     "Help me write a React component",
@@ -131,6 +152,16 @@ test("mode prompt maps teaching depth to instruction sets", () => {
   assert.match(source, /Teaching depth: \${controls\.teachingDepth}/);
 });
 
+test("prompt behavior controls include explicit persona mode", () => {
+  const source = readWorkspaceFile("ai/prompts/control.types.ts");
+  assert.match(
+    source,
+    /export type PersonaMode = "auto" \| "none" \| "senior-engineer"/,
+  );
+  assert.match(source, /persona: PersonaMode/);
+  assert.match(source, /persona: "auto"/);
+});
+
 test("senior-engineer persona prompt is available and registered", () => {
   assert.ok(PROMPTS.seniorEngineer.trim().length > 0);
   assert.match(PROMPTS.seniorEngineer, /SOFTWARE ENGINEERING MODE/);
@@ -155,13 +186,34 @@ test("router includes improved auto-detection for teaching depth", () => {
   assert.match(source, /inferred_audience/);
 });
 
-test("router can detect senior-engineer triggers", () => {
+test("router supports auto persona for coding and explicit overrides", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
+  assert.match(source, /controls\.persona === "senior-engineer"/);
+  assert.match(source, /controls\.persona === "auto"/);
+  assert.match(source, /state\.taskCategory === "coding"/);
+  assert.match(source, /resolvedPersonaRole/);
+  assert.match(source, /persona-senior-engineer/);
+});
+
+test("chat API accepts persona opt-in payload", () => {
+  const source = readWorkspaceFile("app/api/chat/route.ts");
+  assert.match(source, /promptBehavior:/);
   assert.match(
     source,
-    /senior engineer|software engineering mode|act as a senior engineer/,
+    /persona: z\.enum\(\["auto", "none", "senior-engineer"\]\)/,
   );
-  assert.match(source, /persona-senior-engineer/);
+  assert.match(source, /DEFAULT_PROMPT_BEHAVIOR_CONTROLS/);
+});
+
+test("chat client can send senior mode selection", () => {
+  const source = readWorkspaceFile("app/c/[chatId]/ChatClient.tsx");
+  assert.match(source, /isForceSeniorEngineeringMode/);
+  assert.match(source, /promptBehavior: isForceSeniorEngineeringMode/);
+  assert.match(source, /senior-engineer/);
+  assert.match(source, /getSeniorModeStorageKey/);
+  assert.match(source, /window\.localStorage\.getItem/);
+  assert.match(source, /window\.localStorage\.setItem/);
+  assert.match(source, /SE Auto/);
 });
 
 test("classifier prompt recognizes explanation as a teaching category", () => {

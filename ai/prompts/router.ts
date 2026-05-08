@@ -225,6 +225,7 @@ function resolveBehaviorControls(
     audience: resolveAudienceLevel(state),
     teachingDepth: resolveTeachingDepth(state),
     formatting: resolveFormattingProfile(state),
+    persona: "auto",
   };
 }
 
@@ -360,31 +361,14 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const runtimeContext = buildRuntimeContext(state);
   const memoryInjection = buildMemoryInjection(state);
 
-  // Detect whether the user's message requires senior-engineer persona
-  function requiresSeniorEngineer(state: ChatGraphState): boolean {
-    const msg = state.userMessage || "";
-    if (!msg) return false;
+  const seniorEngineerEnabled =
+    controls.persona === "senior-engineer" ||
+    (controls.persona === "auto" &&
+      (state.taskCategory === "coding" || controls.responseMode === "code"));
 
-    // Explicit opt-ins
-    if (
-      /\b(senior engineer|software engineering mode|act as a senior|act as a senior engineer)\b/i.test(
-        msg,
-      )
-    ) {
-      return true;
-    }
-
-    // Architectural or production-grade keywords that imply senior-level reasoning
-    if (
-      /\b(architecture|architecture review|scalab|scalability|performance|security|production-grade|deploy|db migration|refactor|code review|audit|observability|backpressure|connection pool)\b/i.test(
-        msg,
-      )
-    ) {
-      return true;
-    }
-
-    return false;
-  }
+  const resolvedPersonaRole = seniorEngineerEnabled
+    ? "senior-engineer"
+    : "none";
 
   return [
     {
@@ -418,20 +402,19 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.audience": controls.audience,
         "response.teachingDepth": controls.teachingDepth,
         "response.formatting": controls.formatting,
+        "response.persona": resolvedPersonaRole,
       },
     },
-    // Persona layer: senior engineer guidance when required by request
+    // Persona layer: enabled explicitly or automatically for coding tasks
     {
       id: "persona-senior-engineer",
       layer: "persona",
       priority: 84,
-      content: requiresSeniorEngineer(state) ? getSeniorEngineerPrompt() : "",
+      content: seniorEngineerEnabled ? getSeniorEngineerPrompt() : "",
       directives: {
-        "persona.role": requiresSeniorEngineer(state)
-          ? "senior-engineer"
-          : "none",
+        "persona.role": resolvedPersonaRole,
       },
-      enabled: requiresSeniorEngineer(state),
+      enabled: seniorEngineerEnabled,
     },
     {
       id: "tools-policy",

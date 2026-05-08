@@ -115,6 +115,7 @@ test("formatter prompt reflects PromptBehaviorControls from classifier", async (
     audience: "beginner",
     teachingDepth: "minimal",
     formatting: "stepwise",
+    persona: "auto",
   };
 
   const prompt = getFormatterPrompt(controls);

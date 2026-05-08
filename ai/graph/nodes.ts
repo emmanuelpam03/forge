@@ -26,6 +26,7 @@ import {
 import { buildIntentClassificationMessage } from "@/ai/prompts/intent.ts";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
+import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 
 export function normalizeAssistantResponseText(text: string): string {
   // Simplified normalization: avoid aggressive token merging which can
@@ -856,6 +857,8 @@ export async function classifyIntentNode(state: ChatGraphState) {
     }
 
     const queryIntent = deriveQueryIntentFromClassification(classifiedIntent);
+    const requestedPersona =
+      state.promptBehavior?.persona ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS.persona;
     const promptBehavior = structuredIntent
       ? {
           responseMode: structuredIntent.responseMode,
@@ -863,8 +866,9 @@ export async function classifyIntentNode(state: ChatGraphState) {
           audience: structuredIntent.audienceLevel,
           teachingDepth: structuredIntent.reasoningDepth,
           formatting: deriveFormattingProfile(structuredIntent.responseMode),
+          persona: requestedPersona,
         }
-      : undefined;
+      : state.promptBehavior;
 
     console.info(
       JSON.stringify({

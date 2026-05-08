@@ -61,6 +61,9 @@ const MODEL_OPTIONS: ModelOption[] = [
   { id: "gemma-4-31b-it", label: "Gemma 4 31B IT", provider: "google-genai" },
 ];
 
+const getSeniorModeStorageKey = (chatId: string) =>
+  `forge:chat:${chatId}:force-senior-mode`;
+
 function MessageBubble({
   message,
   onStartEdit,
@@ -325,6 +328,8 @@ export function ChatClient({
   const [selectedModelId, setSelectedModelId] = useState(
     MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
   );
+  const [isForceSeniorEngineeringMode, setIsForceSeniorEngineeringMode] =
+    useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -437,6 +442,30 @@ export function ChatClient({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isModelMenuOpen]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(
+        getSeniorModeStorageKey(chatId),
+      );
+      if (stored === "on") {
+        setIsForceSeniorEngineeringMode(true);
+      }
+    } catch {
+      // Ignore storage errors to avoid blocking chat usage.
+    }
+  }, [chatId]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        getSeniorModeStorageKey(chatId),
+        isForceSeniorEngineeringMode ? "on" : "off",
+      );
+    } catch {
+      // Ignore storage errors (private mode/quota issues).
+    }
+  }, [chatId, isForceSeniorEngineeringMode]);
 
   const stopGeneration = () => {
     if (!abortControllerRef.current) {
@@ -1140,6 +1169,9 @@ export function ChatClient({
             message,
             model: selectedModelId,
             provider: selectedModel.provider,
+            promptBehavior: isForceSeniorEngineeringMode
+              ? { persona: "senior-engineer" }
+              : undefined,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -1342,6 +1374,7 @@ export function ChatClient({
       draft,
       isSending,
       selectedModelId,
+      isForceSeniorEngineeringMode,
       showFeedback,
       updateAssistantMessage,
     ],
@@ -1456,6 +1489,34 @@ export function ChatClient({
             </button>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForceSeniorEngineeringMode((current) => {
+                    const next = !current;
+                    showFeedback({
+                      type: "success",
+                      title: next
+                        ? "Force Senior Engineering Mode enabled"
+                        : "Force Senior Engineering Mode disabled",
+                    });
+                    return next;
+                  });
+                }}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                  isForceSeniorEngineeringMode
+                    ? "border-primary/50 bg-primary/15 text-foreground"
+                    : "border-border/80 bg-background/80 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground"
+                }`}
+                title="Force Senior Engineering Mode for all requests"
+                aria-pressed={isForceSeniorEngineeringMode}
+              >
+                <Sparkles size={14} />
+                <span>
+                  {isForceSeniorEngineeringMode ? "Force SE On" : "SE Auto"}
+                </span>
+              </button>
+
               <div className="relative" ref={modelMenuRef}>
                 <button
                   type="button"

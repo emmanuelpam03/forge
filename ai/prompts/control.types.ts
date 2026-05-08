@@ -17,12 +17,15 @@ export type FormattingProfile =
   | "table-first"
   | "stepwise";
 
+export type PersonaMode = "auto" | "none" | "senior-engineer";
+
 export type PromptBehaviorControls = {
   responseMode: ResponseMode;
   verbosity: VerbosityLevel;
   audience: AudienceLevel;
   teachingDepth: TeachingDepth;
   formatting: FormattingProfile | "auto";
+  persona: PersonaMode;
 };
 
 export const DEFAULT_PROMPT_BEHAVIOR_CONTROLS: PromptBehaviorControls = {
@@ -31,4 +34,5 @@ export const DEFAULT_PROMPT_BEHAVIOR_CONTROLS: PromptBehaviorControls = {
   audience: "general",
   teachingDepth: "standard",
   formatting: "auto",
+  persona: "auto",
 };
