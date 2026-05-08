@@ -285,15 +285,18 @@ export async function runChatGraphStream(
 
   // Run persistence and post-processing in the background so the stream can
   // complete immediately after the model finishes.
-  void (async () => {
-    try {
-      const saveResult = await saveMessagesNode(state);
-      Object.assign(state, saveResult);
-    } catch (error) {
-      console.error(`Failed to save messages for chat ${input.chatId}:`, error);
-    }
+  try {
+    // Persist messages synchronously so callers (API routes) receive
+    // persisted IDs and suggestionResponse in their final 'done' event.
+    const saveResult = await saveMessagesNode(state);
+    Object.assign(state, saveResult);
+  } catch (error) {
+    console.error(`Failed to save messages for chat ${input.chatId}:`, error);
+  }
 
-    // Post-stream step 2: Generate and persist chat title
+  // Run non-critical post-processing in background to avoid delaying the
+  // response to clients (title generation and memory extraction).
+  void (async () => {
     try {
       const titleResult = await generateTitleNode(state);
       Object.assign(state, titleResult);
@@ -310,7 +313,6 @@ export async function runChatGraphStream(
       );
     }
 
-    // Post-stream step 3: Extract and store user memory
     try {
       const memoryResult = await extractMemoryNode(state);
       Object.assign(state, memoryResult);

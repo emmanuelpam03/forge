@@ -35,149 +35,19 @@ import type { StreamEvent } from "@/ai/graph/stream";
 import type { TaskSuggestion } from "@/types/tasks";
 
 export function normalizeAssistantResponseText(text: string): string {
-  const commonStopWords = new Set([
-    "a",
-    "an",
-    "and",
-    "as",
-    "at",
-    "be",
-    "by",
-    "for",
-    "from",
-    "if",
-    "in",
-    "is",
-    "it",
-    "of",
-    "on",
-    "or",
-    "so",
-    "to",
-    "the",
-    "this",
-    "that",
-    "these",
-    "those",
-    "was",
-    "were",
-    "with",
-    "within",
-    "without",
-    "we",
-    "you",
-    "he",
-    "she",
-    "they",
-    "them",
-    "us",
-    "our",
-    "your",
-    "their",
-    "my",
-    "me",
-    "not",
-    "no",
-    "yes",
-  ]);
+  // Simplified normalization: avoid aggressive token merging which can
+  // introduce/remove intra-word spaces. Preserve original spacing and
+  // only perform minimal cleanup (normalize newlines, collapse repeated
+  // spaces, and ensure punctuation spacing).
+  if (!text || typeof text !== "string") return "";
 
-  function repairBrokenWordsInLine(line: string): string {
-    const tokens = line.trim().split(/\s+/).filter(Boolean);
-    if (tokens.length < 2) {
-      return line.trim();
-    }
-
-    const repaired: string[] = [];
-
-    for (let index = 0; index < tokens.length; index += 1) {
-      const current = tokens[index];
-      const next = tokens[index + 1];
-      const afterNext = tokens[index + 2];
-
-      if (!next) {
-        repaired.push(current);
-        continue;
-      }
-
-      const currentIsWord = /^[A-Za-z]+$/.test(current);
-      const nextIsWord = /^[A-Za-z]+$/.test(next);
-      const afterNextIsWord = afterNext ? /^[A-Za-z]+$/.test(afterNext) : false;
-
-      if (!currentIsWord || !nextIsWord) {
-        repaired.push(current);
-        continue;
-      }
-
-      const currentLower = current.toLowerCase();
-      const nextLower = next.toLowerCase();
-
-      const mergeTwoTokens =
-        (!commonStopWords.has(currentLower) &&
-          current.length <= 3 &&
-          next.length >= 3) ||
-        (!commonStopWords.has(nextLower) &&
-          current.length >= 4 &&
-          current.length <= 8 &&
-          next.length <= 4);
-
-      const mergeThreeTokens =
-        afterNextIsWord &&
-        !commonStopWords.has(currentLower) &&
-        current.length >= 4 &&
-        next.length <= 3 &&
-        afterNext.length >= 3;
-
-      const mergeThreeShortTokens =
-        afterNextIsWord &&
-        current.length <= 3 &&
-        next.length <= 3 &&
-        afterNext.length >= 3 &&
-        !commonStopWords.has(currentLower) &&
-        !commonStopWords.has(nextLower) &&
-        !commonStopWords.has(afterNext.toLowerCase()) &&
-        current.length + next.length + afterNext.length <= 12;
-
-      if (mergeThreeTokens) {
-        repaired.push(`${current}${next}${afterNext}`);
-        index += 2;
-        continue;
-      }
-
-      if (mergeThreeShortTokens) {
-        repaired.push(`${current}${next}${afterNext}`);
-        index += 2;
-        continue;
-      }
-
-      if (mergeTwoTokens) {
-        repaired.push(`${current}${next}`);
-        index += 1;
-        continue;
-      }
-
-      repaired.push(current);
-    }
-
-    return repaired.join(" ");
-  }
-
-  const normalized = text
+  return text
     .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) =>
-      repairBrokenWordsInLine(line)
-        .replace(/[ \t]{2,}/g, " ")
-        .replace(/\s+([.,;:!?])/g, "$1")
-        .replace(/([.,;:!?])(\S)/g, "$1 $2")
-        .replace(/([a-z])([A-Z])/g, "$1 $2")
-        .replace(/(\d)\s+(?=\d)/g, "$1")
-        .trim(),
-    )
-    .join("\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/([.,;:!?])(\S)/g, "$1 $2")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-
-  return normalized;
 }
 
 let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
