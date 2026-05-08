@@ -18,7 +18,6 @@ import {
   toolRouterNode,
   toolRouterNodeImpl,
   synthesizeEvidenceNode,
-  suggestTaskNode,
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
@@ -105,7 +104,6 @@ const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.planTask, planTaskNode)
   .addNode(CHAT_GRAPH_NODES.toolRouter, toolRouterNode)
   .addNode(CHAT_GRAPH_NODES.synthesizeEvidence, synthesizeEvidenceNode)
-  .addNode(CHAT_GRAPH_NODES.suggestTask, suggestTaskNode)
   .addNode(CHAT_GRAPH_NODES.generateResponse, generateResponseNode)
   .addNode(CHAT_GRAPH_NODES.saveMessages, saveMessagesNode)
   .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode)
@@ -254,9 +252,7 @@ export async function runChatGraphStream(
     throw error;
   }
 
-  // Generate suggestions only after response streaming is complete.
   assistantMessage = await normalizeAssistantResponseText(assistantMessage);
-  Object.assign(state, await suggestTaskNode(state));
 
   // Stream validation: log if response is empty
   if (!assistantMessage.trim()) {
@@ -287,7 +283,7 @@ export async function runChatGraphStream(
   // complete immediately after the model finishes.
   try {
     // Persist messages synchronously so callers (API routes) receive
-    // persisted IDs and suggestionResponse in their final 'done' event.
+    // persisted IDs in their final 'done' event.
     const saveResult = await saveMessagesNode(state);
     Object.assign(state, saveResult);
   } catch (error) {

@@ -163,16 +163,12 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               messageId: result.assistantMessageId ?? undefined,
-              suggestionResponse:
-                (result as { suggestionResponse?: string | null })
-                  .suggestionResponse ?? undefined,
               response: finalMessage,
-              suggestions: result.suggestions ?? [],
             });
           } catch (err) {
             console.error("Edit stream failed:", err);
             send({ type: "status", message: "Failed to generate a response." });
-            send({ type: "done", suggestions: [] });
+            send({ type: "done" });
           }
 
           controller.close();

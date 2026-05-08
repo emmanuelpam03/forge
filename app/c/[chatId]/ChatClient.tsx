@@ -16,10 +16,8 @@ import {
   Plus,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
-import { TaskSuggestionCard } from "@/components/task-suggestion-card";
 import { useFeedback } from "@/components/feedback-provider";
 import { type StreamEvent } from "@/ai/graph/stream";
-import type { TaskSuggestion } from "@/types/tasks";
 
 type BranchOption = {
   id: string;
@@ -42,13 +40,6 @@ type ChatMessage = {
   reasoning?: string;
   reasoningExpanded?: boolean;
   error?: string;
-  suggestions?: TaskSuggestion[];
-  suggestionResponse?: string;
-};
-
-type SuggestionState = TaskSuggestion & {
-  status: "pending" | "approved" | "rejected" | "canceled";
-  taskId?: string | null;
 };
 
 type ChatClientProps = {
@@ -80,13 +71,12 @@ function MessageBubble({
   onCancelEdit,
   onRegenerate,
   onSwitchBranch,
+  onToggleReasoning,
   onCopyMessage,
-  onAcceptSuggestion,
-  onRejectSuggestion,
-  onCancelSuggestion,
   reasoning,
   showReasoning,
 }: {
+  message: ChatMessage;
   onStartEdit: (m: ChatMessage) => void;
   isEditing: boolean;
   editingContent: string | null;
@@ -97,9 +87,6 @@ function MessageBubble({
   onSwitchBranch?: (messageId: string, branch: BranchOption) => void;
   onToggleReasoning?: (messageId: string, expanded: boolean) => void;
   onCopyMessage?: (content: string) => void;
-  onAcceptSuggestion?: (suggestion: SuggestionState) => void;
-  onRejectSuggestion?: (suggestionId: string) => void;
-  onCancelSuggestion?: (suggestion: SuggestionState) => void;
   reasoning: string;
   showReasoning: boolean;
 }) {
@@ -114,7 +101,7 @@ function MessageBubble({
   const branchOptions = message.branchOptions ?? [];
   const activeBranchId = message.branchId ?? message.id;
   const currentBranchIndex = branchOptions.findIndex(
-    (branch) => branch.branchId === activeBranchId,
+    (branch: BranchOption) => branch.branchId === activeBranchId,
   );
   const previousBranch =
     currentBranchIndex > 0 ? branchOptions[currentBranchIndex - 1] : null;
@@ -329,7 +316,6 @@ export function ChatClient({
   const [reasoning, setReasoning] = useState("");
   const [message, setMessage] = useState("");
   const [showReasoning, setShowReasoning] = useState(false);
-  const [suggestions, setSuggestions] = useState<SuggestionState[]>([]);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string | null>(null);
@@ -351,8 +337,6 @@ export function ChatClient({
     MODEL_OPTIONS[0];
 
   const hasMessages = messages.length > 0;
-  const hasSuggestions = suggestions.length > 0;
-  const showSuggestionsPanel = hasSuggestions && !isSending;
 
   const resetStreamBuffers = useCallback(() => {
     setReasoning("");
@@ -504,54 +488,6 @@ export function ChatClient({
     }
   };
 
-  const replaceSuggestionsFromPacket = useCallback(
-    (nextSuggestions: TaskSuggestion[]) => {
-      setSuggestions((currentSuggestions) => {
-        const currentByKey = new Map(
-          currentSuggestions.map((item) => [
-            [
-              item.action,
-              item.description,
-              item.taskType,
-              item.scheduleSpec ?? "",
-              item.conditionText ?? "",
-              item.oneTimeAt ?? "",
-            ].join("|"),
-            item,
-          ]),
-        );
-
-        return nextSuggestions.map((suggestion) => {
-          const existingKey = [
-            suggestion.action,
-            suggestion.description,
-            suggestion.taskType,
-            suggestion.scheduleSpec ?? "",
-            suggestion.conditionText ?? "",
-            suggestion.oneTimeAt ?? "",
-          ].join("|");
-          const existingSuggestion = currentByKey.get(existingKey);
-
-          if (existingSuggestion) {
-            return {
-              ...existingSuggestion,
-              ...suggestion,
-              status: existingSuggestion.status,
-              taskId: existingSuggestion.taskId,
-            };
-          }
-
-          return {
-            ...suggestion,
-            status: "pending",
-            taskId: null,
-          };
-        });
-      });
-    },
-    [],
-  );
-
   const clearAssistantStreamingState = useCallback((messageId: string) => {
     setMessages((currentMessages) =>
       currentMessages.map((currentMessage) =>
@@ -603,130 +539,6 @@ export function ChatClient({
       });
     },
     [chatId, clearAssistantStreamingState],
-  );
-
-  const acceptSuggestion = useCallback(
-    async (suggestion: SuggestionState) => {
-      if (!projectId) {
-        showFeedback({
-          type: "error",
-          title: "Project required",
-          description: "Attach this chat to a project before creating tasks.",
-        });
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/tasks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId,
-            chatId,
-            action: suggestion.action,
-            description: suggestion.description,
-            type: suggestion.taskType,
-            scheduleSpec: suggestion.scheduleSpec ?? null,
-            conditionText: suggestion.conditionText ?? null,
-            oneTimeAt: suggestion.oneTimeAt ?? null,
-            status: "approved",
-          }),
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(payload?.error ?? "Failed to create task.");
-        }
-
-        const payload = (await response.json()) as {
-          task?: { id: string };
-        };
-
-        setSuggestions((current) =>
-          current.map((item) =>
-            item.id === suggestion.id
-              ? {
-                  ...item,
-                  status: "approved",
-                  taskId: payload.task?.id ?? item.taskId ?? null,
-                }
-              : item,
-          ),
-        );
-
-        showFeedback({
-          type: "success",
-          title: "Task created",
-          description: suggestion.description,
-        });
-      } catch (error) {
-        showFeedback({
-          type: "error",
-          title: "Task creation failed",
-          description:
-            error instanceof Error ? error.message : "Failed to create task.",
-        });
-      }
-    },
-    [chatId, projectId, showFeedback],
-  );
-
-  const rejectSuggestion = useCallback((suggestionId: string) => {
-    setSuggestions((current) =>
-      current.map((item) =>
-        item.id === suggestionId ? { ...item, status: "rejected" } : item,
-      ),
-    );
-  }, []);
-
-  const cancelTask = useCallback(
-    async (suggestion: SuggestionState) => {
-      if (!suggestion.taskId) {
-        setSuggestions((current) =>
-          current.map((item) =>
-            item.id === suggestion.id ? { ...item, status: "canceled" } : item,
-          ),
-        );
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/tasks/${suggestion.taskId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "canceled" }),
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(payload?.error ?? "Failed to cancel task.");
-        }
-
-        setSuggestions((current) =>
-          current.map((item) =>
-            item.id === suggestion.id ? { ...item, status: "canceled" } : item,
-          ),
-        );
-
-        showFeedback({
-          type: "success",
-          title: "Task canceled",
-          description: suggestion.description,
-        });
-      } catch (error) {
-        showFeedback({
-          type: "error",
-          title: "Cancel failed",
-          description:
-            error instanceof Error ? error.message : "Failed to cancel task.",
-        });
-      }
-    },
-    [showFeedback],
   );
 
   const switchBranch = (messageId: string, branch: BranchOption) => {
@@ -838,8 +650,6 @@ export function ChatClient({
         content: string,
         persistedMessageId?: string,
         persistedUserMessageId?: string,
-        suggestionResponse?: string,
-        persistedSuggestions?: TaskSuggestion[],
       ) => {
         const finalContent = (content || streamedMessage || "").trim();
         const nextAssistantMessageId =
@@ -878,10 +688,6 @@ export function ChatClient({
                   status: undefined,
                   reasoning: streamedReasoning,
                   reasoningExpanded: currentMessage.reasoningExpanded ?? false,
-                  suggestionResponse:
-                    suggestionResponse ?? currentMessage.suggestionResponse,
-                  suggestions:
-                    persistedSuggestions ?? currentMessage.suggestions ?? [],
                 }
               : persistedUserMessageId && currentMessage.id === messageId
                 ? {
@@ -920,13 +726,10 @@ export function ChatClient({
                 chatId,
                 source: "edit",
               });
-              replaceSuggestionsFromPacket(event.suggestions ?? []);
               applyDone(
                 event.response ?? streamedMessage,
                 event.messageId,
                 event.userMessageId,
-                event.suggestionResponse,
-                event.suggestions,
               );
             }
           } catch (parseError) {
@@ -1098,12 +901,7 @@ export function ChatClient({
         );
       };
 
-      const applyDone = (
-        content: string,
-        persistedMessageId?: string,
-        suggestionResponse?: string,
-        persistedSuggestions?: TaskSuggestion[],
-      ) => {
+      const applyDone = (content: string, persistedMessageId?: string) => {
         const finalContent = (content || streamedMessage || "").trim();
         const nextAssistantMessageId =
           persistedMessageId && persistedMessageId.trim().length > 0
@@ -1159,10 +957,6 @@ export function ChatClient({
                   status: undefined,
                   reasoning: streamedReasoning,
                   reasoningExpanded: currentMessage.reasoningExpanded ?? false,
-                  suggestionResponse:
-                    suggestionResponse ?? currentMessage.suggestionResponse,
-                  suggestions:
-                    persistedSuggestions ?? currentMessage.suggestions ?? [],
                 }
               : currentMessage,
           ),
@@ -1217,13 +1011,7 @@ export function ChatClient({
                   chatId,
                   source: "regenerate",
                 });
-                replaceSuggestionsFromPacket(event.suggestions ?? []);
-                applyDone(
-                  event.response ?? streamedMessage,
-                  event.messageId,
-                  event.suggestionResponse,
-                  event.suggestions,
-                );
+                applyDone(event.response ?? streamedMessage, event.messageId);
               }
             }
           } catch (parseError) {
@@ -1391,8 +1179,6 @@ export function ChatClient({
           content: string,
           persistedMessageId?: string,
           persistedUserMessageId?: string,
-          suggestionResponse?: string,
-          persistedSuggestions?: TaskSuggestion[],
         ) => {
           const finalContent = (content || streamedMessage || "").trim();
           const nextAssistantMessageId =
@@ -1432,10 +1218,6 @@ export function ChatClient({
                     reasoning: streamedReasoning,
                     reasoningExpanded:
                       currentMessage.reasoningExpanded ?? false,
-                    suggestionResponse:
-                      suggestionResponse ?? currentMessage.suggestionResponse,
-                    suggestions:
-                      persistedSuggestions ?? currentMessage.suggestions ?? [],
                   }
                 : persistedUserMessageId && currentMessage.id === userMessageId
                   ? {
@@ -1484,13 +1266,10 @@ export function ChatClient({
                   chatId,
                   source: "send",
                 });
-                replaceSuggestionsFromPacket(event.suggestions ?? []);
                 applyDone(
                   event.response ?? streamedMessage,
                   event.messageId,
                   event.userMessageId,
-                  event.suggestionResponse,
-                  event.suggestions,
                 );
               }
             } catch (parseError) {
@@ -1565,7 +1344,6 @@ export function ChatClient({
       selectedModelId,
       showFeedback,
       updateAssistantMessage,
-      replaceSuggestionsFromPacket,
     ],
   );
 
@@ -1604,34 +1382,7 @@ export function ChatClient({
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-40">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          {showSuggestionsPanel ? (
-            <div className="space-y-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                  Suggestions
-                </p>
-                <h2 className="text-sm font-semibold text-foreground">
-                  Review before execution
-                </h2>
-              </div>
-              <div className="space-y-3">
-                {suggestions.map((suggestion) => (
-                  <TaskSuggestionCard
-                    key={suggestion.id}
-                    suggestion={suggestion}
-                    projectReady={!!projectId}
-                    status={suggestion.status}
-                    isSubmitting={isSending}
-                    onAccept={() => void acceptSuggestion(suggestion)}
-                    onReject={() => rejectSuggestion(suggestion.id)}
-                    onCancel={() => void cancelTask(suggestion)}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {!hasMessages && !hasSuggestions ? (
+          {!hasMessages ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageSquare size={32} className="mb-3 text-muted-foreground" />
               <p className="text-[14px] font-medium text-foreground">
@@ -1670,9 +1421,6 @@ export function ChatClient({
                     ? showReasoning
                     : (message.reasoningExpanded ?? false)
                 }
-                onAcceptSuggestion={(sugg) => void acceptSuggestion(sugg)}
-                onRejectSuggestion={(id) => rejectSuggestion(id)}
-                onCancelSuggestion={(sugg) => void cancelTask(sugg)}
               />
             ))
           )}

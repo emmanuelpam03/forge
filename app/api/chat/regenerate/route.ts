@@ -237,11 +237,7 @@ export async function POST(request: NextRequest) {
             send({
               type: "done",
               messageId: assistantPlaceholder.id,
-              suggestionResponse:
-                (result as { suggestionResponse?: string | null })
-                  .suggestionResponse ?? undefined,
               response: finalMessage,
-              suggestions: result.suggestions ?? [],
             });
 
             // Close stream immediately so client doesn't wait

@@ -1,5 +1,3 @@
-import type { TaskSuggestion } from "@/types/tasks";
-
 export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "reasoning"; content: string }
@@ -26,6 +24,4 @@ export type StreamEvent =
       messageId?: string;
       userMessageId?: string;
       response?: string;
-      suggestionResponse?: string;
-      suggestions?: TaskSuggestion[];
     };

@@ -2,7 +2,6 @@ import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
 import type { QueryIntentClassification } from "@/ai/graph/classification";
-import type { TaskSuggestion } from "@/types/tasks";
 
 export type ClassificationIntent =
   | "factual"
@@ -97,9 +96,6 @@ export type ChatGraphState = {
   executionMode: "none" | "single" | "multi-parallel" | "multi-sequential";
   evidenceBundles: EvidenceBundle[];
   synthesisNote: string;
-  suggestion: TaskSuggestion | null;
-  suggestions: TaskSuggestion[];
-  suggestionResponse: string;
   queryIntent: QueryIntentClassification | null;
   classifiedIntent: ClassifiedIntent | null;
   taskCategory: PromptTaskCategory;
@@ -215,18 +211,6 @@ export const chatGraphState = Annotation.Root({
     default: () => "",
     reducer: lastValue,
   }),
-  suggestion: Annotation<TaskSuggestion | null>({
-    default: () => null,
-    reducer: lastValue,
-  }),
-  suggestions: Annotation<TaskSuggestion[]>({
-    default: () => [],
-    reducer: lastValue,
-  }),
-  suggestionResponse: Annotation<string>({
-    default: () => "",
-    reducer: lastValue,
-  }),
   queryIntent: Annotation<QueryIntentClassification | null>({
     default: () => null,
     reducer: lastValue,
@@ -295,9 +279,6 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   executionMode: "none",
   evidenceBundles: [],
   synthesisNote: "",
-  suggestion: null,
-  suggestions: [],
-  suggestionResponse: "",
   queryIntent: null,
   classifiedIntent: input.classifiedIntent ?? null,
   taskCategory: "general",
