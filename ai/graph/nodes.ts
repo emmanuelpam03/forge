@@ -56,8 +56,13 @@ function humanizeAssistantResponseText(
     return normalized;
   }
 
-  const sanitized = sanitizeAssistantOutput(normalized);
-  return sanitized || normalized;
+  try {
+    const sanitized = sanitizeAssistantOutput(normalized);
+    return sanitized || normalized;
+  } catch (err) {
+    console.warn("Sanitization failed, using normalized text:", err);
+    return normalized;
+  }
 }
 
 let graphStreamEventEmitter: ((event: StreamEvent) => void) | undefined;
