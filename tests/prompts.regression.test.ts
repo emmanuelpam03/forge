@@ -14,31 +14,29 @@ function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
 }
 
-test("system prompt exposes the canonical v2 identity and constraints", () => {
-  assert.match(
-    SYSTEM_PROMPT,
-    /high-capability, production-grade AI agent for Forge/,
-  );
-  assert.match(SYSTEM_PROMPT, /INTELLIGENCE STANDARD/);
-  assert.match(SYSTEM_PROMPT, /OUTPUT DISCIPLINE/);
+test("system prompt exposes the canonical master foundation", () => {
+  assert.match(SYSTEM_PROMPT, /You are Forge, a production-grade AI assistant/);
+  assert.match(SYSTEM_PROMPT, /GLOBAL BEHAVIOR/);
+  assert.match(SYSTEM_PROMPT, /COMMUNICATION PHILOSOPHY/);
+  assert.match(SYSTEM_PROMPT, /PRECEDENCE/);
   assert.equal(PROMPTS.system, SYSTEM_PROMPT);
 });
 
-test("formatter and specialist prompts remain available at top level", () => {
+test("layered prompts remain available at top level", () => {
+  assert.ok(PROMPTS.safety.trim().length > 0);
   assert.ok(PROMPTS.formatter.trim().length > 0);
   assert.ok(PROMPTS.classifier.trim().length > 0);
   assert.ok(PROMPTS.coding.trim().length > 0);
   assert.ok(PROMPTS.reasoning.trim().length > 0);
   assert.ok(PROMPTS.planning.trim().length > 0);
-  // Formatter should enforce OUTPUT DISCIPLINE, not just describe it
   assert.match(PROMPTS.formatter, /OUTPUT DISCIPLINE/);
   assert.match(PROMPTS.formatter, /No filler, preambles/);
   assert.match(PROMPTS.formatter, /No malformed tokens/);
-  assert.match(PROMPTS.formatter, /No vague hedging/);
-  // Should guide on response modes and code blocks
   assert.match(PROMPTS.formatter, /RESPONSE MODE MAPPING/);
   assert.match(PROMPTS.formatter, /one command per line/);
   assert.match(PROMPTS.formatter, /Keep commands copy-paste safe/);
+  assert.match(PROMPTS.safety, /SAFETY BOUNDARY/);
+  assert.match(PROMPTS.safety, /TRUTHFULNESS/);
 });
 
 test("intent classifier prompt contract remains strict and token-only", () => {

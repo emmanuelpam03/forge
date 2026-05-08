@@ -30,13 +30,14 @@ test("v2 classifier message uses classifier prompt contract", () => {
   assert.ok(message.includes(CLASSIFIER_PROMPT));
 });
 
-test("router includes top-level system and formatter layers", () => {
+test("router composes layered master and formatter prompts", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
 
-  assert.match(source, /PROMPTS\.system/);
-  assert.match(source, /PROMPTS\.formatter/);
-  assert.doesNotMatch(source, /PROMPTS_V2_ENABLED/);
-  assert.doesNotMatch(source, /CHAT_SYSTEM_PROMPT/);
+  assert.match(source, /composePromptSegments/);
+  assert.match(source, /getMasterPrompt/);
+  assert.match(source, /getFormatterPrompt/);
+  assert.match(source, /layer: "master-system"/);
+  assert.match(source, /layer: "formatting"/);
 });
 
 test("graph state defines v2 task category with general default", () => {
@@ -65,9 +66,40 @@ test("router defines response mode mapping for key categories", () => {
   );
 });
 
-test("router includes creative fallback and RESPONSE MODE instruction", () => {
+test("router includes creative fallback and behavior-control resolution", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
 
   assert.match(source, /creative\|story\|poem\|generate/i);
-  assert.match(source, /RESPONSE MODE: \$\{resolveResponseMode\(state\)\}/);
+  assert.match(source, /resolveBehaviorControls/);
+  assert.match(source, /promptComposition\.summary/);
+  assert.match(source, /precedence/);
+});
+
+test("graph state includes prompt behavior control fields", () => {
+  const source = readWorkspaceFile("ai/graph/state.ts");
+
+  assert.match(
+    source,
+    /responseMode: Annotation<ResponseMode \| "auto" \| undefined>/,
+  );
+  assert.match(
+    source,
+    /verbosityLevel: Annotation<VerbosityLevel \| "auto" \| undefined>/,
+  );
+  assert.match(
+    source,
+    /audienceLevel: Annotation<AudienceLevel \| "auto" \| undefined>/,
+  );
+  assert.match(
+    source,
+    /teachingDepth: Annotation<TeachingDepth \| "auto" \| undefined>/,
+  );
+  assert.match(
+    source,
+    /formattingProfile: Annotation<FormattingProfile \| "auto" \| undefined>/,
+  );
+  assert.match(
+    source,
+    /promptBehavior: Annotation<PromptBehaviorControls \| undefined>/,
+  );
 });

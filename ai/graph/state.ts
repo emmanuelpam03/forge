@@ -2,6 +2,14 @@ import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
 import type { QueryIntentClassification } from "@/ai/graph/classification";
+import type {
+  AudienceLevel,
+  FormattingProfile,
+  PromptBehaviorControls,
+  ResponseMode,
+  TeachingDepth,
+  VerbosityLevel,
+} from "@/ai/prompts/control.types";
 
 export type ClassificationIntent =
   | "factual"
@@ -99,6 +107,12 @@ export type ChatGraphState = {
   queryIntent: QueryIntentClassification | null;
   classifiedIntent: ClassifiedIntent | null;
   taskCategory: PromptTaskCategory;
+  responseMode?: ResponseMode | "auto";
+  verbosityLevel?: VerbosityLevel | "auto";
+  audienceLevel?: AudienceLevel | "auto";
+  teachingDepth?: TeachingDepth | "auto";
+  formattingProfile?: FormattingProfile | "auto";
+  promptBehavior?: PromptBehaviorControls;
   preResponsePromise?: Promise<void>;
   /**
    * When set, forces the graph to execute a specific tool (e.g. "webSearch").
@@ -227,6 +241,30 @@ export const chatGraphState = Annotation.Root({
     default: () => "general",
     reducer: lastValue,
   }),
+  responseMode: Annotation<ResponseMode | "auto" | undefined>({
+    default: () => "auto",
+    reducer: lastValue,
+  }),
+  verbosityLevel: Annotation<VerbosityLevel | "auto" | undefined>({
+    default: () => "auto",
+    reducer: lastValue,
+  }),
+  audienceLevel: Annotation<AudienceLevel | "auto" | undefined>({
+    default: () => "auto",
+    reducer: lastValue,
+  }),
+  teachingDepth: Annotation<TeachingDepth | "auto" | undefined>({
+    default: () => "auto",
+    reducer: lastValue,
+  }),
+  formattingProfile: Annotation<FormattingProfile | "auto" | undefined>({
+    default: () => "auto",
+    reducer: lastValue,
+  }),
+  promptBehavior: Annotation<PromptBehaviorControls | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
   forceTool: Annotation<string | null>({
     default: () => null,
     reducer: lastValue,
@@ -282,5 +320,11 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   queryIntent: null,
   classifiedIntent: input.classifiedIntent ?? null,
   taskCategory: "general",
+  responseMode: "auto",
+  verbosityLevel: "auto",
+  audienceLevel: "auto",
+  teachingDepth: "auto",
+  formattingProfile: "auto",
+  promptBehavior: undefined,
   forceTool: input.forceTool ?? null,
 });

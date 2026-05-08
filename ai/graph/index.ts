@@ -29,7 +29,7 @@ import {
   getChatModelConfig,
   type ModelOverride,
 } from "@/ai/models";
-import { buildChatMessages } from "@/ai/prompts/router";
+import { buildChatMessages } from "@/ai/prompts/router.ts";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
 

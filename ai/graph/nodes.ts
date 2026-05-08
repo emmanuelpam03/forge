@@ -11,7 +11,7 @@ import {
 import {
   buildChatMessages,
   buildFreshnessClassificationMessage,
-} from "@/ai/prompts/router";
+} from "@/ai/prompts/router.ts";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { MEMORY_EXTRACTION_PROMPT } from "@/ai/prompts/memory";
 import {
