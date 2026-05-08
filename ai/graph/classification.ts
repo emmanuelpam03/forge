@@ -121,6 +121,8 @@ function normalizeAudienceLevel(
   ) {
     return normalized;
   }
+  // Default to intermediate for unknown values
+  // Note: resolveAudienceLevel in router.ts provides context-aware inference from user message
   return "intermediate";
 }
 

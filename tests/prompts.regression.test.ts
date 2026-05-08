@@ -89,3 +89,69 @@ test("router keeps backward-compatible freshness export contract", () => {
     /export\s+\{\s*buildFreshnessClassificationMessage\s*\};/,
   );
 });
+
+test("teaching prompt exports centralized principles and readability rules", () => {
+  const source = readWorkspaceFile("ai/prompts/teaching.prompt.ts");
+
+  assert.match(source, /TEACHING_PRINCIPLES/);
+  assert.match(source, /READABILITY_RULES/);
+  assert.match(source, /PROGRESSIVE DISCLOSURE/);
+  assert.match(source, /DEPTH MODES/);
+  assert.match(source, /MINIMAL mode/);
+  assert.match(source, /STANDARD mode/);
+  assert.match(source, /DEEP mode/);
+  assert.match(source, /getTeachingInstructionsForDepth/);
+  assert.match(source, /getReadabilityFormatting/);
+});
+
+test("system prompt incorporates teaching principles", () => {
+  assert.match(SYSTEM_PROMPT, /TEACHING EXCELLENCE/);
+  assert.match(SYSTEM_PROMPT, /PROGRESSIVE DISCLOSURE/);
+  assert.match(SYSTEM_PROMPT, /READABILITY OPTIMIZATION/);
+  assert.match(SYSTEM_PROMPT, /DEPTH MODES/);
+});
+
+test("formatter prompt includes progressive disclosure and teaching guidance", () => {
+  const source = readWorkspaceFile("ai/prompts/formatter.prompt.ts");
+
+  assert.match(
+    source,
+    /teach.*Educational response prioritizing progressive disclosure/,
+  );
+  assert.match(source, /PROGRESSIVE DISCLOSURE/);
+  assert.match(source, /Further detail →/);
+  assert.match(source, /ADVANCED:/);
+  assert.match(source, /WHY THIS MATTERS/);
+});
+
+test("mode prompt maps teaching depth to instruction sets", () => {
+  const source = readWorkspaceFile("ai/prompts/mode.prompt.ts");
+
+  assert.match(source, /getTeachingInstructionsForDepth/);
+  assert.match(source, /Teaching depth: \${controls\.teachingDepth}/);
+});
+
+test("router includes improved auto-detection for teaching depth", () => {
+  const source = readWorkspaceFile("ai/prompts/router.ts");
+
+  // Check for keyword-based depth detection
+  assert.match(source, /explain|why|how|walk me through|teach me|break down/);
+  assert.match(source, /just answer|no explanation|brief|tl/);
+
+  // Check for audience-to-depth mapping
+  assert.match(source, /inferredAudience === "beginner"/);
+  assert.match(source, /inferredAudience === "expert"/);
+
+  // Check for telemetry logging
+  assert.match(source, /logTeachingDepthTelemetry/);
+  assert.match(source, /topic_hash/);
+  assert.match(source, /chosen_depth/);
+  assert.match(source, /inferred_audience/);
+});
+
+test("classifier prompt recognizes explanation as a teaching category", () => {
+  const source = readWorkspaceFile("ai/prompts/classifier.prompt.ts");
+
+  assert.match(source, /explanation/);
+  assert.match(source, /teaching, conceptual breakdowns, comparisons/);
+});

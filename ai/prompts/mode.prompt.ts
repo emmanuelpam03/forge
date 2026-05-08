@@ -1,8 +1,21 @@
 import type { PromptBehaviorControls } from "@/ai/prompts/control.types";
+import { getTeachingInstructionsForDepth } from "./teaching.prompt.ts";
 
 export function buildModePrompt(controls: PromptBehaviorControls): string {
   const formattingProfile =
     controls.formatting === "auto" ? "default" : controls.formatting;
+
+  // Map teaching depth to instruction set
+  const teachingDepthForInstructions =
+    controls.teachingDepth === "standard"
+      ? "standard"
+      : controls.teachingDepth === "minimal"
+        ? "minimal"
+        : "deep";
+
+  const teachingInstructions = getTeachingInstructionsForDepth(
+    teachingDepthForInstructions,
+  );
 
   return `
 RESPONSE MODE
@@ -18,5 +31,7 @@ MODE RULES
 - Adapt examples and explanations to the audience level.
 - Explain progressively: start simple, then increase depth only as needed.
 - Keep detail proportional to user request and task complexity.
+
+${teachingInstructions}
 `;
 }

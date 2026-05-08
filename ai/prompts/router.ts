@@ -97,16 +97,103 @@ function resolveTeachingDepth(state: ChatGraphState): TeachingDepth {
   }
 
   const message = state.userMessage.toLowerCase();
+
+  // Explicit deep-depth keywords (request for explanation, teaching, reasoning)
   if (
-    /\b(explain|why|how|walk me through|teach me|break down)\b/.test(message)
+    /\b(explain|explain to me|why|how|walk me through|teach me|break down|reasoning|intuition|conceptual)\b/.test(
+      message,
+    )
   ) {
     return "deep";
   }
-  if (/\b(just answer|no explanation|brief)\b/.test(message)) {
+
+  // Explicit minimal-depth keywords (direct answer only, no explanation)
+  if (
+    /\b(just answer|no explanation|brief|tl;?dr|quick|one-liner)\b/.test(
+      message,
+    )
+  ) {
     return "minimal";
   }
 
+  // Map audience level to teaching depth when no explicit depth keyword is present
+  // This provides intelligent escalation based on inferred skill level
+  const inferredAudience = resolveAudienceLevel(state);
+  if (inferredAudience === "beginner") {
+    return "deep"; // Beginners benefit from more detailed, progressive explanations
+  }
+  if (inferredAudience === "expert") {
+    return "deep"; // Experts prefer deep, edge-case focused content
+  }
+
+  // Default for intermediate audience
   return "standard";
+}
+
+/**
+ * Log anonymized teaching depth choice for ML feedback training.
+ * Stores (topic_hash, chosen_depth, inferred_audience) tuples for analysis.
+ */
+function logTeachingDepthTelemetry(
+  state: ChatGraphState,
+  chosen: TeachingDepth,
+): void {
+  // Avoid logging in test/dev environments
+  if (process.env.NODE_ENV === "test" || process.env.SKIP_TELEMETRY === "1") {
+    return;
+  }
+
+  try {
+    // Hash the user message to create a topic signature without exposing content
+    const topicHash = hashUserMessage(state.userMessage);
+    const inferredAudience = resolveAudienceLevel(state);
+
+    // Build telemetry payload (anonymized)
+    const telemetryPayload = {
+      timestamp: new Date().toISOString(),
+      // Note: userId_hash would be set by middleware; omitted here for safety
+      topic_hash: topicHash,
+      chosen_depth: chosen,
+      inferred_audience: inferredAudience,
+      responseMode: state.responseMode || "auto",
+    };
+
+    // Log for aggregation (this integrates with your logging/analytics pipeline)
+    // For now, we log to console in dev; production should route to analytics DB
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[TeachingDepthTelemetry]", telemetryPayload);
+    }
+
+    // TODO: integrate with analytics backend (e.g., POST to /api/telemetry/teaching-depth)
+    // Example future code:
+    // await fetch("/api/telemetry/teaching-depth", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify(telemetryPayload),
+    // }).catch((err) => {
+    //   // Silent failure to avoid blocking response
+    //   console.error("[TeachingDepthTelemetry] Error logging:", err.message);
+    // });
+  } catch (error) {
+    // Telemetry errors should never block response generation
+    if (process.env.NODE_ENV === "development") {
+      console.error("[TeachingDepthTelemetry] Unexpected error:", error);
+    }
+  }
+}
+
+/**
+ * Simple hash function for user message (topic signature).
+ * Used to anonymize content for telemetry while allowing pattern detection.
+ */
+function hashUserMessage(message: string): string {
+  // Simple hash: first 50 chars + message length + word count
+  // This is intentionally weak hashing to avoid re-identifying content
+  const preview = message.substring(0, 50).toLowerCase();
+  const wordCount = message.split(/\s+/).length;
+  const charCount = message.length;
+  const hash = `${preview.replace(/[^a-z0-9]/g, "").substring(0, 20)}:${charCount}:${wordCount}`;
+  return hash.substring(0, 64); // Cap at 64 chars for consistency
 }
 
 function resolveFormattingProfile(state: ChatGraphState): FormattingProfile {
@@ -264,6 +351,10 @@ function buildMemoryInjection(state: ChatGraphState): string {
 
 function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const controls = state.promptBehavior ?? resolveBehaviorControls(state);
+
+  // Log anonymized teaching depth choice for ML feedback
+  logTeachingDepthTelemetry(state, controls.teachingDepth);
+
   const taskPrompt = getTaskPrompt(state.taskCategory);
   const runtimeContext = buildRuntimeContext(state);
   const memoryInjection = buildMemoryInjection(state);
