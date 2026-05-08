@@ -196,6 +196,29 @@ function estimateTokens(text: string): number {
   return Math.ceil((text?.length ?? 0) / 4);
 }
 
+const FORMATTING_BY_RESPONSE_MODE = {
+  code: "stepwise",
+  compare: "table-first",
+} as const;
+
+type DerivedFormattingProfile =
+  | (typeof FORMATTING_BY_RESPONSE_MODE)[keyof typeof FORMATTING_BY_RESPONSE_MODE]
+  | "auto";
+
+function deriveFormattingProfile(
+  responseMode?: string | null,
+): DerivedFormattingProfile {
+  if (!responseMode) {
+    return "auto";
+  }
+
+  return (
+    FORMATTING_BY_RESPONSE_MODE[
+      responseMode as keyof typeof FORMATTING_BY_RESPONSE_MODE
+    ] ?? "auto"
+  );
+}
+
 /**
  * Checks if text looks like a valid numeric expression for the calculator tool.
  * The calculator needs expressions like "100 * 0.15", not prose like "Web search result: ..."
@@ -839,12 +862,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
           verbosity: structuredIntent.verbosity,
           audience: structuredIntent.audienceLevel,
           teachingDepth: structuredIntent.reasoningDepth,
-          formatting:
-            structuredIntent.responseMode === "code"
-              ? "stepwise"
-              : structuredIntent.responseMode === "compare"
-                ? "table-first"
-                : "default",
+          formatting: deriveFormattingProfile(structuredIntent.responseMode),
         }
       : undefined;
 
@@ -888,12 +906,9 @@ export async function classifyIntentNode(state: ChatGraphState) {
       verbosityLevel: structuredIntent?.verbosity ?? "auto",
       audienceLevel: structuredIntent?.audienceLevel ?? "auto",
       teachingDepth: structuredIntent?.reasoningDepth ?? "auto",
-      formattingProfile:
-        structuredIntent?.responseMode === "code"
-          ? "stepwise"
-          : structuredIntent?.responseMode === "compare"
-            ? "table-first"
-            : "auto",
+      formattingProfile: deriveFormattingProfile(
+        structuredIntent?.responseMode,
+      ),
       promptBehavior,
     };
   } catch (error) {

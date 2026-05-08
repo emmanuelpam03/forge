@@ -39,11 +39,14 @@ SANITIZATION
 import type { PromptBehaviorControls } from "./control.types.ts";
 
 export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
+  const formattingProfile =
+    controls.formatting === "auto" ? "default" : controls.formatting;
+
   // Small, high-priority header that communicates selected formatting profile
   // and audience/verbosity so the model can tailor the rest of the formatter
   // guidance that follows.
   const header =
-    `FORMATTER PROFILE: ${controls.formatting}\n` +
+    `FORMATTER PROFILE: ${formattingProfile}\n` +
     `Preferred verbosity: ${controls.verbosity}\n` +
     `Audience level: ${controls.audience}\n` +
     `Response mode hint: ${controls.responseMode}\n\n`;

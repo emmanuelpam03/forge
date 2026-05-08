@@ -22,7 +22,7 @@ export type PromptBehaviorControls = {
   verbosity: VerbosityLevel;
   audience: AudienceLevel;
   teachingDepth: TeachingDepth;
-  formatting: FormattingProfile;
+  formatting: FormattingProfile | "auto";
 };
 
 export const DEFAULT_PROMPT_BEHAVIOR_CONTROLS: PromptBehaviorControls = {
@@ -30,5 +30,5 @@ export const DEFAULT_PROMPT_BEHAVIOR_CONTROLS: PromptBehaviorControls = {
   verbosity: "balanced",
   audience: "general",
   teachingDepth: "standard",
-  formatting: "default",
+  formatting: "auto",
 };

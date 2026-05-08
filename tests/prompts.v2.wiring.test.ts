@@ -7,6 +7,7 @@ import {
   buildTaskCategoryClassificationMessage,
   parseTaskCategory,
 } from "../ai/prompts/classification.ts";
+import type { PromptBehaviorControls } from "../ai/prompts/control.types.ts";
 import { CLASSIFIER_PROMPT } from "../ai/prompts/classifier.prompt.ts";
 
 function readWorkspaceFile(relativePath: string): string {
@@ -108,7 +109,7 @@ test("formatter prompt reflects PromptBehaviorControls from classifier", async (
   const { getFormatterPrompt } =
     await import("../ai/prompts/promptRegistry.ts");
 
-  const controls = {
+  const controls: PromptBehaviorControls = {
     responseMode: "code",
     verbosity: "concise",
     audience: "beginner",
