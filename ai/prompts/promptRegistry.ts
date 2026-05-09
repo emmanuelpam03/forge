@@ -10,6 +10,7 @@ import { SELF_IMPROVE_PROMPT } from "./self_improve.prompt.ts";
 import { buildModePrompt } from "./mode.prompt.ts";
 import { SENIOR_ENGINEER_PROMPT } from "./senior-engineer.prompt.ts";
 import { HUMANIZATION_PROMPT } from "./humanization.prompt.ts";
+import { REFLECTION_PROMPT } from "../graph/reflection.prompt.ts";
 import type { PromptBehaviorControls } from "./control.types.ts";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "./control.types.ts";
 import type { PromptTaskCategory } from "@/ai/graph/state";
@@ -110,6 +111,13 @@ const UTILITY_PROMPTS = {
     version: "1.0.0",
     content: SELF_IMPROVE_PROMPT,
   },
+  reflection: {
+    id: "utility.reflection.v1",
+    layer: "utility",
+    version: "1.0.0",
+    content: REFLECTION_PROMPT,
+    tags: ["quality", "evaluation", "pre-streaming"],
+  },
 } as const satisfies Record<string, PromptRegistryEntry>;
 
 export const PROMPT_REGISTRY = {
@@ -173,6 +181,10 @@ export function getToolsPrompt(): string {
   return UTILITY_PROMPTS.tools.content;
 }
 
+export function getReflectionPrompt(): string {
+  return UTILITY_PROMPTS.reflection.content;
+}
+
 export const PROMPTS = {
   system: getMasterPrompt(),
   safety: getSafetyPrompt(),
@@ -180,6 +192,7 @@ export const PROMPTS = {
   tools: getToolsPrompt(),
   formatter: getFormatterPrompt(),
   humanization: getHumanizationPrompt(),
+  reflection: getReflectionPrompt(),
   coding: TASK_PROMPTS.coding.content,
   reasoning: TASK_PROMPTS.reasoning.content,
   planning: TASK_PROMPTS.planning.content,

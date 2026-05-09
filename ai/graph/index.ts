@@ -18,17 +18,12 @@ import {
   toolRouterNode,
   toolRouterNodeImpl,
   synthesizeEvidenceNode,
+  reflectionNode,
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
   normalizeAssistantResponseText,
 } from "@/ai/graph/nodes";
-import {
-  createGeminiModel,
-  extractTextFromModelChunk,
-  getChatModelConfig,
-  type ModelOverride,
-} from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router.ts";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
@@ -88,6 +83,7 @@ async function runGraphPreResponse(
   Object.assign(state, await planTaskNode(state));
   Object.assign(state, await toolRouterNodeImpl(state, onEvent));
   Object.assign(state, await synthesizeEvidenceNode(state));
+  Object.assign(state, await reflectionNode(state));
 
   // Clear the run-scoped emitter after all pre-response events are done.
   setGraphStreamEventEmitter(undefined);
@@ -104,6 +100,7 @@ const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.planTask, planTaskNode)
   .addNode(CHAT_GRAPH_NODES.toolRouter, toolRouterNode)
   .addNode(CHAT_GRAPH_NODES.synthesizeEvidence, synthesizeEvidenceNode)
+  .addNode(CHAT_GRAPH_NODES.reflectOnResponse, reflectionNode)
   .addNode(CHAT_GRAPH_NODES.generateResponse, generateResponseNode)
   .addNode(CHAT_GRAPH_NODES.saveMessages, saveMessagesNode)
   .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode)
@@ -128,12 +125,6 @@ export async function runChatGraphStream(
 ) {
   const state = await runGraphPreResponse(input, onEvent);
 
-  const override: ModelOverride = {
-    model: input.model,
-    provider: input.provider as "google-genai" | "ollama" | undefined,
-  };
-  const model = createGeminiModel(override);
-  const modelConfig = getChatModelConfig(override);
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
   console.info("PRE-RESPONSE_MS", {
@@ -154,63 +145,29 @@ export async function runChatGraphStream(
   try {
     onEvent?.({ type: "status", message: "Generating response..." });
     let firstTokenAt: number | null = null;
+    const reflectedMessage = state.assistantMessage?.trim();
 
-    // Stream model output in a provider-agnostic way.
-    const streamCallStart = Date.now();
-    let tokenStreamRaw: unknown;
+    if (reflectedMessage) {
+      const tokens = reflectedMessage.split(/(\s+)/);
 
-    if (modelConfig.provider === "ollama") {
-      // For Ollama, use the stream() method for real token streaming
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tokenStreamRaw = (model as any).stream(messages);
-    } else {
-      // For Gemini, use native streaming (nativeStream is async, must await)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tokenStreamRaw = (model as any).nativeStream(messages);
-    }
+      for (const token of tokens) {
+        if (!token) {
+          continue;
+        }
 
-    // Ensure tokenStream is awaited if it's a Promise
-    const tokenStream: AsyncIterable<unknown> =
-      tokenStreamRaw instanceof Promise
-        ? await tokenStreamRaw
-        : (tokenStreamRaw as AsyncIterable<unknown>);
+        if (firstTokenAt === null) {
+          firstTokenAt = Date.now();
+          console.info("FIRST TOKEN SENT", {
+            chatId: hashIdentifierForLogging(input.chatId),
+            runId: hashIdentifierForLogging(input.runId),
+            ttftMs: firstTokenAt - startedAt,
+            reflectionScore: state.reflectionReport?.score ?? null,
+          });
+        }
 
-    const streamCallEnd = Date.now();
-    console.info("MODEL_STREAM_CREATED", {
-      chatId: hashIdentifierForLogging(input.chatId),
-      runId: hashIdentifierForLogging(input.runId),
-      streamSetupTimeMs: streamCallEnd - streamCallStart,
-      timestamp: streamCallEnd - startedAt,
-      provider: modelConfig.provider,
-      model: modelConfig.model,
-    });
-
-    // Forward tokens immediately as they arrive.
-    for await (const chunk of tokenStream) {
-      const chunkText = extractTextFromModelChunk(chunk);
-
-      if (!chunkText) {
-        continue;
+        assistantMessage += token;
+        onEvent?.({ type: "token", content: token });
       }
-
-      if (firstTokenAt === null) {
-        firstTokenAt = Date.now();
-        console.info("FIRST TOKEN SENT", {
-          chatId: hashIdentifierForLogging(input.chatId),
-          runId: hashIdentifierForLogging(input.runId),
-          ttftMs: firstTokenAt - startedAt,
-        });
-      }
-
-      // Preserve spacing across chunk boundaries when streaming
-      const prevLast = assistantMessage.slice(-1);
-      const nextFirst = chunkText.charAt(0);
-      const needsSpace =
-        (/[A-Za-z0-9\)\]]$/.test(prevLast) || /[.,:;!?]$/.test(prevLast)) &&
-        /^[A-Za-z0-9\(\[]/.test(nextFirst);
-      const emitted = needsSpace ? ` ${chunkText}` : chunkText;
-      assistantMessage += emitted;
-      onEvent?.({ type: "token", content: emitted });
     }
 
     if (!assistantMessage.trim()) {
@@ -272,8 +229,11 @@ export async function runChatGraphStream(
 
   Object.assign(state, {
     assistantMessage,
-    modelUsed: modelConfig.model,
-    provider: modelConfig.provider,
+    modelUsed: input.model ?? state.modelUsed ?? "",
+    provider:
+      (input.provider as "google-genai" | "ollama" | undefined) ??
+      state.provider ??
+      "",
     inputTokens,
     outputTokens,
     latencyMs: Date.now() - startedAt,

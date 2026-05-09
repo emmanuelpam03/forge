@@ -28,6 +28,11 @@ import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
+import { getReflectionPrompt } from "@/ai/prompts/promptRegistry";
+import {
+  parseReflectionReport,
+  type ReflectionReport,
+} from "@/ai/graph/reflection.prompt";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 
 export function normalizeAssistantResponseText(text: string): string {
@@ -91,6 +96,211 @@ function getToolStatusMessage(toolName: string): string {
 
 function looksLikeDateTimeQuery(message: string): boolean {
   return /\b(time|timezone|date|day of week|calendar)\b/i.test(message);
+}
+
+/**
+ * Generate response draft (non-streaming) for reflection analysis
+ * Returns just the text without token emission
+ */
+async function generateDraftResponse(state: ChatGraphState): Promise<string> {
+  const override: ModelOverride = {
+    model: state.modelUsed || undefined,
+    provider:
+      (state.provider as "google-genai" | "ollama" | undefined) || undefined,
+  };
+  const model = createGeminiModel(override);
+  const messages = buildChatMessages(state);
+
+  try {
+    let draftText = "";
+
+    // For draft generation, use non-streaming invoke to get full response quickly
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (model as any).invoke(messages as BaseMessage[]);
+    draftText = extractTextFromModelChunk(response);
+
+    if (!draftText?.trim()) {
+      if (state.toolContext) {
+        draftText = "Based on the information I found:\n\n" + state.toolContext;
+      } else {
+        draftText =
+          "I encountered an issue generating a response. Please try again or rephrase your question.";
+      }
+    }
+
+    return normalizeAssistantResponseText(draftText);
+  } catch (error) {
+    console.error("Draft generation failed:", error);
+    return (
+      state.toolContext ||
+      "I encountered an issue generating a response. Please try again or rephrase your question."
+    );
+  }
+}
+
+/**
+ * Analyze response quality using reflection prompt
+ * Returns structured quality report for decision-making
+ */
+async function analyzeResponseQuality(
+  response: string,
+  userMessage: string,
+): Promise<ReflectionReport> {
+  if (!response?.trim()) {
+    return {
+      score: 1,
+      issues: [
+        {
+          dimension: "completeness",
+          severity: "critical",
+          description: "Response is empty or blank",
+        },
+      ],
+      suggestRevision: true,
+      revisionFocus: "Generate a non-empty response",
+    };
+  }
+
+  try {
+    const reflectionPrompt = getReflectionPrompt();
+    const model = createGeminiModel();
+
+    // Build reflection message
+    const reflectionMessage = new HumanMessage(
+      `RESPONSE TO EVALUATE:\n\n${response}\n\n` +
+        `USER QUERY:\n${userMessage}\n\n` +
+        `${reflectionPrompt}`,
+    );
+
+    // Invoke reflection analysis (non-streaming for quick turnaround)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const analysisResponse = await (model as any).invoke([reflectionMessage]);
+    const analysisText = extractTextFromModelChunk(analysisResponse);
+
+    const report = parseReflectionReport(analysisText);
+    return report;
+  } catch (error) {
+    console.error("Reflection analysis failed:", error);
+    // Return neutral report on failure to allow response to proceed
+    return {
+      score: 5,
+      issues: [],
+      suggestRevision: false,
+      strengths: "Unable to analyze quality; response appears functional",
+    };
+  }
+}
+
+/**
+ * Regenerate response with reflection feedback (for revision attempts)
+ */
+async function generateDraftResponseWithFeedback(
+  state: ChatGraphState,
+  feedback: string,
+): Promise<string> {
+  const override: ModelOverride = {
+    model: state.modelUsed || undefined,
+    provider:
+      (state.provider as "google-genai" | "ollama" | undefined) || undefined,
+  };
+  const model = createGeminiModel(override);
+  const messages = buildChatMessages(state);
+
+  // Add feedback context to messages
+  const messagesWithFeedback: BaseMessage[] = [
+    ...messages,
+    new HumanMessage(
+      `Quality feedback on your previous response:\n${feedback}\n\n` +
+        `Please revise the response to address the feedback. Keep the core content ` +
+        `but improve clarity, remove redundancy, or fix any issues identified.`,
+    ),
+  ];
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response = await (model as any).invoke(messagesWithFeedback);
+    const revisedText = extractTextFromModelChunk(response);
+
+    return normalizeAssistantResponseText(
+      revisedText ||
+        state.toolContext ||
+        "I encountered an issue generating a response. Please try again or rephrase your question.",
+    );
+  } catch (error) {
+    console.error("Response revision failed:", error);
+    // Return original draft if revision fails
+    return state.draftResponse || "";
+  }
+}
+
+/**
+ * Pre-streaming reflection node
+ * Analyzes draft response quality and optionally triggers revision
+ * Runs before tokens are emitted to user
+ */
+export async function reflectionNode(state: ChatGraphState) {
+  const startedAt = Date.now();
+
+  // Generate initial draft (non-streaming)
+  let draftResponse = state.draftResponse;
+  if (!draftResponse) {
+    emitStatus(undefined, "Analyzing quality...");
+    draftResponse = await generateDraftResponse(state);
+  }
+
+  // Analyze quality
+  const report = await analyzeResponseQuality(draftResponse, state.userMessage);
+
+  console.info("REFLECTION ANALYSIS", {
+    chatId: hashIdentifierForLogging(state.chatId),
+    runId: hashIdentifierForLogging(state.runId),
+    score: report.score,
+    issueCount: report.issues.length,
+    suggestRevision: report.suggestRevision,
+    durationMs: Date.now() - startedAt,
+  });
+
+  // Determine if revision is needed
+  const iterationCount = (state.reflectionIterationCount ?? 0) + 1;
+  let finalResponse = draftResponse;
+
+  if (report.suggestRevision && iterationCount < 2 && report.revisionFocus) {
+    // Attempt revision
+    emitStatus(undefined, "Refining response...");
+    const revisedResponse = await generateDraftResponseWithFeedback(
+      state,
+      report.revisionFocus,
+    );
+
+    // Re-analyze revised response
+    const revisedReport = await analyzeResponseQuality(
+      revisedResponse,
+      state.userMessage,
+    );
+
+    console.info("REFLECTION REVISION", {
+      chatId: hashIdentifierForLogging(state.chatId),
+      runId: hashIdentifierForLogging(state.runId),
+      originalScore: report.score,
+      revisedScore: revisedReport.score,
+      iterationCount,
+    });
+
+    // Use revised response if quality improved or stayed same (prefer conciseness)
+    if (revisedReport.score >= report.score - 1) {
+      finalResponse = revisedResponse;
+      report.score = revisedReport.score;
+      report.issues = revisedReport.issues;
+    }
+  }
+
+  return {
+    draftResponse: finalResponse,
+    reflectionReport: report,
+    responseRevisionFeedback: report.revisionFocus,
+    reflectionIterationCount: iterationCount,
+    assistantMessage: finalResponse,
+  };
 }
 
 function deriveQueryIntentFromClassification(
@@ -272,6 +482,67 @@ export async function loadContextNode(state: ChatGraphState) {
 
 export async function generateResponseNode(state: ChatGraphState) {
   emitStatus(undefined, "Writing response...");
+
+  const startedAt = Date.now();
+  let assistantMessage = state.assistantMessage || "";
+  const messages = buildChatMessages(state);
+
+  // If response already generated by reflectionNode, stream it directly
+  if (assistantMessage?.trim()) {
+    try {
+      // Stream the pre-approved response
+      let firstTokenAt: number | null = null;
+      const tokens = assistantMessage.split(/(\s+)/);
+
+      for (const token of tokens) {
+        if (!token.trim()) {
+          continue;
+        }
+
+        if (firstTokenAt === null) {
+          firstTokenAt = Date.now();
+          console.info("FIRST TOKEN SENT (from reflection)", {
+            chatId: hashIdentifierForLogging(state.chatId),
+            runId: hashIdentifierForLogging(state.runId),
+            ttftMs: firstTokenAt - startedAt,
+            reflectionScore: state.reflectionReport?.score,
+          });
+        }
+
+        graphStreamEventEmitter?.({ type: "token", content: token });
+      }
+
+      console.info("STREAM CLOSED (from reflection)", {
+        chatId: hashIdentifierForLogging(state.chatId),
+        runId: hashIdentifierForLogging(state.runId),
+        durationMs: Date.now() - startedAt,
+        ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+      });
+
+      const inputTokens = estimateTokens(
+        messages
+          .map((message) =>
+            toTextContent((message as { content?: unknown }).content),
+          )
+          .join("\n"),
+      );
+      const outputTokens = estimateTokens(assistantMessage);
+
+      return {
+        assistantMessage,
+        modelUsed: state.modelUsed || "",
+        provider: state.provider || "",
+        inputTokens,
+        outputTokens,
+        latencyMs: Date.now() - startedAt,
+      };
+    } catch (err) {
+      console.error("Streaming pre-approved response failed:", err);
+      // Fall through to regenerate
+    }
+  }
+
+  // Fallback: Generate and stream response if not already generated
   function joinWithSpacing(
     prev: string,
     next: string,
@@ -290,6 +561,7 @@ export async function generateResponseNode(state: ChatGraphState) {
 
     return { combined: `${prev}${next}`, emitted: next };
   }
+
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
     provider:
@@ -297,13 +569,7 @@ export async function generateResponseNode(state: ChatGraphState) {
   };
   const model = createGeminiModel(override);
   const modelConfig = getChatModelConfig(override);
-  const messages = buildChatMessages(state);
-  const startedAt = Date.now();
-  let assistantMessage = "";
-  // Prefer streaming from the model when available. Emit tokens as they
-  // arrive via the run-scoped event emitter so upstream code can forward
-  // them to clients immediately. Do NOT fall back to `invoke()` here —
-  // streaming is required for low TTFT.
+
   try {
     let tokenStream: AsyncIterable<unknown>;
 

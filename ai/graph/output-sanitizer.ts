@@ -310,3 +310,140 @@ export function sanitizeAssistantOutput(text: string): string {
     startedVisibleAnswer: false,
   }).text;
 }
+
+/**
+ * Calculate readability score for response text (0-100)
+ * Factors: sentence length, passive voice ratio, word variety, jargon density
+ */
+export function calculateReadabilityScore(text: string): number {
+  if (!text?.trim()) return 0;
+
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  if (sentences.length === 0) return 50;
+
+  const words = text.split(/\s+/).filter((w) => w.trim().length > 0);
+  const avgSentenceLength = words.length / sentences.length;
+  const avgWordLength =
+    words.reduce((sum, w) => sum + w.length, 0) / words.length;
+
+  // Passive voice detection (simplified)
+  const passivePattern =
+    /\b(is|are|was|were|been|be|being)\s+\w+ed\b|\bby\s+\w+\b/gi;
+  const passiveVoiceCount = (text.match(passivePattern) || []).length;
+  const passiveVoiceRatio = passiveVoiceCount / sentences.length;
+
+  // Calculate score components
+  let score = 100;
+
+  // Penalize long sentences (ideal: 15-20 words)
+  if (avgSentenceLength > 25) score -= 15;
+  else if (avgSentenceLength > 20) score -= 8;
+  else if (avgSentenceLength < 8) score -= 5;
+
+  // Penalize long words (ideal avg: 5-6 chars)
+  if (avgWordLength > 7) score -= 10;
+
+  // Penalize excessive passive voice (ideal: <20%)
+  if (passiveVoiceRatio > 0.3) score -= 15;
+  else if (passiveVoiceRatio > 0.2) score -= 8;
+
+  // Bonus for varied sentence starters
+  const sentenceStarters = new Set(
+    sentences.map((s) => s.trim().split(/\s+/)[0]),
+  );
+  if (sentenceStarters.size / sentences.length > 0.7) score += 5;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Identify redundant phrases and repetition
+ */
+export function identifyRedundancy(text: string): string[] {
+  const lines = text.split("\n");
+  const phraseCounts: Record<string, number> = {};
+  const redundantPhrases: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim().toLowerCase();
+    if (trimmed.length < 10) continue;
+
+    if (phraseCounts[trimmed]) {
+      phraseCounts[trimmed]++;
+      if (phraseCounts[trimmed] === 2) {
+        redundantPhrases.push(trimmed);
+      }
+    } else {
+      phraseCounts[trimmed] = 1;
+    }
+  }
+
+  return redundantPhrases;
+}
+
+/**
+ * Detect obvious hallucination markers
+ */
+export function detectHallucinationMarkers(text: string): string[] {
+  const markers: string[] = [];
+  const hallMarkerPatterns = [
+    /\b(I assume|I believe|probably|maybe|I think|supposedly)\b/gi,
+    /\b(I cannot|I don't|I'm not)\s+(certain|sure|aware|sure|confident)\b/gi,
+    /\b(unknown|unclear|undefined)\b/gi,
+  ];
+
+  for (const pattern of hallMarkerPatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      markers.push(...matches.map((m) => m.toLowerCase()));
+    }
+  }
+
+  return [...new Set(markers)];
+}
+
+/**
+ * Calculate detailed readability metrics
+ */
+export type ReadabilityMetrics = {
+  score: number;
+  avgSentenceLength: number;
+  avgWordLength: number;
+  passiveVoiceRatio: number;
+  hasCodeBlocks: boolean;
+  hasLists: boolean;
+  sentenceCount: number;
+  wordCount: number;
+};
+
+export function calculateReadabilityMetrics(text: string): ReadabilityMetrics {
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const words = text.split(/\s+/).filter((w) => w.trim().length > 0);
+
+  const avgSentenceLength =
+    words.length > 0 ? words.length / sentences.length : 0;
+  const avgWordLength =
+    words.length > 0
+      ? words.reduce((sum, w) => sum + w.length, 0) / words.length
+      : 0;
+
+  const passivePattern =
+    /\b(is|are|was|were|been|be|being)\s+\w+ed\b|\bby\s+\w+\b/gi;
+  const passiveVoiceCount = (text.match(passivePattern) || []).length;
+  const passiveVoiceRatio =
+    sentences.length > 0 ? passiveVoiceCount / sentences.length : 0;
+
+  const hasCodeBlocks = /```/.test(text);
+  const hasLists = /^[-*]\s/m.test(text);
+
+  return {
+    score: calculateReadabilityScore(text),
+    avgSentenceLength,
+    avgWordLength,
+    passiveVoiceRatio,
+    hasCodeBlocks,
+    hasLists,
+    sentenceCount: sentences.length,
+    wordCount: words.length,
+  };
+}

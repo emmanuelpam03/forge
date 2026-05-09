@@ -2,6 +2,7 @@ import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
 import type { QueryIntentClassification } from "@/ai/graph/classification.ts";
+import type { ReflectionReport } from "@/ai/graph/reflection.prompt";
 import type { StructuredIntentClassification } from "@/ai/graph/classification.ts";
 import type {
   AudienceLevel,
@@ -120,6 +121,22 @@ export type ChatGraphState = {
    * When set, forces the graph to execute a specific tool (e.g. "webSearch").
    */
   forceTool?: string | null;
+  /**
+   * Draft response before reflection analysis (non-streamed version)
+   */
+  draftResponse?: string;
+  /**
+   * Quality analysis report from reflection node
+   */
+  reflectionReport?: ReflectionReport | null;
+  /**
+   * Feedback from reflection for response revision (if needed)
+   */
+  responseRevisionFeedback?: string;
+  /**
+   * Counter for reflection iteration attempts (max 2)
+   */
+  reflectionIterationCount?: number;
 };
 
 const lastValue = <T>(_: T, update: T) => update;
@@ -275,6 +292,22 @@ export const chatGraphState = Annotation.Root({
     default: () => null,
     reducer: lastValue,
   }),
+  draftResponse: Annotation<string | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  reflectionReport: Annotation<ReflectionReport | null | undefined>({
+    default: () => null,
+    reducer: lastValue,
+  }),
+  responseRevisionFeedback: Annotation<string | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  reflectionIterationCount: Annotation<number | undefined>({
+    default: () => 0,
+    reducer: lastValue,
+  }),
 });
 
 export type ChatGraphInput = Pick<
@@ -335,4 +368,8 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   formattingProfile: "auto",
   promptBehavior: input.promptBehavior,
   forceTool: input.forceTool ?? null,
+  draftResponse: undefined,
+  reflectionReport: null,
+  responseRevisionFeedback: undefined,
+  reflectionIterationCount: 0,
 });

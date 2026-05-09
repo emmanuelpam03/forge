@@ -24,4 +24,5 @@ export type StreamEvent =
       messageId?: string;
       userMessageId?: string;
       response?: string;
+      suggestions?: string[];
     };
