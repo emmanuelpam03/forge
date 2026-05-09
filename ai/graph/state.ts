@@ -128,7 +128,7 @@ export type ChatGraphState = {
   /**
    * Quality analysis report from reflection node
    */
-  reflectionReport?: ReflectionReport | null;
+  reflectionReport: ReflectionReport | null;
   /**
    * Feedback from reflection for response revision (if needed)
    */
@@ -136,7 +136,7 @@ export type ChatGraphState = {
   /**
    * Counter for reflection iteration attempts (max 2)
    */
-  reflectionIterationCount?: number;
+  reflectionIterationCount: number;
 };
 
 const lastValue = <T>(_: T, update: T) => update;
@@ -296,7 +296,7 @@ export const chatGraphState = Annotation.Root({
     default: () => undefined,
     reducer: lastValue,
   }),
-  reflectionReport: Annotation<ReflectionReport | null | undefined>({
+  reflectionReport: Annotation<ReflectionReport | null>({
     default: () => null,
     reducer: lastValue,
   }),
@@ -304,7 +304,7 @@ export const chatGraphState = Annotation.Root({
     default: () => undefined,
     reducer: lastValue,
   }),
-  reflectionIterationCount: Annotation<number | undefined>({
+  reflectionIterationCount: Annotation<number>({
     default: () => 0,
     reducer: lastValue,
   }),
@@ -373,3 +373,4 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   responseRevisionFeedback: undefined,
   reflectionIterationCount: 0,
 });
+

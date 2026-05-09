@@ -314,14 +314,15 @@ export function sanitizeAssistantOutput(text: string): string {
 /**
  * Calculate readability score for response text (0-100)
  * Factors: sentence length, passive voice ratio, word variety, jargon density
+ * Internal helper that accepts precomputed sentences/words to avoid re-splitting
  */
-export function calculateReadabilityScore(text: string): number {
-  if (!text?.trim()) return 0;
+function calculateReadabilityScoreFromArrays(
+  text: string,
+  sentences: string[],
+  words: string[],
+): number {
+  if (!text?.trim() || sentences.length === 0) return 50;
 
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-  if (sentences.length === 0) return 50;
-
-  const words = text.split(/\s+/).filter((w) => w.trim().length > 0);
   const avgSentenceLength = words.length / sentences.length;
   const avgWordLength =
     words.reduce((sum, w) => sum + w.length, 0) / words.length;
@@ -354,6 +355,21 @@ export function calculateReadabilityScore(text: string): number {
   if (sentenceStarters.size / sentences.length > 0.7) score += 5;
 
   return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate readability score for response text (0-100)
+ * Factors: sentence length, passive voice ratio, word variety, jargon density
+ */
+export function calculateReadabilityScore(text: string): number {
+  if (!text?.trim()) return 0;
+
+  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  if (sentences.length === 0) return 50;
+
+  const words = text.split(/\s+/).filter((w) => w.trim().length > 0);
+
+  return calculateReadabilityScoreFromArrays(text, sentences, words);
 }
 
 /**
@@ -421,7 +437,7 @@ export function calculateReadabilityMetrics(text: string): ReadabilityMetrics {
   const words = text.split(/\s+/).filter((w) => w.trim().length > 0);
 
   const avgSentenceLength =
-    words.length > 0 ? words.length / sentences.length : 0;
+    sentences.length > 0 ? words.length / sentences.length : 0;
   const avgWordLength =
     words.length > 0
       ? words.reduce((sum, w) => sum + w.length, 0) / words.length
@@ -434,10 +450,10 @@ export function calculateReadabilityMetrics(text: string): ReadabilityMetrics {
     sentences.length > 0 ? passiveVoiceCount / sentences.length : 0;
 
   const hasCodeBlocks = /```/.test(text);
-  const hasLists = /^[-*]\s/m.test(text);
+  const hasLists = /^\s*(?:[-*]|\d+\.|[a-zA-Z]\))\s/m.test(text);
 
   return {
-    score: calculateReadabilityScore(text),
+    score: calculateReadabilityScoreFromArrays(text, sentences, words),
     avgSentenceLength,
     avgWordLength,
     passiveVoiceRatio,

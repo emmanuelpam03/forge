@@ -16,6 +16,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import SettingsShell from "../../components/SettingsShell";
+import SettingsGlobalSeniorToggle from "../../components/SettingsGlobalSeniorToggle";
 
 const SETTINGS_SECTIONS = [
   {
@@ -249,6 +250,22 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+
+            {/* Global Senior Engineering Mode */}
+            <div className="rounded-2xl border border-border bg-muted p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[14px] font-medium text-foreground">
+                    Senior Engineering Mode (global)
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                    Force Senior-Engineer persona across all chats. Overrides
+                    per-chat setting when enabled.
+                  </p>
+                </div>
+                <SettingsGlobalSeniorToggle />
+              </div>
+            </div>
           </div>
         </section>
 

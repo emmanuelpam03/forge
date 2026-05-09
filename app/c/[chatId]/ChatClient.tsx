@@ -1377,17 +1377,37 @@ export function ChatClient({
       />
 
       <div className="relative z-10 flex items-center justify-between border-b border-border px-6 py-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            Chat
-          </p>
-          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-        </div>
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+              Chat
+            </p>
+            <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+          </div>
 
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
-          <Sparkles size={12} className="text-primary" />
-          Forge Preview
-        </span>
+          {isForceSeniorEngineeringMode ? (
+            <button
+              type="button"
+              onClick={() => {
+                toggleSeniorMode();
+                showFeedback({
+                  type: "success",
+                  title: "Senior Engineering Mode disabled for this chat",
+                });
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/8 px-2 py-1 text-[12px] text-foreground"
+              title="Senior Engineering Mode is enabled for this chat — click to disable"
+            >
+              <Sparkles size={14} />
+              <span className="font-medium">SE</span>
+            </button>
+          ) : null}
+
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
+            <Sparkles size={12} className="text-primary" />
+            Forge Preview
+          </span>
+        </div>
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-40">

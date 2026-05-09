@@ -526,6 +526,10 @@ export async function generateResponseNode(state: ChatGraphState) {
           )
           .join("\n"),
       );
+      assistantMessage = humanizeAssistantResponseText(
+        assistantMessage,
+        shouldUseHumanizationMode(state.userMessage),
+      );
       const outputTokens = estimateTokens(assistantMessage);
 
       return {

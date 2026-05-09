@@ -869,30 +869,50 @@ export function SidebarClient({
             <div className="flex items-center gap-2">
               <ModeToggle />
               {activeChatId ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    toggleSeniorMode();
-                    showFeedback({
-                      type: "success",
-                      title: isForceSeniorEngineeringMode
-                        ? "Senior Engineering Mode disabled"
-                        : "Senior Engineering Mode enabled",
-                    });
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-3 py-2 text-[12px] font-medium transition-[background-color,border-color,color,transform,box-shadow] duration-200 ease-out ${
-                    isForceSeniorEngineeringMode
-                      ? "border-primary/40 bg-primary/10 text-foreground"
-                      : "border-border bg-card/60 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/60 hover:text-foreground"
-                  }`}
-                  title="Force Senior Engineering Mode for this chat"
-                  aria-pressed={isForceSeniorEngineeringMode}
-                >
-                  <Sparkles size={13} />
-                  <span>
-                    {isForceSeniorEngineeringMode ? "SE On" : "SE Auto"}
-                  </span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="se-toggle"
+                    className="text-[12px] font-medium text-muted-foreground"
+                    style={{ opacity: 0.86 }}
+                    title="Force Senior Engineering Mode for this chat"
+                  >
+                    Senior
+                  </label>
+
+                  <button
+                    id="se-toggle"
+                    type="button"
+                    onClick={() => {
+                      toggleSeniorMode();
+                      showFeedback({
+                        type: "success",
+                        title: isForceSeniorEngineeringMode
+                          ? "Senior Engineering Mode disabled"
+                          : "Senior Engineering Mode enabled",
+                      });
+                    }}
+                    role="switch"
+                    aria-checked={isForceSeniorEngineeringMode}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none ${
+                      isForceSeniorEngineeringMode
+                        ? "bg-primary/80"
+                        : "bg-border/20"
+                    }`}
+                    title={
+                      isForceSeniorEngineeringMode
+                        ? "Senior Engineering Mode is ON for this chat"
+                        : "Senior Engineering Mode is OFF (auto)"
+                    }
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                        isForceSeniorEngineeringMode
+                          ? "translate-x-5"
+                          : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
               ) : null}
               <Link
                 href="/settings"

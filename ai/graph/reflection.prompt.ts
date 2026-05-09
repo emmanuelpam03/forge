@@ -72,6 +72,21 @@ export type ReflectionReport = {
 };
 
 /**
+ * Allowed enum values for issue fields
+ */
+const ALLOWED_DIMENSIONS = new Set([
+  "clarity",
+  "redundancy",
+  "hallucinations",
+  "correctness",
+  "completeness",
+  "formatting",
+  "readability",
+]);
+
+const ALLOWED_SEVERITIES = new Set(["critical", "medium", "low"]);
+
+/**
  * Parse reflection output string into structured report
  */
 export function parseReflectionReport(output: string): ReflectionReport {
@@ -83,13 +98,76 @@ export function parseReflectionReport(output: string): ReflectionReport {
     }
     const parsed = JSON.parse(jsonMatch[0]) as ReflectionReport;
 
-    // Validate structure
+    // Validate top-level structure
     if (
       typeof parsed.score !== "number" ||
       !Array.isArray(parsed.issues) ||
       typeof parsed.suggestRevision !== "boolean"
     ) {
       throw new Error("Invalid reflection report structure");
+    }
+
+    // Validate score: must be integer within 1-10
+    if (
+      !Number.isInteger(parsed.score) ||
+      parsed.score < 1 ||
+      parsed.score > 10
+    ) {
+      throw new Error(
+        `Invalid score: must be an integer between 1 and 10, got ${parsed.score}`,
+      );
+    }
+
+    // Validate each issue
+    for (let i = 0; i < parsed.issues.length; i++) {
+      const issue = parsed.issues[i];
+
+      // Check issue is an object
+      if (typeof issue !== "object" || issue === null) {
+        throw new Error(
+          `Issue at index ${i}: expected object, got ${typeof issue}`,
+        );
+      }
+
+      // Check required field: dimension
+      if (typeof issue.dimension !== "string") {
+        throw new Error(
+          `Issue at index ${i}: dimension field must be a string, got ${typeof issue.dimension}`,
+        );
+      }
+      if (!ALLOWED_DIMENSIONS.has(issue.dimension)) {
+        throw new Error(
+          `Issue at index ${i}: dimension "${issue.dimension}" not in allowed set: ${Array.from(
+            ALLOWED_DIMENSIONS,
+          ).join(", ")}`,
+        );
+      }
+
+      // Check required field: severity
+      if (typeof issue.severity !== "string") {
+        throw new Error(
+          `Issue at index ${i}: severity field must be a string, got ${typeof issue.severity}`,
+        );
+      }
+      if (!ALLOWED_SEVERITIES.has(issue.severity)) {
+        throw new Error(
+          `Issue at index ${i}: severity "${issue.severity}" not in allowed set: critical, medium, low`,
+        );
+      }
+
+      // Check required field: description
+      if (typeof issue.description !== "string") {
+        throw new Error(
+          `Issue at index ${i}: description field must be a string, got ${typeof issue.description}`,
+        );
+      }
+
+      // Check optional field: location (if present, must be string)
+      if (issue.location !== undefined && typeof issue.location !== "string") {
+        throw new Error(
+          `Issue at index ${i}: location field (if present) must be a string, got ${typeof issue.location}`,
+        );
+      }
     }
 
     return parsed;
