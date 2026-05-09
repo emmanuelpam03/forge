@@ -18,6 +18,7 @@ import {
 import { MessageRenderer } from "@/components/MessageRenderer";
 import { useFeedback } from "@/components/feedback-provider";
 import { type StreamEvent } from "@/ai/graph/stream";
+import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 
 type BranchOption = {
   id: string;
@@ -328,8 +329,8 @@ export function ChatClient({
   const [selectedModelId, setSelectedModelId] = useState(
     MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
   );
-  const [isForceSeniorEngineeringMode, setIsForceSeniorEngineeringMode] =
-    useState(false);
+  const { isEnabled: isForceSeniorEngineeringMode, toggle: toggleSeniorMode } =
+    useSeniorEngineeringMode(chatId);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -442,30 +443,6 @@ export function ChatClient({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isModelMenuOpen]);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(
-        getSeniorModeStorageKey(chatId),
-      );
-      if (stored === "on") {
-        setIsForceSeniorEngineeringMode(true);
-      }
-    } catch {
-      // Ignore storage errors to avoid blocking chat usage.
-    }
-  }, [chatId]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        getSeniorModeStorageKey(chatId),
-        isForceSeniorEngineeringMode ? "on" : "off",
-      );
-    } catch {
-      // Ignore storage errors (private mode/quota issues).
-    }
-  }, [chatId, isForceSeniorEngineeringMode]);
 
   const stopGeneration = () => {
     if (!abortControllerRef.current) {
@@ -1489,34 +1466,6 @@ export function ChatClient({
             </button>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsForceSeniorEngineeringMode((current) => {
-                    const next = !current;
-                    showFeedback({
-                      type: "success",
-                      title: next
-                        ? "Force Senior Engineering Mode enabled"
-                        : "Force Senior Engineering Mode disabled",
-                    });
-                    return next;
-                  });
-                }}
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
-                  isForceSeniorEngineeringMode
-                    ? "border-primary/50 bg-primary/15 text-foreground"
-                    : "border-border/80 bg-background/80 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground"
-                }`}
-                title="Force Senior Engineering Mode for all requests"
-                aria-pressed={isForceSeniorEngineeringMode}
-              >
-                <Sparkles size={14} />
-                <span>
-                  {isForceSeniorEngineeringMode ? "Force SE On" : "SE Auto"}
-                </span>
-              </button>
-
               <div className="relative" ref={modelMenuRef}>
                 <button
                   type="button"
@@ -1555,14 +1504,12 @@ export function ChatClient({
                             setIsModelMenuOpen(false);
                           }}
                           className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-foreground ${
-                            isActive
-                              ? "bg-accent text-foreground"
-                              : "text-muted-foreground"
+                            isActive ? "bg-accent text-foreground" : ""
                           }`}
                         >
-                          <span>{option.label}</span>
+                          <span className="pr-3">{option.label}</span>
                           {isActive ? (
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                            <span className="text-[10px] uppercase tracking-[0.3em] text-primary">
                               Active
                             </span>
                           ) : null}
@@ -1575,17 +1522,22 @@ export function ChatClient({
 
               {isSending ? (
                 <button
+                  type="button"
                   onClick={stopGeneration}
-                  className="rounded-full bg-destructive/20 p-2 text-destructive transition hover:bg-destructive/30"
+                  className="rounded-full bg-destructive p-2 text-destructive-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label="Stop generation"
                   title="Stop generation"
                 >
                   <Square size={16} />
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={() => void sendMessage()}
                   disabled={!draft.trim()}
                   className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label="Send message"
+                  title="Send message"
                 >
                   <ArrowUp size={16} />
                 </button>

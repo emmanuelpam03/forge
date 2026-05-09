@@ -77,11 +77,10 @@ export type ReflectionReport = {
 export function parseReflectionReport(output: string): ReflectionReport {
   try {
     // Extract JSON from output (handles minor whitespace/formatting issues)
-    const jsonMatch = output.match(/\{[\s\S]*\}/);
+    const jsonMatch = output.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       throw new Error("No JSON found in reflection output");
     }
-
     const parsed = JSON.parse(jsonMatch[0]) as ReflectionReport;
 
     // Validate structure

@@ -13,12 +13,14 @@ import {
   MessageSquare,
   MoreHorizontal,
   Settings,
+  Sparkles,
   Trash2,
   Pencil,
 } from "lucide-react";
 import ForgeLogo from "./ForgeLogo";
 import { useFeedback } from "./feedback-provider";
 import { ModeToggle } from "./mode-toggle";
+import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 import {
   createProject,
   updateProject,
@@ -444,6 +446,9 @@ export function SidebarClient({
   const { showFeedback } = useFeedback();
   const pathname = usePathname();
   const router = useRouter();
+  const activeChatId = pathname?.match(/^\/c\/([^/]+)/)?.[1] ?? null;
+  const { isEnabled: isForceSeniorEngineeringMode, toggle: toggleSeniorMode } =
+    useSeniorEngineeringMode(activeChatId);
 
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
@@ -863,6 +868,32 @@ export function SidebarClient({
           >
             <div className="flex items-center gap-2">
               <ModeToggle />
+              {activeChatId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleSeniorMode();
+                    showFeedback({
+                      type: "success",
+                      title: isForceSeniorEngineeringMode
+                        ? "Senior Engineering Mode disabled"
+                        : "Senior Engineering Mode enabled",
+                    });
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-2xl border px-3 py-2 text-[12px] font-medium transition-[background-color,border-color,color,transform,box-shadow] duration-200 ease-out ${
+                    isForceSeniorEngineeringMode
+                      ? "border-primary/40 bg-primary/10 text-foreground"
+                      : "border-border bg-card/60 text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/60 hover:text-foreground"
+                  }`}
+                  title="Force Senior Engineering Mode for this chat"
+                  aria-pressed={isForceSeniorEngineeringMode}
+                >
+                  <Sparkles size={13} />
+                  <span>
+                    {isForceSeniorEngineeringMode ? "SE On" : "SE Auto"}
+                  </span>
+                </button>
+              ) : null}
               <Link
                 href="/settings"
                 className="flex flex-1 items-center gap-2 rounded-2xl px-3 py-2 text-[12.5px] transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
