@@ -98,6 +98,37 @@ function looksLikeDateTimeQuery(message: string): boolean {
   return /\b(time|timezone|date|day of week|calendar)\b/i.test(message);
 }
 
+function buildLangSmithRunConfig(
+  state: ChatGraphState,
+  phase: string,
+): {
+  runName: string;
+  tags: string[];
+  metadata: Record<string, string | boolean>;
+} {
+  const selectedOptions = state.selectedOptions ?? [];
+  const persona = state.promptBehavior?.persona ?? "auto";
+  const taskCategory = state.taskCategory ?? "general";
+
+  return {
+    runName: `forge.${phase}`,
+    tags: [
+      `phase:${phase}`,
+      `task:${taskCategory}`,
+      `persona:${persona}`,
+      ...selectedOptions.map((optionId) => `option:${optionId}`),
+    ],
+    metadata: {
+      chatId: hashIdentifierForLogging(state.chatId),
+      runId: hashIdentifierForLogging(state.runId),
+      taskCategory,
+      persona,
+      selectedOptions: selectedOptions.join(","),
+      codingOptionSelected: selectedOptions.includes("coding"),
+    },
+  };
+}
+
 /**
  * Generate response draft (non-streaming) for reflection analysis
  * Returns just the text without token emission
@@ -116,7 +147,10 @@ async function generateDraftResponse(state: ChatGraphState): Promise<string> {
 
     // For draft generation, use non-streaming invoke to get full response quickly
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (model as any).invoke(messages as BaseMessage[]);
+    const response = await (model as any).invoke(
+      messages as BaseMessage[],
+      buildLangSmithRunConfig(state, "draft-response"),
+    );
     draftText = extractTextFromModelChunk(response);
 
     if (!draftText?.trim()) {
@@ -218,7 +252,10 @@ async function generateDraftResponseWithFeedback(
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (model as any).invoke(messagesWithFeedback);
+    const response = await (model as any).invoke(
+      messagesWithFeedback,
+      buildLangSmithRunConfig(state, "draft-revision"),
+    );
     const revisedText = extractTextFromModelChunk(response);
 
     return normalizeAssistantResponseText(
@@ -856,20 +893,25 @@ export async function planTaskNode(state: ChatGraphState) {
     const queryIntent =
       state.queryIntent ??
       deriveQueryIntentFromClassification(state.classifiedIntent);
-    // If the user explicitly selected the `coding` chip, force coding
-    // task category and bias the prompt persona toward a senior engineer.
     const selected = state.selectedOptions ?? [];
-    if (selected.includes("coding")) {
-      state.taskCategory = "coding";
-      state.promptBehavior = {
-        ...(state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
-        persona: "senior-engineer",
-      };
+    const forceSeniorEngineeringFromCoding = selected.includes("coding");
+    const forcedPromptBehavior = forceSeniorEngineeringFromCoding
+      ? {
+          ...(state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
+          persona: "senior-engineer" as const,
+        }
+      : state.promptBehavior;
+    const forcedTaskCategory = forceSeniorEngineeringFromCoding
+      ? "coding"
+      : state.taskCategory;
+
+    if (forceSeniorEngineeringFromCoding) {
       console.info(
         JSON.stringify({
           event: "promptRouting.forcePersona",
           chatId: hashIdentifierForLogging(state.chatId),
           runId: hashIdentifierForLogging(state.runId),
+          reason: "selectedOption:coding",
           forcedPersona: "senior-engineer",
         }),
       );
@@ -920,6 +962,8 @@ export async function planTaskNode(state: ChatGraphState) {
       executionMode,
       intent: queryIntent.type,
       queryIntent,
+      taskCategory: forcedTaskCategory,
+      promptBehavior: forcedPromptBehavior,
     };
   } catch (error) {
     console.error("Tool planning failed:", error);
@@ -1159,9 +1203,10 @@ export async function classifyIntentNode(state: ChatGraphState) {
     let structuredIntent = null;
     let taskCategory = state.taskCategory ?? "general";
     try {
-      const response = await model.invoke([
-        new HumanMessage(classificationPrompt),
-      ]);
+      const response = await model.invoke(
+        [new HumanMessage(classificationPrompt)],
+        buildLangSmithRunConfig(state, "intent-classification"),
+      );
       const parsed = parseClassificationText(toTextContent(response.content));
 
       structuredIntent = parsed.structured ?? null;
@@ -1207,7 +1252,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
     const queryIntent = deriveQueryIntentFromClassification(classifiedIntent);
     const requestedPersona =
       state.promptBehavior?.persona ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS.persona;
-    const promptBehavior = structuredIntent
+    let promptBehavior = structuredIntent
       ? {
           responseMode: structuredIntent.responseMode,
           verbosity: structuredIntent.verbosity,
@@ -1217,6 +1262,17 @@ export async function classifyIntentNode(state: ChatGraphState) {
           persona: requestedPersona,
         }
       : state.promptBehavior;
+
+    const forceSeniorEngineeringFromCoding = (
+      state.selectedOptions ?? []
+    ).includes("coding");
+    if (forceSeniorEngineeringFromCoding) {
+      taskCategory = "coding";
+      promptBehavior = {
+        ...(promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
+        persona: "senior-engineer",
+      };
+    }
 
     console.info(
       JSON.stringify({
@@ -1304,7 +1360,10 @@ export async function generateTitleNode(state: ChatGraphState) {
       state.userMessage,
     ).replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage);
 
-    const response = await model.invoke([new HumanMessage(prompt)]);
+    const response = await model.invoke(
+      [new HumanMessage(prompt)],
+      buildLangSmithRunConfig(state, "title-generation"),
+    );
     const generatedTitle = toTextContent(response.content)
       .toLowerCase()
       .trim()
@@ -1344,7 +1403,10 @@ export async function extractMemoryNode(state: ChatGraphState) {
       .replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage)
       .replace(/"{INTENT}"/g, state.intent || "");
 
-    const response = await model.invoke([new HumanMessage(prompt)]);
+    const response = await model.invoke(
+      [new HumanMessage(prompt)],
+      buildLangSmithRunConfig(state, "memory-extraction"),
+    );
     const extractedMemory = toTextContent(response.content)
       .trim()
       .replace(/^["']|["']$/g, "");
