@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
-import { ArrowUp, Bookmark, Layers, Globe, Mic, Plus } from "lucide-react";
+import { useRef, useState, type CSSProperties } from "react";
+import { ArrowUp, Bookmark, Globe, Layers, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
+import { ModesMenu } from "@/components/ModesMenu";
 import { useFeedback } from "@/components/feedback-provider";
+import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 
 function ForgeLogo({
   className,
@@ -49,10 +52,12 @@ const FEATURE_CARDS = [
 export default function HomePage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
+  const homeScopeId = "home-global";
 
   const hour = new Date().getHours();
   const greetingText =
     hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+
   const [userName] = useState(() => {
     try {
       return localStorage.getItem("userName") ?? "there";
@@ -64,6 +69,14 @@ export default function HomePage() {
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [error, setError] = useState("");
+  const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
+  const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const {
+    selectedOptions: selectedOptionIds,
+    getSelectedOptionObjects,
+    removeOption,
+  } = useSelectedOptions(homeScopeId);
+  const selectedOptions = getSelectedOptionObjects();
 
   const handleSend = async () => {
     const message = input.trim();
@@ -80,7 +93,6 @@ export default function HomePage() {
       setError("");
       setIsCreatingChat(true);
       const { createChat, updateChat } = await import("@/lib/actions/chats");
-
       const createResult = await createChat();
 
       if (!createResult.success || !createResult.chat) {
@@ -90,6 +102,18 @@ export default function HomePage() {
       const chatId = createResult.chat.id;
       const title =
         message.length > 60 ? `${message.slice(0, 60)}...` : message;
+
+      try {
+        localStorage.setItem(
+          `forge:chat:${chatId}:selected-options`,
+          JSON.stringify(selectedOptionIds),
+        );
+      } catch (storageError) {
+        console.warn(
+          "Failed to persist selected options for chat:",
+          storageError,
+        );
+      }
 
       showFeedback({
         type: "success",
@@ -104,12 +128,14 @@ export default function HomePage() {
         );
       }, 0);
 
-      void updateChat(chatId, { title }).catch((error) => {
-        console.error("Failed to update chat title:", error);
+      void updateChat(chatId, { title }).catch((updateError) => {
+        console.error("Failed to update chat title:", updateError);
       });
-    } catch (error) {
+    } catch (caughtError) {
       const description =
-        error instanceof Error ? error.message : "Failed to create chat";
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Failed to create chat";
 
       setError(description);
       showFeedback({
@@ -124,7 +150,6 @@ export default function HomePage() {
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-background">
-      {/* Subtle ambient glow — matches chat page */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -133,7 +158,6 @@ export default function HomePage() {
         }}
       />
 
-      {/* Subtle grid texture */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.018]"
         style={{
@@ -144,8 +168,7 @@ export default function HomePage() {
       />
 
       <div className="relative z-10 flex w-full flex-col items-center gap-5 px-6">
-        {/* Wordmark */}
-        <div className="flex flex-col items-center gap-2 mb-1">
+        <div className="mb-1 flex flex-col items-center gap-2">
           <div
             className="flex h-12 w-12 items-center justify-center rounded-2xl"
             style={{
@@ -159,7 +182,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Main Card */}
         <div
           className="flex w-full max-w-104 flex-col gap-6"
           style={{
@@ -174,7 +196,6 @@ export default function HomePage() {
             backdropFilter: "blur(12px)",
           }}
         >
-          {/* Header */}
           <div className="flex flex-col items-center gap-2 text-center">
             <h1
               className="text-[26px] font-semibold leading-tight text-foreground"
@@ -194,7 +215,6 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Feature Cards */}
           <div className="grid grid-cols-3 gap-2">
             {FEATURE_CARDS.map(({ id, icon: Icon, title, description }) => (
               <button
@@ -208,16 +228,16 @@ export default function HomePage() {
                   borderRadius: "14px",
                   padding: "12px 10px",
                 }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background =
+                onMouseEnter={(event) => {
+                  (event.currentTarget as HTMLElement).style.background =
                     "color-mix(in oklab, var(--primary) 9%, var(--card))";
-                  (e.currentTarget as HTMLElement).style.borderColor =
+                  (event.currentTarget as HTMLElement).style.borderColor =
                     "color-mix(in oklab, var(--primary) 38%, transparent)";
                 }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background =
+                onMouseLeave={(event) => {
+                  (event.currentTarget as HTMLElement).style.background =
                     "color-mix(in oklab, var(--card) 94%, var(--primary) 6%)";
-                  (e.currentTarget as HTMLElement).style.borderColor =
+                  (event.currentTarget as HTMLElement).style.borderColor =
                     "color-mix(in oklab, var(--border) 78%, transparent)";
                 }}
               >
@@ -249,67 +269,100 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-
-          {/* Placeholder for floating input to render below */}
         </div>
 
-        {/* Footer */}
         <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
           Forge can make mistakes. Verify important information.
         </p>
       </div>
 
-      {/* Floating Input (same as chat page) */}
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
-          <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
-            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
-              <Plus size={18} />
-            </button>
-
-            <input
-              type="text"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && void handleSend()}
-              placeholder="Ask anything"
-              disabled={isCreatingChat}
-              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-            />
-
-            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
-              <Mic size={18} />
-            </button>
-
-            <div className="flex items-center gap-2">
-              {isCreatingChat ? (
+          <div className="relative rounded-[28px] border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+              <div className="relative col-start-1 row-start-1 self-center">
                 <button
-                  className="rounded-full bg-muted/50 p-2 text-muted-foreground cursor-not-allowed"
-                  disabled
+                  ref={modesMenuTriggerRef}
+                  type="button"
+                  onClick={() => setIsModesMenuOpen((value) => !value)}
+                  className="rounded-full p-2 text-muted-foreground transition hover:text-foreground"
+                  aria-haspopup="menu"
+                  aria-expanded={isModesMenuOpen}
+                  title="Open modes"
                 >
-                  <span
-                    className="block h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
-                    style={{ borderColor: "currentColor" }}
-                  />
+                  <Plus size={18} />
                 </button>
-              ) : (
-                <button
-                  onClick={() => void handleSend()}
-                  disabled={!input.trim()}
-                  className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <ArrowUp size={16} />
+
+                <ModesMenu
+                  isOpen={isModesMenuOpen}
+                  onClose={() => setIsModesMenuOpen(false)}
+                  chatId={homeScopeId}
+                  triggerRef={modesMenuTriggerRef}
+                  className="absolute bottom-full left-0 mb-3 z-50 w-[20rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+                />
+              </div>
+
+              <input
+                type="text"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    void handleSend();
+                  }
+                }}
+                placeholder="Ask anything"
+                disabled={isCreatingChat}
+                className="col-start-2 row-start-1 w-full bg-transparent py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+
+              <div className="col-start-3 row-start-1 flex items-center gap-2 self-center">
+                <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
+                  <Mic size={18} />
                 </button>
-              )}
+
+                {isCreatingChat ? (
+                  <button
+                    className="rounded-full bg-muted/50 p-2 text-muted-foreground cursor-not-allowed"
+                    disabled
+                  >
+                    <span
+                      className="block h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
+                      style={{ borderColor: "currentColor" }}
+                    />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => void handleSend()}
+                    disabled={!input.trim()}
+                    className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                )}
+              </div>
+
+              {selectedOptions.length > 0 ? (
+                <div className="col-start-2 row-start-2 flex flex-wrap gap-2">
+                  {selectedOptions.map((option) => (
+                    <ActiveToolChip
+                      key={option.id}
+                      option={option}
+                      onRemove={() => removeOption(option.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
-          </div>
 
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground px-3">
-            <p>Enter to send.</p>
+            <div className="mt-2 flex items-center justify-between px-3 text-[11px] text-muted-foreground">
+              <p>Enter to send.</p>
+            </div>
+
+            {error ? (
+              <p className="mt-2 px-3 text-[11px] text-red-400">{error}</p>
+            ) : null}
           </div>
-          {error ? (
-            <p className="mt-2 text-[11px] text-red-400 px-3">{error}</p>
-          ) : null}
         </div>
       </div>
     </div>
