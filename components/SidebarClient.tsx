@@ -20,7 +20,6 @@ import {
 import ForgeLogo from "./ForgeLogo";
 import { useFeedback } from "./feedback-provider";
 import { ModeToggle } from "./mode-toggle";
-import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 import {
   createProject,
   updateProject,
@@ -446,9 +445,6 @@ export function SidebarClient({
   const { showFeedback } = useFeedback();
   const pathname = usePathname();
   const router = useRouter();
-  const activeChatId = pathname?.match(/^\/c\/([^/]+)/)?.[1] ?? null;
-  const { isEnabled: isForceSeniorEngineeringMode, toggle: toggleSeniorMode } =
-    useSeniorEngineeringMode(activeChatId);
 
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
@@ -868,52 +864,6 @@ export function SidebarClient({
           >
             <div className="flex items-center gap-2">
               <ModeToggle />
-              {activeChatId ? (
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="se-toggle"
-                    className="text-[12px] font-medium text-muted-foreground"
-                    style={{ opacity: 0.86 }}
-                    title="Force Senior Engineering Mode for this chat"
-                  >
-                    Senior
-                  </label>
-
-                  <button
-                    id="se-toggle"
-                    type="button"
-                    onClick={() => {
-                      toggleSeniorMode();
-                      showFeedback({
-                        type: "success",
-                        title: isForceSeniorEngineeringMode
-                          ? "Senior Engineering Mode disabled"
-                          : "Senior Engineering Mode enabled",
-                      });
-                    }}
-                    role="switch"
-                    aria-checked={isForceSeniorEngineeringMode}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all focus:outline-none ${
-                      isForceSeniorEngineeringMode
-                        ? "bg-primary/80"
-                        : "bg-border/20"
-                    }`}
-                    title={
-                      isForceSeniorEngineeringMode
-                        ? "Senior Engineering Mode is ON for this chat"
-                        : "Senior Engineering Mode is OFF (auto)"
-                    }
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                        isForceSeniorEngineeringMode
-                          ? "translate-x-5"
-                          : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-              ) : null}
               <Link
                 href="/settings"
                 className="flex flex-1 items-center gap-2 rounded-2xl px-3 py-2 text-[12.5px] transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"

@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, MessageSquare, Folder, X } from "lucide-react";
 import { getProjects } from "@/lib/actions/projects";
 import { getRecentChats } from "@/lib/actions/chats";
 import { useFeedback } from "@/components/feedback-provider";
+import { ModesMenu } from "@/components/ModesMenu";
 
 export default function SearchPage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
 
   const [query, setQuery] = useState("");
+  const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
+  const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   type Project = { id: string; name: string; href?: string };
   type ChatPreview = { id: string; title: string; preview: string };
 
@@ -132,7 +135,7 @@ export default function SearchPage() {
 
       {/* Search Modal */}
       <div className="absolute inset-0 flex items-start justify-center pt-16 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-125 mx-4 rounded-2xl border border-border bg-popover shadow-lg overflow-hidden">
+        <div className="pointer-events-auto w-full max-w-125 mx-4 rounded-2xl border border-border bg-popover shadow-lg overflow-hidden relative">
           {/* Search Input */}
           <div className="flex items-center gap-3 border-b border-border px-4 py-3">
             <Search size={18} className="text-muted-foreground shrink-0" />
@@ -146,12 +149,22 @@ export default function SearchPage() {
               className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
             />
             <button
-              onClick={() => router.back()}
+              ref={modesMenuTriggerRef}
+              onClick={() => setIsModesMenuOpen(!isModesMenuOpen)}
               className="rounded p-1 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              title="Open modes menu"
             >
               <X size={16} />
             </button>
           </div>
+
+          {/* Modes Menu */}
+          <ModesMenu
+            isOpen={isModesMenuOpen}
+            onClose={() => setIsModesMenuOpen(false)}
+            chatId={null}
+            triggerRef={modesMenuTriggerRef}
+          />
 
           {/* Results */}
           <div className="max-h-[60vh] overflow-y-auto">

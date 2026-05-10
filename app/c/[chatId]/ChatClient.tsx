@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
 import { useFeedback } from "@/components/feedback-provider";
+import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
+import { ModesMenu } from "@/components/ModesMenu";
+import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 import { type StreamEvent } from "@/ai/graph/stream";
 import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 
@@ -61,9 +64,6 @@ const MODEL_OPTIONS: ModelOption[] = [
   { id: "gpt-oss:120b", label: "GPT-OSS 120B", provider: "ollama" },
   { id: "gemma-4-31b-it", label: "Gemma 4 31B IT", provider: "google-genai" },
 ];
-
-const getSeniorModeStorageKey = (chatId: string) =>
-  `forge:chat:${chatId}:force-senior-mode`;
 
 function MessageBubble({
   message,
@@ -326,15 +326,23 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+  const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState(
     MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
   );
-  const { isEnabled: isForceSeniorEngineeringMode, toggle: toggleSeniorMode } =
+  const {
+    getSelectedOptionObjects,
+    removeOption,
+    isLoaded: optionsLoaded,
+  } = useSelectedOptions(chatId);
+  const selectedOptions = getSelectedOptionObjects();
+  const { isEnabled: isForceSeniorEngineeringMode } =
     useSeniorEngineeringMode(chatId);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
+  const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
 
@@ -1385,24 +1393,6 @@ export function ChatClient({
             <h1 className="text-lg font-semibold text-foreground">{title}</h1>
           </div>
 
-          {isForceSeniorEngineeringMode ? (
-            <button
-              type="button"
-              onClick={() => {
-                toggleSeniorMode();
-                showFeedback({
-                  type: "success",
-                  title: "Senior Engineering Mode disabled for this chat",
-                });
-              }}
-              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/8 px-2 py-1 text-[12px] text-foreground"
-              title="Senior Engineering Mode is enabled for this chat — click to disable"
-            >
-              <Sparkles size={14} />
-              <span className="font-medium">SE</span>
-            </button>
-          ) : null}
-
           <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
             <Sparkles size={12} className="text-primary" />
             Forge Preview
@@ -1460,108 +1450,140 @@ export function ChatClient({
 
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
-          <div className="rounded-full bg-card/90 border border-border shadow-lg px-4 py-3 backdrop-blur flex items-center gap-3">
-            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
-              <Plus size={18} />
-            </button>
-
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendMessage();
-                }
-              }}
-              placeholder="Ask anything"
-              rows={1}
-              disabled={isSending}
-              className="max-h-40 min-h-6 w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground px-2 py-1"
-            />
-
-            <button className="rounded-full p-2 text-muted-foreground hover:text-foreground transition">
-              <Mic size={18} />
-            </button>
-
-            <div className="flex items-center gap-2">
-              <div className="relative" ref={modelMenuRef}>
+          <div className="relative rounded-full border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <div className="relative shrink-0">
                 <button
+                  ref={modesMenuTriggerRef}
                   type="button"
-                  title="Select model"
-                  aria-label="Select model"
-                  aria-expanded={isModelMenuOpen}
+                  onClick={() => setIsModesMenuOpen((value) => !value)}
+                  className="rounded-full p-2 text-muted-foreground transition hover:text-foreground"
                   aria-haspopup="menu"
-                  onClick={() => setIsModelMenuOpen((value) => !value)}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-2 text-[12px] font-medium text-muted-foreground shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  aria-expanded={isModesMenuOpen}
+                  title="Open modes"
                 >
-                  <span className="truncate">{selectedModel.label}</span>
-                  <ChevronDown
-                    size={16}
-                    className={`transition-transform duration-200 ${
-                      isModelMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
+                  <Plus size={18} />
                 </button>
 
-                {isModelMenuOpen ? (
-                  <div
-                    role="menu"
-                    className="absolute right-0 bottom-full mb-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover p-1 shadow-xl"
-                  >
-                    {MODEL_OPTIONS.map((option) => {
-                      const isActive = option.id === selectedModelId;
-
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={isActive}
-                          onClick={() => {
-                            setSelectedModelId(option.id);
-                            setIsModelMenuOpen(false);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-foreground ${
-                            isActive ? "bg-accent text-foreground" : ""
-                          }`}
-                        >
-                          <span className="pr-3">{option.label}</span>
-                          {isActive ? (
-                            <span className="text-[10px] uppercase tracking-[0.3em] text-primary">
-                              Active
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                <ModesMenu
+                  isOpen={isModesMenuOpen}
+                  onClose={() => setIsModesMenuOpen(false)}
+                  chatId={chatId}
+                  triggerRef={modesMenuTriggerRef}
+                  className="absolute bottom-full left-0 mb-3 z-50 w-[20rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
+                />
               </div>
 
-              {isSending ? (
-                <button
-                  type="button"
-                  onClick={stopGeneration}
-                  className="rounded-full bg-destructive p-2 text-destructive-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label="Stop generation"
-                  title="Stop generation"
-                >
-                  <Square size={16} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void sendMessage()}
-                  disabled={!draft.trim()}
-                  className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label="Send message"
-                  title="Send message"
-                >
-                  <ArrowUp size={16} />
-                </button>
-              )}
+              {optionsLoaded && selectedOptions.length > 0 ? (
+                <div className="flex min-w-0 max-w-full flex-1 flex-wrap items-center gap-2">
+                  {selectedOptions.map((option) => (
+                    <ActiveToolChip
+                      key={option.id}
+                      option={option}
+                      onRemove={() => removeOption(option.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendMessage();
+                  }
+                }}
+                placeholder="Ask anything"
+                rows={1}
+                disabled={isSending}
+                className="min-h-10 max-h-40 flex-1 resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+
+              <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
+                <Mic size={18} />
+              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="relative" ref={modelMenuRef}>
+                  <button
+                    type="button"
+                    title="Select model"
+                    aria-label="Select model"
+                    aria-expanded={isModelMenuOpen}
+                    aria-haspopup="menu"
+                    onClick={() => setIsModelMenuOpen((value) => !value)}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-2 text-[12px] font-medium text-muted-foreground shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  >
+                    <span className="truncate">{selectedModel.label}</span>
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform duration-200 ${
+                        isModelMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isModelMenuOpen ? (
+                    <div
+                      role="menu"
+                      className="absolute right-0 bottom-full mb-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover p-1 shadow-xl"
+                    >
+                      {MODEL_OPTIONS.map((option) => {
+                        const isActive = option.id === selectedModelId;
+
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={isActive}
+                            onClick={() => {
+                              setSelectedModelId(option.id);
+                              setIsModelMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-foreground ${
+                              isActive ? "bg-accent text-foreground" : ""
+                            }`}
+                          >
+                            <span className="pr-3">{option.label}</span>
+                            {isActive ? (
+                              <span className="text-[10px] uppercase tracking-[0.3em] text-primary">
+                                Active
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+
+                {isSending ? (
+                  <button
+                    type="button"
+                    onClick={stopGeneration}
+                    className="rounded-full bg-destructive p-2 text-destructive-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Stop generation"
+                    title="Stop generation"
+                  >
+                    <Square size={16} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void sendMessage()}
+                    disabled={!draft.trim()}
+                    className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Send message"
+                    title="Send message"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
