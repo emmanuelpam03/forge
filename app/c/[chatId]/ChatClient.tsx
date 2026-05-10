@@ -330,11 +330,7 @@ export function ChatClient({
   const [selectedModelId, setSelectedModelId] = useState(
     MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
   );
-  const {
-    getSelectedOptionObjects,
-    removeOption,
-    isLoaded: optionsLoaded,
-  } = useSelectedOptions(chatId);
+  const { getSelectedOptionObjects, removeOption } = useSelectedOptions(chatId);
   const selectedOptions = getSelectedOptionObjects();
   const { isEnabled: isForceSeniorEngineeringMode } =
     useSeniorEngineeringMode(chatId);
@@ -1451,8 +1447,8 @@ export function ChatClient({
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
           <div className="relative rounded-full border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
-            <div className="flex min-w-0 flex-wrap items-center gap-3">
-              <div className="relative shrink-0">
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+              <div className="relative col-start-1 row-start-1 self-center">
                 <button
                   ref={modesMenuTriggerRef}
                   type="button"
@@ -1474,8 +1470,8 @@ export function ChatClient({
                 />
               </div>
 
-              {optionsLoaded && selectedOptions.length > 0 ? (
-                <div className="flex min-w-0 max-w-full flex-1 flex-wrap items-center gap-2">
+              {selectedOptions.length > 0 ? (
+                <div className="col-start-2 row-start-2 flex flex-wrap gap-2">
                   {selectedOptions.map((option) => (
                     <ActiveToolChip
                       key={option.id}
@@ -1499,14 +1495,14 @@ export function ChatClient({
                 placeholder="Ask anything"
                 rows={1}
                 disabled={isSending}
-                className="min-h-10 max-h-40 flex-1 resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="col-start-2 row-start-1 min-h-10 max-h-40 w-full resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
 
-              <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
-                <Mic size={18} />
-              </button>
+              <div className="col-start-3 row-start-1 flex items-center gap-2 self-center">
+                <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
+                  <Mic size={18} />
+                </button>
 
-              <div className="flex items-center gap-2">
                 <div className="relative" ref={modelMenuRef}>
                   <button
                     type="button"

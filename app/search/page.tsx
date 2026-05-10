@@ -3,15 +3,18 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, MessageSquare, Folder, X } from "lucide-react";
+import { Search, MessageSquare, Folder, Plus } from "lucide-react";
 import { getProjects } from "@/lib/actions/projects";
 import { getRecentChats } from "@/lib/actions/chats";
 import { useFeedback } from "@/components/feedback-provider";
+import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
 import { ModesMenu } from "@/components/ModesMenu";
+import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 
 export default function SearchPage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
+  const searchScopeId = "search-global";
 
   const [query, setQuery] = useState("");
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
@@ -23,6 +26,9 @@ export default function SearchPage() {
   const [recentChats, setRecentChats] = useState<ChatPreview[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const { getSelectedOptionObjects, removeOption } =
+    useSelectedOptions(searchScopeId);
+  const selectedOptions = getSelectedOptionObjects();
 
   useEffect(() => {
     const loadData = async () => {
@@ -135,34 +141,51 @@ export default function SearchPage() {
 
       {/* Search Modal */}
       <div className="absolute inset-0 flex items-start justify-center pt-16 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-125 mx-4 rounded-2xl border border-border bg-popover shadow-lg overflow-hidden relative">
+        <div className="pointer-events-auto relative mx-4 w-full max-w-125 overflow-hidden rounded-2xl border border-border bg-popover shadow-lg">
           {/* Search Input */}
-          <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-            <Search size={18} className="text-muted-foreground shrink-0" />
-            <input
-              autoFocus
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
-              placeholder="Search chats and projects..."
-              className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
-            />
-            <button
-              ref={modesMenuTriggerRef}
-              onClick={() => setIsModesMenuOpen(!isModesMenuOpen)}
-              className="rounded p-1 hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              title="Open modes menu"
-            >
-              <X size={16} />
-            </button>
+          <div className="border-b border-border px-4 py-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <Search size={18} className="shrink-0 text-muted-foreground" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
+                  placeholder="Search chats and projects..."
+                  className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+
+              <button
+                ref={modesMenuTriggerRef}
+                onClick={() => setIsModesMenuOpen(!isModesMenuOpen)}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                title="Open modes menu"
+              >
+                <Plus size={16} />
+              </button>
+
+              {selectedOptions.length > 0 ? (
+                <div className="col-start-2 flex max-w-[16rem] flex-wrap justify-end gap-2">
+                  {selectedOptions.map((option) => (
+                    <ActiveToolChip
+                      key={option.id}
+                      option={option}
+                      onRemove={() => removeOption(option.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {/* Modes Menu */}
           <ModesMenu
             isOpen={isModesMenuOpen}
             onClose={() => setIsModesMenuOpen(false)}
-            chatId={null}
+            chatId={searchScopeId}
             triggerRef={modesMenuTriggerRef}
           />
 
