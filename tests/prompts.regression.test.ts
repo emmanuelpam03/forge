@@ -196,7 +196,8 @@ test("router supports auto persona for coding and explicit overrides", () => {
   assert.match(source, /controls\.persona === "auto"/);
   assert.match(source, /state\.taskCategory === "coding"/);
   assert.match(source, /resolvedPersonaRole/);
-  assert.match(source, /persona-senior-engineer/);
+  assert.match(source, /effectiveTaskCategory/);
+  assert.match(source, /looksLikeCodeRequest/);
 });
 
 test("router wires explicit-only humanization prompt activation", () => {
@@ -230,13 +231,15 @@ test("chat API accepts persona opt-in payload", () => {
 
 test("chat client can send senior mode selection", () => {
   const source = readWorkspaceFile("app/c/[chatId]/ChatClient.tsx");
+  assert.match(source, /useSeniorEngineeringMode/);
   assert.match(source, /isForceSeniorEngineeringMode/);
   assert.match(source, /promptBehavior: isForceSeniorEngineeringMode/);
   assert.match(source, /senior-engineer/);
-  assert.match(source, /getSeniorModeStorageKey/);
-  assert.match(source, /window\.localStorage\.getItem/);
-  assert.match(source, /window\.localStorage\.setItem/);
-  assert.match(source, /SE Auto/);
+
+  const hookSource = readWorkspaceFile("hooks/useSeniorEngineeringMode.ts");
+  assert.match(hookSource, /getSeniorModeStorageKey/);
+  assert.match(hookSource, /window\.localStorage\.getItem/);
+  assert.match(hookSource, /window\.localStorage\.setItem/);
 });
 
 test("classifier prompt recognizes explanation as a teaching category", () => {

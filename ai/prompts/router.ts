@@ -16,7 +16,6 @@ import {
   getTaskPrompt,
   getToolsPrompt,
 } from "@/ai/prompts/promptRegistry";
-import { getSeniorEngineerPrompt } from "@/ai/prompts/promptRegistry";
 import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import {
   DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
@@ -368,6 +367,12 @@ function buildMemoryInjection(state: ChatGraphState): string {
   ].join(" ");
 }
 
+function looksLikeCodeRequest(message: string): boolean {
+  return /```|\b(code|coding|function|class|interface|type|typescript|javascript|python|java|c\+\+|c#|sql|api|endpoint|bug|debug|fix|refactor|implement|algorithm|query|schema)\b/i.test(
+    message,
+  );
+}
+
 function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const controls = state.promptBehavior ?? resolveBehaviorControls(state);
   const humanizationEnabled = shouldUseHumanizationMode(state.userMessage);
@@ -375,7 +380,6 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   // Log anonymized teaching depth choice for ML feedback
   logTeachingDepthTelemetry(state, controls.teachingDepth);
 
-  const taskPrompt = getTaskPrompt(state.taskCategory);
   const runtimeContext = buildRuntimeContext(state);
   const memoryInjection = buildMemoryInjection(state);
 
@@ -383,6 +387,18 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
     controls.persona === "senior-engineer" ||
     (controls.persona === "auto" &&
       (state.taskCategory === "coding" || controls.responseMode === "code"));
+
+  const shouldPrioritizeCodingTaskPrompt =
+    seniorEngineerEnabled ||
+    state.taskCategory === "coding" ||
+    controls.responseMode === "code" ||
+    looksLikeCodeRequest(state.userMessage);
+
+  const effectiveTaskCategory = shouldPrioritizeCodingTaskPrompt
+    ? "coding"
+    : state.taskCategory;
+
+  const taskPrompt = getTaskPrompt(effectiveTaskCategory);
 
   const resolvedPersonaRole = seniorEngineerEnabled
     ? "senior-engineer"
@@ -423,17 +439,6 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.persona": resolvedPersonaRole,
       },
     },
-    // Persona layer: enabled explicitly or automatically for coding tasks
-    {
-      id: "persona-senior-engineer",
-      layer: "persona",
-      priority: 84,
-      content: seniorEngineerEnabled ? getSeniorEngineerPrompt() : "",
-      directives: {
-        "persona.role": resolvedPersonaRole,
-      },
-      enabled: seniorEngineerEnabled,
-    },
     {
       id: "tools-policy",
       layer: "task",
@@ -444,12 +449,12 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       },
     },
     {
-      id: `task-${state.taskCategory}`,
+      id: `task-${effectiveTaskCategory}`,
       layer: "task",
       priority: 80,
       content: taskPrompt,
       directives: {
-        "task.category": state.taskCategory,
+        "task.category": effectiveTaskCategory,
       },
       enabled: taskPrompt.trim().length > 0,
     },
@@ -475,6 +480,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.verbosity": controls.verbosity,
         "response.audience": controls.audience,
       },
+      enabled: effectiveTaskCategory !== "coding",
     },
     {
       id: "runtime-context",
@@ -502,6 +508,15 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   const segments = buildPromptSegments(state);
   const composition = composePromptSegments(segments);
+  const behaviorControls =
+    state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS;
+  const effectiveTaskCategory =
+    behaviorControls.persona === "senior-engineer" ||
+    state.taskCategory === "coding" ||
+    behaviorControls.responseMode === "code" ||
+    looksLikeCodeRequest(state.userMessage)
+      ? "coding"
+      : state.taskCategory;
 
   console.info(
     JSON.stringify({
@@ -512,8 +527,8 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
       skippedSegments: composition.diagnostics.skippedSegmentIds,
       conflicts: composition.diagnostics.conflicts,
       resolvedDirectiveCount: composition.diagnostics.resolvedDirectiveCount,
-      behaviorControls:
-        state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
+      behaviorControls,
+      effectiveTaskCategory,
       precedence: [
         "System Prompt",
         "Safety",

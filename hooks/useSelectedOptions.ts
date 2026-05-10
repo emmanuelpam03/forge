@@ -23,6 +23,7 @@ type SelectedOptionsStore = {
 };
 
 const selectedOptionsStores = new Map<string, SelectedOptionsStore>();
+const EMPTY_SELECTED_OPTIONS: OptionId[] = [];
 
 function getSelectedOptionsStore(storageKey: string): SelectedOptionsStore {
   const existingStore = selectedOptionsStores.get(storageKey);
@@ -124,7 +125,7 @@ export function useSelectedOptions(chatId: string) {
   const selectedOptions = useSyncExternalStore(
     subscribe,
     getSnapshot,
-    () => [],
+    () => EMPTY_SELECTED_OPTIONS,
   );
 
   const syncFromStorage = useCallback(() => {
