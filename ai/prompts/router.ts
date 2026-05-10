@@ -30,6 +30,21 @@ import {
 import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
+import { SELECTED_OPTION_LABELS } from "@/ai/selected-options";
+
+function formatSelectedOptions(state: ChatGraphState): string {
+  const selectedOptions = state.selectedOptions ?? [];
+
+  if (selectedOptions.length === 0) {
+    return "";
+  }
+
+  const labels = selectedOptions
+    .map((optionId) => SELECTED_OPTION_LABELS[optionId] ?? optionId)
+    .join(", ");
+
+  return `User-selected assistant modes are ${labels}.`;
+}
 
 function resolveResponseMode(state: ChatGraphState): ResponseMode {
   if (state.responseMode && state.responseMode !== "auto") {
@@ -336,6 +351,7 @@ function buildRuntimeContext(state: ChatGraphState): string {
 
   return [
     evidencePriorityContext,
+    formatSelectedOptions(state),
     formatIntent(state),
     formatToolContext(state),
     formatToolPlan(state),

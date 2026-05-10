@@ -4,6 +4,7 @@ import type { SelectedContext } from "@/ai/context/engine";
 import type { QueryIntentClassification } from "@/ai/graph/classification.ts";
 import type { ReflectionReport } from "@/ai/graph/reflection.prompt";
 import type { StructuredIntentClassification } from "@/ai/graph/classification.ts";
+import type { SelectedOptionId } from "@/ai/selected-options";
 import type {
   AudienceLevel,
   FormattingProfile,
@@ -133,6 +134,7 @@ export type ChatGraphState = {
    * Feedback from reflection for response revision (if needed)
    */
   responseRevisionFeedback?: string;
+  selectedOptions?: SelectedOptionId[];
   /**
    * Counter for reflection iteration attempts (max 2)
    */
@@ -288,6 +290,10 @@ export const chatGraphState = Annotation.Root({
     default: () => undefined,
     reducer: lastValue,
   }),
+  selectedOptions: Annotation<SelectedOptionId[]>({
+    default: () => [],
+    reducer: lastValue,
+  }),
   forceTool: Annotation<string | null>({
     default: () => null,
     reducer: lastValue,
@@ -322,6 +328,7 @@ export type ChatGraphInput = Pick<
   | "assistantMessageId"
   | "skipUserCreate"
   | "promptBehavior"
+  | "selectedOptions"
 > & {
   model?: string;
   provider?: string;
@@ -367,10 +374,10 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   teachingDepth: "auto",
   formattingProfile: "auto",
   promptBehavior: input.promptBehavior,
+  selectedOptions: input.selectedOptions ?? [],
   forceTool: input.forceTool ?? null,
   draftResponse: undefined,
   reflectionReport: null,
   responseRevisionFeedback: undefined,
   reflectionIterationCount: 0,
 });
-

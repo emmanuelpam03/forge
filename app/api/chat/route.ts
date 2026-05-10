@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
+import { selectedOptionIdSchema } from "@/ai/selected-options";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ const chatRequestSchema = z.object({
       persona: z.enum(["auto", "none", "senior-engineer"]),
     })
     .optional(),
+  selectedOptions: z.array(selectedOptionIdSchema).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
                 classifiedIntent: null,
                 model: parsedBody.data.model,
                 provider: parsedBody.data.provider,
+                selectedOptions: parsedBody.data.selectedOptions ?? [],
                 promptBehavior: parsedBody.data.promptBehavior
                   ? {
                       ...DEFAULT_PROMPT_BEHAVIOR_CONTROLS,

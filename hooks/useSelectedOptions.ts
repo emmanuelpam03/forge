@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import type { SelectedOptionId } from "@/ai/selected-options";
 
-export type OptionId = "search" | "research" | "analysis" | "coding";
+export type OptionId = SelectedOptionId;
 
 export interface Option {
   id: OptionId;

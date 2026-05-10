@@ -330,7 +330,11 @@ export function ChatClient({
   const [selectedModelId, setSelectedModelId] = useState(
     MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
   );
-  const { getSelectedOptionObjects, removeOption } = useSelectedOptions(chatId);
+  const {
+    selectedOptions: selectedOptionIds,
+    getSelectedOptionObjects,
+    removeOption,
+  } = useSelectedOptions(chatId);
   const selectedOptions = getSelectedOptionObjects();
   const { isEnabled: isForceSeniorEngineeringMode } =
     useSeniorEngineeringMode(chatId);
@@ -625,6 +629,7 @@ export function ChatClient({
           newContent,
           model: selectedModelId,
           provider: selectedModel.provider,
+          selectedOptions: selectedOptionIds,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -840,6 +845,7 @@ export function ChatClient({
           assistantMessageId,
           model: selectedModelId,
           provider: selectedModel.provider,
+          selectedOptions: selectedOptionIds,
         }),
         signal: abortControllerRef.current.signal,
       });
@@ -1150,6 +1156,7 @@ export function ChatClient({
             message,
             model: selectedModelId,
             provider: selectedModel.provider,
+            selectedOptions: selectedOptionIds,
             promptBehavior: isForceSeniorEngineeringMode
               ? { persona: "senior-engineer" }
               : undefined,

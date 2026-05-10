@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
+import { selectedOptionIdSchema } from "@/ai/selected-options";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,7 @@ const regenRequestSchema = z.object({
   assistantMessageId: z.string().min(1),
   model: z.string().optional(),
   provider: z.enum(["google-genai", "ollama"]).optional(),
+  selectedOptions: z.array(selectedOptionIdSchema).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -179,6 +181,7 @@ export async function POST(request: NextRequest) {
                 skipUserCreate: true,
                 model: parsed.data.model,
                 provider: parsed.data.provider,
+                selectedOptions: parsed.data.selectedOptions ?? [],
               },
               (event) => {
                 if (event.type === "token") {

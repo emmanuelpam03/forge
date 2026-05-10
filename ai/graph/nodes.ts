@@ -325,18 +325,54 @@ function resolveToolPlanForQueryIntent(
   queryIntent: QueryIntentClassification,
 ): string[] {
   const message = state.userMessage;
-
-  if (!queryIntent.needsTools) {
-    return [];
+  // If intent does not need tools, still allow user-selected options to
+  // force use of tools. We merge inferred tools with any selected options
+  // provided by the client (UI chips).
+  const inferredTools: string[] = [];
+  if (queryIntent.needsTools) {
+    if (queryIntent.type === "real_time") {
+      inferredTools.push(
+        looksLikeDateTimeQuery(message) ? "currentDateTime" : "webSearch",
+      );
+    }
   }
 
-  if (queryIntent.type === "real_time") {
-    return looksLikeDateTimeQuery(message)
-      ? ["currentDateTime"]
-      : ["webSearch"];
+  // Map selected UI option IDs to concrete tool names. Keep ordering but
+  // deduplicate later.
+  const selected = state.selectedOptions ?? [];
+  const selectedTools: string[] = [];
+
+  if (selected.includes("search")) {
+    selectedTools.push("webSearch");
   }
 
-  return [];
+  if (selected.includes("research")) {
+    // Research should check both local project context and the web.
+    selectedTools.push("projectContextLookup");
+    selectedTools.push("webSearch");
+    selectedTools.push("summarizeText");
+  }
+
+  if (selected.includes("analysis")) {
+    // Analysis prefers summarization and may also use calculator for numeric queries.
+    selectedTools.push("summarizeText");
+    if (
+      /\bcalculate|compute|what is|what's|percent|%|\d+\s*[+\-*/]/i.test(
+        message,
+      )
+    ) {
+      selectedTools.push("calculator");
+    }
+  }
+
+  if (selected.includes("coding")) {
+    // Coding benefits from project context lookup to find relevant code/docs.
+    selectedTools.push("projectContextLookup");
+  }
+
+  // Combine inferred and selected tools, preserving order but removing duplicates
+  const final = Array.from(new Set([...selectedTools, ...inferredTools]));
+  return final;
 }
 
 function extractCalculatorExpression(message: string): string {
@@ -820,6 +856,24 @@ export async function planTaskNode(state: ChatGraphState) {
     const queryIntent =
       state.queryIntent ??
       deriveQueryIntentFromClassification(state.classifiedIntent);
+    // If the user explicitly selected the `coding` chip, force coding
+    // task category and bias the prompt persona toward a senior engineer.
+    const selected = state.selectedOptions ?? [];
+    if (selected.includes("coding")) {
+      state.taskCategory = "coding";
+      state.promptBehavior = {
+        ...(state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
+        persona: "senior-engineer",
+      };
+      console.info(
+        JSON.stringify({
+          event: "promptRouting.forcePersona",
+          chatId: hashIdentifierForLogging(state.chatId),
+          runId: hashIdentifierForLogging(state.runId),
+          forcedPersona: "senior-engineer",
+        }),
+      );
+    }
     const forcedTool = state.forceTool ?? null;
     const toolsNeeded = forcedTool
       ? [forcedTool]
