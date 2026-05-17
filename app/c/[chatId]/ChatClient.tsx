@@ -57,13 +57,22 @@ type ChatClientProps = {
 type ModelOption = {
   id: string;
   label: string;
-  provider: "google-genai" | "ollama";
+  provider: "google-genai" | "ollama" | "openrouter";
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
   { id: "gpt-oss:120b", label: "GPT-OSS 120B", provider: "ollama" },
   { id: "gemma-4-31b-it", label: "Gemma 4 31B IT", provider: "google-genai" },
+  {
+    id: "meta-llama/llama-3.3-70b-instruct:free",
+    label: "Llama 3.3 70B Instruct Free",
+    provider: "openrouter",
+  },
 ];
+
+const CODING_MODEL_OPTION =
+  MODEL_OPTIONS.find((option) => option.provider === "openrouter") ??
+  MODEL_OPTIONS[0];
 
 function MessageBubble({
   message,
@@ -138,7 +147,7 @@ function MessageBubble({
               autoFocus
               value={editingContent ?? message.content}
               onChange={(e) => setEditingContent(e.target.value)}
-              className="min-h-[5rem] w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/70"
+              className="min-h-20 w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/70"
               rows={3}
             />
             <div className="mt-4 flex items-center justify-end gap-3">
@@ -347,6 +356,14 @@ export function ChatClient({
   const selectedModel =
     MODEL_OPTIONS.find((model) => model.id === selectedModelId) ??
     MODEL_OPTIONS[0];
+  const initialDefaultModelId = MODEL_OPTIONS[0].id;
+  const isUsingAppDefaultModel = selectedModelId === initialDefaultModelId;
+
+  // Use OpenRouter for coding only when the user didn't explicitly pick another model.
+  const requestModel =
+    selectedOptionIds.includes("coding") && isUsingAppDefaultModel
+      ? CODING_MODEL_OPTION
+      : selectedModel;
 
   const hasMessages = messages.length > 0;
 
@@ -616,8 +633,8 @@ export function ChatClient({
           chatId,
           messageId,
           newContent,
-          model: selectedModelId,
-          provider: selectedModel.provider,
+          model: requestModel.id,
+          provider: requestModel.provider,
           selectedOptions: selectedOptionIds,
         }),
         signal: abortControllerRef.current.signal,
@@ -831,8 +848,8 @@ export function ChatClient({
         body: JSON.stringify({
           chatId,
           assistantMessageId,
-          model: selectedModelId,
-          provider: selectedModel.provider,
+          model: requestModel.id,
+          provider: requestModel.provider,
           selectedOptions: selectedOptionIds,
         }),
         signal: abortControllerRef.current.signal,
@@ -1141,8 +1158,8 @@ export function ChatClient({
           body: JSON.stringify({
             chatId,
             message,
-            model: selectedModelId,
-            provider: selectedModel.provider,
+            model: requestModel.id,
+            provider: requestModel.provider,
             selectedOptions: selectedOptionIds,
             promptBehavior: isForceSeniorEngineeringMode
               ? { persona: "senior-engineer" }
@@ -1347,8 +1364,8 @@ export function ChatClient({
       chatId,
       draft,
       isSending,
-      selectedModelId,
-      selectedModel.provider,
+      requestModel.id,
+      requestModel.provider,
       selectedOptionIds,
       isForceSeniorEngineeringMode,
       showFeedback,
@@ -1490,7 +1507,7 @@ export function ChatClient({
                 placeholder="Ask anything"
                 rows={1}
                 disabled={isSending}
-                className="col-start-2 row-start-1 min-h-10 max-h-40 w-full resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="col-start-2 row-start-1 min-h-10 max-h-40 w-full resize-none bg-transparent px-1 py-2 leading-6 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
 
               <div className="col-start-3 row-start-1 flex items-center gap-2 self-center">
@@ -1551,6 +1568,17 @@ export function ChatClient({
                     </div>
                   ) : null}
                 </div>
+
+                {isUsingAppDefaultModel && selectedOptionIds.includes("coding") ? (
+                  <div className="hidden md:flex items-center ml-2">
+                    <span
+                      title={`Using coding default: ${requestModel.label}`}
+                      className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-muted/10 px-3 py-1 text-[11px] text-muted-foreground"
+                    >
+                      <span>Code default: {requestModel.label}</span>
+                    </span>
+                  </div>
+                ) : null}
 
                 {isSending ? (
                   <button

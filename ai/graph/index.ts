@@ -222,7 +222,7 @@ export async function runChatGraphStream(
     assistantMessage,
     modelUsed: input.model ?? state.modelUsed ?? "",
     provider:
-      (input.provider as "google-genai" | "ollama" | undefined) ??
+      (input.provider as "google-genai" | "ollama" | "openrouter" | undefined) ??
       state.provider ??
       "",
     inputTokens,

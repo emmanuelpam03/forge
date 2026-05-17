@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { ChatOllama } from "@langchain/ollama";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatOpenAI } from "@langchain/openai";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
 import type { BaseMessage } from "@langchain/core/messages";
 import { SystemMessage } from "@langchain/core/messages";
@@ -13,8 +14,11 @@ import { warn } from "@/lib/logger";
 export const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 export const DEFAULT_OLLAMA_MODEL = "qwen2.5:7b-instruct";
 export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+export const DEFAULT_OPENROUTER_CODE_MODEL =
+  "meta-llama/llama-3.3-70b-instruct:free";
 
-export type ChatModelProvider = "google-genai" | "ollama";
+export type ChatModelProvider = "google-genai" | "ollama" | "openrouter";
 
 export type ChatModelConfig =
   | {
@@ -23,6 +27,11 @@ export type ChatModelConfig =
     }
   | {
       provider: "ollama";
+      model: string;
+      baseUrl: string;
+    }
+  | {
+      provider: "openrouter";
       model: string;
       baseUrl: string;
     };
@@ -51,6 +60,10 @@ function getNativeClient(): GoogleGenerativeAI {
  * Models starting with "gemini" map to google-genai; others default to ollama.
  */
 function inferProviderFromModel(modelName: string): ChatModelProvider {
+  if (modelName.includes("/") || modelName.includes(":free")) {
+    return "openrouter";
+  }
+
   if (modelName.toLowerCase().startsWith("gemini")) {
     return "google-genai";
   }
@@ -71,16 +84,32 @@ export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
   }
 
   // Use override provider if provided, otherwise read from env
-  const provider = override?.provider ||  
-    (process.env.AI_MODEL_PROVIDER?.trim().toLowerCase() === "ollama"
+  const envProvider = process.env.AI_MODEL_PROVIDER?.trim().toLowerCase();
+  const provider =
+    override?.provider ||
+    (envProvider === "ollama"
       ? "ollama"
-      : "google-genai");
+      : envProvider === "openrouter"
+        ? "openrouter"
+        : "google-genai");
 
   if (provider === "ollama") {
     return {
       provider,
       model: override?.model || process.env.OLLAMA_MODEL?.trim() || DEFAULT_OLLAMA_MODEL,
       baseUrl: process.env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL,
+    };
+  }
+
+  if (provider === "openrouter") {
+    return {
+      provider,
+      model:
+        override?.model ||
+        process.env.OPENROUTER_CODE_MODEL?.trim() ||
+        DEFAULT_OPENROUTER_CODE_MODEL,
+      baseUrl:
+        process.env.OPENROUTER_BASE_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL,
     };
   }
 
@@ -98,6 +127,9 @@ const ModelEnvSchema = z
     OLLAMA_MODEL: z.string().optional(),
     OLLAMA_BASE_URL: z.string().optional(),
     OLLAMA_API_KEY: z.string().optional(),
+    OPENROUTER_BASE_URL: z.string().optional(),
+    OPENROUTER_CODE_MODEL: z.string().optional(),
+    OPENROUTER_API_KEY: z.string().optional(),
   })
   .passthrough(); // Allow extra env vars without warning
 
@@ -240,6 +272,27 @@ export function createGeminiModel(override?: ModelOverride) {
     };
 
     return new ChatOllama(ollamaOpts);
+  }
+
+  if (config.provider === "openrouter") {
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error("OPENROUTER_API_KEY is required for the OpenRouter provider.");
+    }
+
+    return new ChatOpenAI({
+      apiKey,
+      model: config.model,
+      temperature: 0.7,
+      maxRetries: 2,
+      configuration: {
+        baseURL: config.baseUrl,
+        defaultHeaders: {
+          "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER?.trim() || "http://localhost:3000",
+          "X-Title": process.env.OPENROUTER_APP_TITLE?.trim() || "Forge",
+        },
+      },
+    });
   }
 
   const apiKey = process.env.GOOGLE_API_KEY?.trim();

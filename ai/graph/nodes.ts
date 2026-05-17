@@ -146,7 +146,7 @@ async function generateDraftResponse(state: ChatGraphState): Promise<string> {
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
     provider:
-      (state.provider as "google-genai" | "ollama" | undefined) || undefined,
+      (state.provider as "google-genai" | "ollama" | "openrouter" | undefined) || undefined,
   };
   const model = createGeminiModel(override);
   const messages = buildChatMessages(state);
@@ -250,7 +250,7 @@ async function generateDraftResponseWithFeedback(
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
     provider:
-      (state.provider as "google-genai" | "ollama" | undefined) || undefined,
+      (state.provider as "google-genai" | "ollama" | "openrouter" | undefined) || undefined,
   };
   const model = createGeminiModel(override);
   const messages = buildChatMessages(state);
@@ -660,7 +660,7 @@ export async function generateResponseNode(state: ChatGraphState) {
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
     provider:
-      (state.provider as "google-genai" | "ollama" | undefined) || undefined,
+      (state.provider as "google-genai" | "ollama" | "openrouter" | undefined) || undefined,
   };
   const model = createGeminiModel(override);
   const modelConfig = getChatModelConfig(override);

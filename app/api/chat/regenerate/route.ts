@@ -11,7 +11,7 @@ const regenRequestSchema = z.object({
   chatId: z.string().min(1),
   assistantMessageId: z.string().min(1),
   model: z.string().optional(),
-  provider: z.enum(["google-genai", "ollama"]).optional(),
+  provider: z.enum(["google-genai", "ollama", "openrouter"]).optional(),
   selectedOptions: z.array(selectedOptionIdSchema).optional(),
 });
 

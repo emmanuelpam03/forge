@@ -12,7 +12,7 @@ const chatRequestSchema = z.object({
   chatId: z.string().min(1),
   message: z.string().min(1),
   model: z.string().optional(),
-  provider: z.enum(["google-genai", "ollama"]).optional(),
+  provider: z.enum(["google-genai", "ollama", "openrouter"]).optional(),
   promptBehavior: z
     .object({
       persona: z.enum(["auto", "none", "senior-engineer"]),

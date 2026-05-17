@@ -12,7 +12,7 @@ const editRequestSchema = z.object({
   messageId: z.string().min(1),
   newContent: z.string().min(1),
   model: z.string().optional(),
-  provider: z.enum(["google-genai", "ollama"]).optional(),
+  provider: z.enum(["google-genai", "ollama", "openrouter"]).optional(),
   selectedOptions: z.array(selectedOptionIdSchema).optional(),
 });
 
