@@ -1417,7 +1417,7 @@ export function ChatClient({
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-40">
-        <div className="mx-auto w-full max-w-4xl space-y-4">
+        <div className="mx-auto w-full max-w-[52rem] space-y-4">
           {!hasMessages ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageSquare size={32} className="mb-3 text-muted-foreground" />
@@ -1465,7 +1465,7 @@ export function ChatClient({
       </div>
 
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
-        <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
+        <div className="mx-auto w-full max-w-[52rem] px-6 pointer-events-auto">
           <div className="relative rounded-full border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
               <div className="relative col-start-1 row-start-1 self-center">
