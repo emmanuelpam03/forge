@@ -452,6 +452,28 @@ export function SidebarClient({
   const [isBooting, setIsBooting] = useState(true);
   const [recentChats, setRecentChats] = useState(initialChats);
 
+  // Optimistic chat creation: listen for chat:created and chat:confirmed events
+  useEffect(() => {
+    function handleChatCreated(e: CustomEvent) {
+      const { id, title } = e.detail;
+      setRecentChats((prev) => [{ id, title }, ...prev]);
+    }
+    function handleChatConfirmed(e: CustomEvent) {
+      const { tempId, id, title } = e.detail;
+      setRecentChats((prev) => {
+        // Replace temp chat with real chat
+        const filtered = prev.filter((c) => c.id !== tempId);
+        return [{ id, title }, ...filtered];
+      });
+    }
+    window.addEventListener("chat:created", handleChatCreated as EventListener);
+    window.addEventListener("chat:confirmed", handleChatConfirmed as EventListener);
+    return () => {
+      window.removeEventListener("chat:created", handleChatCreated as EventListener);
+      window.removeEventListener("chat:confirmed", handleChatConfirmed as EventListener);
+    };
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 260);
     return () => window.clearTimeout(timer);

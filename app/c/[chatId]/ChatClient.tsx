@@ -61,6 +61,7 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
+  { id: "deepseek/deepseek-v4-flash", label: "Deepseek v4 Flash", provider: "openrouter" },
   { id: "gpt-oss:120b", label: "GPT-OSS 120B", provider: "ollama" },
   { id: "gemma-4-31b-it", label: "Gemma 4 31B IT", provider: "google-genai" },
   {
@@ -71,7 +72,8 @@ const MODEL_OPTIONS: ModelOption[] = [
 ];
 
 const CODING_MODEL_OPTION =
-  MODEL_OPTIONS.find((option) => option.provider === "openrouter") ??
+  MODEL_OPTIONS.find((option) => option.id === "meta-llama/llama-3.3-70b-instruct:free") ||
+  MODEL_OPTIONS.find((option) => option.provider === "openrouter") ||
   MODEL_OPTIONS[0];
 
 function MessageBubble({
@@ -131,29 +133,32 @@ function MessageBubble({
       className={`flex ${isUser ? "justify-end" : message.role === "assistant" ? "justify-center" : "justify-start"}`}
     >
       <div
-        className={`group relative ${
+        className={`relative group/message ${
           message.role === "assistant"
             ? "w-full max-w-225 px-0 py-0 bg-transparent border-0 text-foreground"
-            : `max-w-[80%] rounded-2xl border px-4 py-3 ${
+            : `${isUser && isEditing ? "w-full max-w-225" : "max-w-[80%]"} rounded-2xl border px-4 py-3 ${
                 isUser
-                  ? "border-primary bg-primary/15 text-foreground"
+                  ? isEditing
+                    ? "border-transparent bg-transparent text-foreground p-0"
+                    : "border-primary bg-primary/15 text-foreground"
                   : "border-border bg-card text-foreground"
               }`
         }`}
+        tabIndex={0}
       >
         {isEditing && isUser ? (
-          <div className="min-w-[min(100%,48rem)] rounded-[28px] border border-border/80 bg-card/95 px-6 py-5 shadow-2xl shadow-black/20 backdrop-blur-sm">
+          <div className="flex w-full max-w-none flex-col rounded-[1.5rem] bg-[#363636] px-5 py-4 text-white shadow-none">
             <textarea
               autoFocus
               value={editingContent ?? message.content}
               onChange={(e) => setEditingContent(e.target.value)}
-              className="min-h-20 w-full resize-none border-0 bg-transparent p-0 text-[15px] leading-7 text-foreground outline-none placeholder:text-muted-foreground/70"
-              rows={3}
+              className="min-h-8 w-full resize-none border-0 bg-transparent p-0 text-[16px] leading-[1.45] text-white outline-none placeholder:text-white/60"
+              rows={1}
             />
-            <div className="mt-4 flex items-center justify-end gap-3">
+            <div className="mt-3 flex items-center justify-end gap-2 self-end">
               <button
                 onClick={onCancelEdit}
-                className="rounded-full bg-[#1f1f1f] px-5 py-2 text-sm font-semibold text-foreground transition hover:bg-[#2a2a2a]"
+                className="rounded-full bg-black px-3.5 py-1.5 text-[13px] font-medium text-white transition hover:bg-black/90"
               >
                 Cancel
               </button>
@@ -161,7 +166,7 @@ function MessageBubble({
                 onClick={() =>
                   onSaveEdit(message.id, editingContent ?? message.content)
                 }
-                className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111111] transition hover:bg-white/90"
+                className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-[#111111] transition hover:bg-white/90"
               >
                 Send
               </button>
@@ -225,7 +230,7 @@ function MessageBubble({
         {message.role === "assistant" &&
         !message.pending &&
         !message.streaming ? (
-          <div className="mt-3 flex items-center gap-2 text-muted-foreground opacity-100 transition group-hover:opacity-100">
+          <div className="mt-3 flex items-center gap-2 text-muted-foreground opacity-100 transition group-hover/message:opacity-100 group-focus-within/message:opacity-100">
             {hasBranches ? (
               <div className="flex items-center gap-1 text-muted-foreground">
                 <button
@@ -280,37 +285,40 @@ function MessageBubble({
         ) : null}
 
         {isUser && !isEditing ? (
-          <div className="absolute right-3 -bottom-10 hidden items-center gap-1 rounded-full border border-border/70 bg-background/90 px-2 py-1 shadow-lg shadow-black/15 backdrop-blur group-hover:flex group-focus-within:flex">
-            {canCopyMessage ? (
+          <>
+            <div className="absolute right-3 -bottom-10 h-10 w-24" />
+            <div className="absolute right-3 -bottom-10 z-20 flex items-center gap-1 rounded-full border border-border/70 bg-background/90 px-2 py-1 shadow-lg shadow-black/15 backdrop-blur opacity-0 pointer-events-auto transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+              {canCopyMessage ? (
+                <button
+                  type="button"
+                  onClick={() => onCopyMessage?.(message.content)}
+                  className="rounded-full p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                  aria-label="Copy prompt"
+                  title="Copy prompt"
+                >
+                  <Copy size={13} />
+                </button>
+              ) : null}
               <button
-                type="button"
-                onClick={() => onCopyMessage?.(message.content)}
+                onClick={() => onStartEdit(message)}
+                aria-label="Edit prompt"
+                title="Edit prompt"
+                tabIndex={0}
                 className="rounded-full p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                aria-label="Copy prompt"
-                title="Copy prompt"
               >
-                <Copy size={13} />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  className="fill-current"
+                  aria-hidden="true"
+                >
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
+                </svg>
               </button>
-            ) : null}
-            <button
-              onClick={() => onStartEdit(message)}
-              aria-label="Edit prompt"
-              title="Edit prompt"
-              tabIndex={0}
-              className="rounded-full p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                className="fill-current"
-                aria-hidden="true"
-              >
-                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
-              </svg>
-            </button>
-          </div>
+            </div>
+          </>
         ) : null}
       </div>
     </div>

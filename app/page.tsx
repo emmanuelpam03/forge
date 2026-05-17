@@ -89,6 +89,14 @@ export default function HomePage() {
       return;
     }
 
+    // Optimistic update: dispatch chat:created with temp ID
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    window.dispatchEvent(
+      new CustomEvent("chat:created", {
+        detail: { id: tempId, title: "New Chat" },
+      })
+    );
+
     try {
       setError("");
       setIsCreatingChat(true);
@@ -102,6 +110,13 @@ export default function HomePage() {
       const chatId = createResult.chat.id;
       const title =
         message.length > 60 ? `${message.slice(0, 60)}...` : message;
+
+      // Confirm real chat: replace temp with real
+      window.dispatchEvent(
+        new CustomEvent("chat:confirmed", {
+          detail: { tempId, id: chatId, title },
+        })
+      );
 
       try {
         localStorage.setItem(
