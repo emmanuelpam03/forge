@@ -12,7 +12,7 @@ export default async function ChatPage({
 }) {
   const { chatId } = await params;
   const { initialMessage } = await searchParams;
-  const chat = await getChatById(chatId);
+  const chat = await getChatById(chatId, { take: 1000 });
 
   if (!chat) {
     notFound();
@@ -70,7 +70,30 @@ export default async function ChatPage({
     latestAssistantByParentId.set(effectiveParentId, message);
   }
 
-  const initialMessages: Array<Record<string, unknown>> = [];
+  type BranchOption = {
+    id: string;
+    content: string;
+    parentId: string | null;
+    branchId: string | null;
+    createdAt: string;
+  };
+
+  type ChatMessage = {
+    id: string;
+    role: string;
+    content: string;
+    parentId?: string | null;
+    branchId?: string | null;
+    branchOptions?: BranchOption[];
+    pending?: boolean;
+    streaming?: boolean;
+    status?: string;
+    reasoning?: string;
+    reasoningExpanded?: boolean;
+    error?: string;
+  };
+
+  const initialMessages: ChatMessage[] = [];
   for (const message of chat.messages) {
     if (message.role === "user") {
       initialMessages.push({
@@ -125,8 +148,7 @@ export default async function ChatPage({
       projectId={chat.projectId}
       title={chat.title}
       initialMessage={initialMessage}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- server-to-client shape is simplified here
-      initialMessages={initialMessages as any}
+      initialMessages={initialMessages}
     />
   );
 }

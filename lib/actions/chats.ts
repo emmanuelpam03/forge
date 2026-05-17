@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { error as logError } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/app/generated/prisma/client";
 
@@ -20,7 +21,7 @@ export async function createChat(projectId?: string) {
     revalidatePath("/", "layout");
     return { success: true, chat };
   } catch (error) {
-    console.error("Failed to create chat:", error);
+    logError("create_chat_failed", { error });
     return { success: false, error: "Failed to create chat" };
   }
 }
@@ -43,7 +44,7 @@ export async function updateChat(
     revalidatePath("/", "layout");
     return { success: true, chat };
   } catch (error) {
-    console.error("Failed to update chat:", error);
+    logError("update_chat_failed", { id, error });
     return { success: false, error: "Failed to update chat" };
   }
 }
@@ -57,13 +58,14 @@ export async function deleteChat(id: string) {
     revalidatePath("/", "layout");
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete chat:", error);
+    logError("delete_chat_failed", { id, error });
     return { success: false, error: "Failed to delete chat" };
   }
 }
 
 export async function getChatById(
   id: string,
+  options?: { take?: number; skip?: number },
 ): Promise<ChatWithMessages | null> {
   try {
     const chat = await prisma.chat.findUnique({
@@ -71,12 +73,14 @@ export async function getChatById(
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
+          take: options?.take ?? 1000,
+          skip: options?.skip ?? 0,
         },
       },
     });
     return chat as ChatWithMessages | null;
   } catch (error) {
-    console.error("Failed to get chat:", error);
+    logError("get_chat_failed", { id, error });
     return null;
   }
 }
@@ -93,7 +97,7 @@ export async function getRecentChats(limit: number = 5) {
     });
     return chats;
   } catch (error) {
-    console.error("Failed to get recent chats:", error);
+    logError("get_recent_chats_failed", { error });
     return [];
   }
 }
@@ -109,7 +113,7 @@ export async function getProjectChats(projectId: string) {
     });
     return chats;
   } catch (error) {
-    console.error("Failed to get project chats:", error);
+    logError("get_project_chats_failed", { projectId, error });
     return [];
   }
 }
@@ -150,7 +154,7 @@ export async function createChatWithMessage(
     revalidatePath("/", "layout");
     return { success: true, chatId: chat.id };
   } catch (error) {
-    console.error("Failed to create chat with message:", error);
+    logError("create_chat_with_message_failed", { projectId, error });
     return { success: false, error: "Failed to create chat" };
   }
 }
