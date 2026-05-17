@@ -50,7 +50,7 @@ test("coding prompt enforces senior-engineer instructions", () => {
   assert.match(source, /audit it before changing anything/);
   assert.match(source, /Forge must behave like a senior software engineer/);
   assert.match(source, /FRAMEWORK AWARENESS/);
-  assert.match(source, /RESPONSE STRUCTURE/);
+  assert.match(source, /RESPONSE SHAPING/);
   assert.match(source, /Explanation:/);
   assert.match(source, /Architecture:/);
   assert.match(source, /Implementation:/);

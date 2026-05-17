@@ -228,13 +228,16 @@ export function MessageRenderer({
           {children}
         </a>
       ),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      code: (props: any) => {
-        const { className, children, inline, ...restProps } = props;
+      code: (props: { inline?: boolean; className?: string; children: React.ReactNode } & Record<string, unknown>) => {
+        const { className, children, inline, ...restProps } = props as {
+          className?: string;
+          children: React.ReactNode;
+          inline?: boolean;
+        } & Record<string, unknown>;
         const languageMatch = /language-(\w+)/.exec(className ?? "");
         const language = languageMatch?.[1];
         const codeText = String(children).replace(/\n$/, "");
-        const isBlockCode = !(inline as boolean);
+        const isBlockCode = !Boolean(inline);
 
         if (!isBlockCode) {
           return (

@@ -38,8 +38,8 @@ export type SelectedContext = {
   budgetUsed: number; // percentage
 };
 
-const TOKEN_BUDGET = 3000; // tokens reserved for context (system + history + prefs)
-const RECENT_TURN_WINDOW = 6; // keep last 6 turns by default
+const TOKEN_BUDGET = 2000; // tokens reserved for context (system + history + prefs) — reduced to speed context assembly
+const RECENT_TURN_WINDOW = 3; // keep last 3 turns by default — reduced to minimize DB queries
 
 /**
  * Rough token estimation for text.
@@ -151,7 +151,7 @@ async function loadProjectContext(chatId: string): Promise<string | null> {
       role: { in: ["user", "assistant"] },
     },
     orderBy: { createdAt: "desc" },
-    take: 30,
+    take: 10,
     select: { content: true, role: true, createdAt: true },
   });
 

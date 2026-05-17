@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { error as logError } from "@/lib/logger";
 
 export async function createProject(name: string = "New Project") {
   try {
@@ -15,7 +16,7 @@ export async function createProject(name: string = "New Project") {
     revalidatePath("/", "layout");
     return { success: true, project };
   } catch (error) {
-    console.error("Failed to create project:", error);
+    logError("create_project_failed", { error });
     return { success: false, error: "Failed to create project" };
   }
 }
@@ -33,7 +34,7 @@ export async function updateProject(
     revalidatePath("/", "layout");
     return { success: true, project };
   } catch (error) {
-    console.error("Failed to update project:", error);
+    logError("update_project_failed", { id, error });
     return { success: false, error: "Failed to update project" };
   }
 }
@@ -47,7 +48,7 @@ export async function deleteProject(id: string) {
     revalidatePath("/", "layout");
     return { success: true };
   } catch (error) {
-    console.error("Failed to delete project:", error);
+    logError("delete_project_failed", { id, error });
     return { success: false, error: "Failed to delete project" };
   }
 }
@@ -59,7 +60,7 @@ export async function getProjects() {
     });
     return projects;
   } catch (error) {
-    console.error("Failed to get projects:", error);
+    logError("get_projects_failed", { error });
     return [];
   }
 }
@@ -71,7 +72,7 @@ export async function getProjectById(id: string) {
     });
     return project;
   } catch (error) {
-    console.error("Failed to get project:", error);
+    logError("get_project_failed", { id, error });
     return null;
   }
 }

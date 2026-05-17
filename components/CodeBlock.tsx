@@ -90,12 +90,12 @@ export default function CodeBlock({ code, language }: Props) {
         >
           {copied ? (
             <>
-              <Check size={14} className="flex-shrink-0" />
+              <Check size={14} className="shrink-0" />
               <span>Copied</span>
             </>
           ) : (
             <>
-              <Copy size={14} className="flex-shrink-0" />
+              <Copy size={14} className="shrink-0" />
               <span className="hidden sm:inline">Copy</span>
             </>
           )}

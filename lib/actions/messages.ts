@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { MessageRole } from "@/app/generated/prisma/enums";
 import { revalidatePath } from "next/cache";
+import { error as logError } from "@/lib/logger";
 
 export async function createMessage(
   chatId: string,
@@ -30,7 +31,7 @@ export async function createMessage(
     revalidatePath(`/c/${chatId}`);
     return { success: true, message };
   } catch (error) {
-    console.error("Failed to create message:", error);
+    logError("create_message_failed", { chatId, role, error });
     return { success: false, error: "Failed to create message" };
   }
 }
@@ -43,7 +44,7 @@ export async function getMessagesByChat(chatId: string) {
     });
     return messages;
   } catch (error) {
-    console.error("Failed to get messages:", error);
+    logError("get_messages_failed", { chatId, error });
     return [];
   }
 }
@@ -56,7 +57,7 @@ export async function getBranchesForParent(parentMessageId: string) {
     });
     return branches;
   } catch (error) {
-    console.error("Failed to fetch branches:", error);
+    logError("get_branches_failed", { parentMessageId, error });
     return [];
   }
 }

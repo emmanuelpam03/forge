@@ -25,7 +25,16 @@ function getInitialTheme(): Theme {
 }
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [theme, setTheme] = useState<Theme>("dark");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const initialTheme = isValidTheme(stored)
+      ? stored
+      : getSystemPreference();
+
+    setTheme(initialTheme);
+  }, []);
 
   // Apply theme to DOM when it changes
   useEffect(() => {

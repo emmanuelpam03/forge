@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import "dotenv/config";
 import { randomUUID } from "crypto";
 import prisma from "@/lib/prisma";
@@ -8,7 +7,7 @@ const BATCH_SIZE = 250;
 async function backfillMessageBranches() {
   console.log("\n🌿 Backfilling message branch metadata\n");
 
-  const chats = (await prisma.chat.findMany({
+  const chats = await prisma.chat.findMany({
     select: {
       id: true,
       messages: {
@@ -23,7 +22,7 @@ async function backfillMessageBranches() {
       },
     },
     orderBy: { createdAt: "asc" },
-  })) as any;
+  });
 
   let updatedMessages = 0;
 

@@ -3,6 +3,7 @@ import "server-only";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import prisma from "@/lib/prisma";
 import { hashIdentifierForLogging } from "@/lib/logging";
+import { info, warn, error as logError, debug } from "@/lib/logger";
 import {
   createChatGraphSeed,
   chatGraphState,
@@ -127,14 +128,14 @@ export async function runChatGraphStream(
 
   const messages = buildChatMessages(state);
   const startedAt = Date.now();
-  console.info("PRE-RESPONSE_MS", {
-    chatId: hashIdentifierForLogging(input.chatId),
-    runId: hashIdentifierForLogging(input.runId),
+  info("pre_response_ms", {
+    chatId: input.chatId,
+    runId: input.runId,
     preResponseMs: state.__preResponseMs ?? null,
   });
-  console.info("MODEL STREAM START", {
-    chatId: hashIdentifierForLogging(input.chatId),
-    runId: hashIdentifierForLogging(input.runId),
+  info("model_stream_start", {
+    chatId: input.chatId,
+    runId: input.runId,
     timestamp: Date.now(),
   });
 
@@ -157,9 +158,9 @@ export async function runChatGraphStream(
 
         if (firstTokenAt === null) {
           firstTokenAt = Date.now();
-          console.info("FIRST TOKEN SENT", {
-            chatId: hashIdentifierForLogging(input.chatId),
-            runId: hashIdentifierForLogging(input.runId),
+          info("first_token_sent", {
+            chatId: input.chatId,
+            runId: input.runId,
             ttftMs: firstTokenAt - startedAt,
             reflectionScore: state.reflectionReport?.score ?? null,
           });
@@ -177,34 +178,23 @@ export async function runChatGraphStream(
     }
 
     const endedAt = Date.now();
-    console.info("STREAM CLOSED", {
-      chatId: hashIdentifierForLogging(input.chatId),
-      runId: hashIdentifierForLogging(input.runId),
+    info("stream_closed", {
+      chatId: input.chatId,
+      runId: input.runId,
       durationMs: endedAt - startedAt,
       ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
     });
-    console.info(
-      JSON.stringify({
-        event: "stream_completed",
-        chatId: hashIdentifierForLogging(input.chatId),
-        runId: hashIdentifierForLogging(input.runId),
-        durationMs: endedAt - startedAt,
-        ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
-      }),
-    );
-    console.info("GRAPH COMPLETE", {
-      chatId: hashIdentifierForLogging(input.chatId),
-      runId: hashIdentifierForLogging(input.runId),
+    info("stream_completed", {
+      chatId: input.chatId,
+      runId: input.runId,
+      durationMs: endedAt - startedAt,
+      ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+    });
+    info("graph_complete", {
+      chatId: input.chatId,
+      runId: input.runId,
       durationMs: endedAt - startedAt,
     });
-    console.info(
-      JSON.stringify({
-        event: "graph_complete",
-        chatId: hashIdentifierForLogging(input.chatId),
-        runId: hashIdentifierForLogging(input.runId),
-        durationMs: endedAt - startedAt,
-      }),
-    );
   } catch (error) {
     throw error;
   }
@@ -213,9 +203,10 @@ export async function runChatGraphStream(
 
   // Stream validation: log if response is empty
   if (!assistantMessage.trim()) {
-    console.warn(
-      `Stream validation: Empty response after streaming. Chat: ${input.chatId}, Intent: ${state.intent}`,
-    );
+    warn("stream_validation_empty_response", {
+      chatId: input.chatId,
+      intent: state.intent,
+    });
   }
 
   outputTokens = estimateTokens(assistantMessage);
@@ -247,7 +238,7 @@ export async function runChatGraphStream(
     const saveResult = await saveMessagesNode(state);
     Object.assign(state, saveResult);
   } catch (error) {
-    console.error(`Failed to save messages for chat ${input.chatId}:`, error);
+    logError("save_messages_failed", { chatId: input.chatId, error });
   }
 
   // Run non-critical post-processing in background to avoid delaying the
@@ -262,21 +253,15 @@ export async function runChatGraphStream(
           data: { title: titleResult.generatedTitle },
         });
       }
-    } catch (error) {
-      console.error(
-        `Failed to generate/persist title for chat ${input.chatId}:`,
-        error,
-      );
+      } catch (error) {
+      logError("generate_title_failed", { chatId: input.chatId, error });
     }
 
     try {
       const memoryResult = await extractMemoryNode(state);
       Object.assign(state, memoryResult);
     } catch (error) {
-      console.error(
-        `Failed to extract memory for chat ${input.chatId}:`,
-        error,
-      );
+      logError("extract_memory_failed", { chatId: input.chatId, error });
     }
   })();
 

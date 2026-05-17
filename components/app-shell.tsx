@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import { SiteLoading } from "@/components/site-loading";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +15,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Sidebar />
       </Suspense>
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main className="flex-1 overflow-hidden">
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
+      </main>
     </div>
   );
 }

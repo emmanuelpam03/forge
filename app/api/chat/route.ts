@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
-import { hashIdentifierForLogging } from "@/lib/logging";
+import { info, error as logError, debug } from "@/lib/logger";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
+import { toResponse, ApiError } from "@/lib/error-response";
 
 export const runtime = "nodejs";
 
@@ -48,15 +49,12 @@ export async function POST(request: NextRequest) {
       start(controller) {
         const send = (event: StreamEvent) => {
           if (debugStream) {
-            console.info(
-              JSON.stringify({
-                event: "stream_forward",
-                type: event.type,
-                chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-                runId: hashIdentifierForLogging(runId),
-                timestamp: Date.now() - requestStartedAt,
-              }),
-            );
+            debug("stream_forward", {
+              type: event.type,
+              chatId: parsedBody.data.chatId,
+              runId,
+              timestampMs: Date.now() - requestStartedAt,
+            });
           }
 
           // Verbose event logging removed for cleaner console output;
@@ -66,7 +64,7 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
           } catch (err) {
             // If enqueue fails, log and close controller to avoid hangs
-            console.error("Failed to enqueue stream event:", err);
+            logError("enqueue_failed", { error: err });
             try {
               controller.close();
             } catch {}
@@ -79,14 +77,11 @@ export async function POST(request: NextRequest) {
 
           try {
             placeholderSentAt = Date.now();
-            console.info(
-              JSON.stringify({
-                event: "first_token_placeholder",
-                chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-                runId: hashIdentifierForLogging(runId),
-                ttftMs: placeholderSentAt - requestStartedAt,
-              }),
-            );
+            info("first_token_placeholder", {
+              chatId: parsedBody.data.chatId,
+              runId,
+              ttftMs: placeholderSentAt - requestStartedAt,
+            });
 
             // Graph handles classification, tool routing, and streaming tokens
             const result = await runChatGraphStream(
@@ -127,16 +122,13 @@ export async function POST(request: NextRequest) {
             finalPersistedMessageId = result.assistantMessageId ?? undefined;
 
             if (!finalMessage) {
-              console.error(
-                JSON.stringify({
-                  error: "empty-response-after-streaming",
-                  chat_id: hashIdentifierForLogging(result.chatId),
-                  run_id: hashIdentifierForLogging(result.runId),
-                  intent: result.intent,
-                  tools_used: result.toolsUsed || [],
-                  streamed_length: assistantMessage.length,
-                }),
-              );
+              logError("empty-response-after-streaming", {
+                chatId: result.chatId,
+                runId: result.runId,
+                intent: result.intent,
+                toolsUsed: result.toolsUsed || [],
+                streamedLength: assistantMessage.length,
+              });
 
               // Send a friendly fallback token so the UI never receives an empty answer
               send({
@@ -146,12 +138,10 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            console.info("GRAPH COMPLETE", {
-              chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-              runId: hashIdentifierForLogging(runId),
-              messageId: hashIdentifierForLogging(
-                finalPersistedMessageId ?? assistantMessageId,
-              ),
+            info("graph_complete", {
+              chatId: parsedBody.data.chatId,
+              runId,
+              messageId: finalPersistedMessageId ?? assistantMessageId,
             });
 
             send({
@@ -163,14 +153,14 @@ export async function POST(request: NextRequest) {
               response: finalMessage,
             });
 
-            console.info("STREAM CLOSED", {
-              chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-              runId: hashIdentifierForLogging(runId),
+            info("stream_closed", {
+              chatId: parsedBody.data.chatId,
+              runId,
               totalMs: Date.now() - requestStartedAt,
             });
             controller.close();
           } catch (error) {
-            console.error("Chat stream failed:", error);
+            logError("chat_stream_failed", { error });
 
             // If no tokens were emitted, provide a fallback token so UI can render
             if (!firstTokenAt) {
@@ -183,9 +173,9 @@ export async function POST(request: NextRequest) {
             send({ type: "status", message: "Failed to generate a response." });
             send({ type: "done" });
 
-            console.info("STREAM CLOSED", {
-              chatId: hashIdentifierForLogging(parsedBody.data.chatId),
-              runId: hashIdentifierForLogging(runId),
+            info("stream_closed", {
+              chatId: parsedBody.data.chatId,
+              runId,
               totalMs: Date.now() - requestStartedAt,
             });
             controller.close();
@@ -193,7 +183,7 @@ export async function POST(request: NextRequest) {
             // Stream closure is handled immediately after the terminal event.
           }
         })().catch((error) => {
-          console.error("Chat stream failed:", error);
+          logError("chat_stream_failed", { error });
           try {
             controller.close();
           } catch {}
@@ -209,14 +199,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat route failed:", error);
-
-    return new Response(
-      JSON.stringify({ error: "Failed to generate a response." }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    // Use unified error response helper for consistent payloads
+    logError("chat_route_error", { error });
+    return toResponse(error instanceof Error ? new ApiError(error.message, 500) : error);
   }
 }

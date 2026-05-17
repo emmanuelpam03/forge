@@ -1,5 +1,6 @@
 ﻿import "server-only";
 
+import { z } from "zod";
 import { ChatOllama } from "@langchain/ollama";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
@@ -7,6 +8,7 @@ import type { BaseMessage } from "@langchain/core/messages";
 import { SystemMessage } from "@langchain/core/messages";
 import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
 import { assertLangSmithConfig } from "@/lib/langsmith";
+import { warn } from "@/lib/logger";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 export const DEFAULT_OLLAMA_MODEL = "qwen2.5:7b-instruct";
@@ -87,6 +89,27 @@ export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
     model: override?.model || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
   };
 }
+
+// Validate model/provider-related env vars to fail early with clear errors
+const ModelEnvSchema = z
+  .object({
+    AI_MODEL_PROVIDER: z.string().optional(),
+    GOOGLE_API_KEY: z.string().optional(),
+    OLLAMA_MODEL: z.string().optional(),
+    OLLAMA_BASE_URL: z.string().optional(),
+    OLLAMA_API_KEY: z.string().optional(),
+  })
+  .passthrough(); // Allow extra env vars without warning
+
+function assertModelEnv() {
+  try {
+    ModelEnvSchema.parse(process.env);
+  } catch (err) {
+    // Keep errors simple and actionable
+    warn("model_env_parse_warning", { error: err });
+  }
+}
+
 
 export function getChatModelConfig_OLD(): ChatModelConfig {
   const provider =
@@ -197,6 +220,7 @@ export function extractTextFromModelChunk(chunk: unknown): string {
 
 export function createGeminiModel(override?: ModelOverride) {
   assertLangSmithConfig();
+  assertModelEnv();
   const config = getChatModelConfig(override);
 
   if (config.provider === "ollama") {

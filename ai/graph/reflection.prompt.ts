@@ -1,3 +1,5 @@
+import { error as logError } from "../../lib/logger.ts";
+
 /**
  * REFLECTION PROMPT
  *
@@ -172,7 +174,7 @@ export function parseReflectionReport(output: string): ReflectionReport {
 
     return parsed;
   } catch (error) {
-    console.error("Failed to parse reflection report:", error, output);
+    logError("reflection_parse_failed", { error, output });
     // Fallback: return minimal report
     return {
       score: 5,

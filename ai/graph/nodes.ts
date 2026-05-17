@@ -18,6 +18,7 @@ import {
 } from "@/ai/context/engine";
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
+import { info, warn, error as logError, debug } from "@/lib/logger";
 import {
   parseClassificationText,
   deriveLegacyIntentFromStructured,
@@ -34,6 +35,14 @@ import {
   type ReflectionReport,
 } from "@/ai/graph/reflection.prompt";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
+
+// Lightweight typing for models we interact with. We avoid `any` and declare
+// the minimal surface used by this module: `invoke`, `stream`, and `nativeStream`.
+type ModelInvoker = {
+  invoke?: (messages: BaseMessage[] | unknown, opts?: unknown) => Promise<unknown>;
+  stream?: (messages: BaseMessage[]) => AsyncIterable<unknown>;
+  nativeStream?: (messages: BaseMessage[]) => AsyncIterable<unknown>;
+};
 
 export function normalizeAssistantResponseText(text: string): string {
   // Simplified normalization: avoid aggressive token merging which can
@@ -65,7 +74,7 @@ function humanizeAssistantResponseText(
     const sanitized = sanitizeAssistantOutput(normalized);
     return sanitized || normalized;
   } catch (err) {
-    console.warn("Sanitization failed, using normalized text:", err);
+    warn("sanitization_failed", { error: err });
     return normalized;
   }
 }
@@ -146,8 +155,11 @@ async function generateDraftResponse(state: ChatGraphState): Promise<string> {
     let draftText = "";
 
     // For draft generation, use non-streaming invoke to get full response quickly
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (model as any).invoke(
+    const invoker = model as unknown as ModelInvoker;
+    if (!invoker.invoke) {
+      throw new Error("Model does not support non-streaming invoke");
+    }
+    const response = await invoker.invoke(
       messages as BaseMessage[],
       buildLangSmithRunConfig(state, "draft-response"),
     );
@@ -164,7 +176,7 @@ async function generateDraftResponse(state: ChatGraphState): Promise<string> {
 
     return normalizeAssistantResponseText(draftText);
   } catch (error) {
-    console.error("Draft generation failed:", error);
+    logError("draft_generation_failed", { error });
     return (
       state.toolContext ||
       "I encountered an issue generating a response. Please try again or rephrase your question."
@@ -207,14 +219,17 @@ async function analyzeResponseQuality(
     );
 
     // Invoke reflection analysis (non-streaming for quick turnaround)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const analysisResponse = await (model as any).invoke([reflectionMessage]);
+    const invoker = model as unknown as ModelInvoker;
+    if (!invoker.invoke) {
+      throw new Error("Model does not support non-streaming invoke");
+    }
+    const analysisResponse = await invoker.invoke([reflectionMessage]);
     const analysisText = extractTextFromModelChunk(analysisResponse);
 
     const report = parseReflectionReport(analysisText);
     return report;
   } catch (error) {
-    console.error("Reflection analysis failed:", error);
+    logError("reflection_analysis_failed", { error });
     // Return neutral report on failure to allow response to proceed
     return {
       score: 5,
@@ -251,8 +266,11 @@ async function generateDraftResponseWithFeedback(
   ];
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await (model as any).invoke(
+    const invoker = model as unknown as ModelInvoker;
+    if (!invoker.invoke) {
+      throw new Error("Model does not support non-streaming invoke");
+    }
+    const response = await invoker.invoke(
       messagesWithFeedback,
       buildLangSmithRunConfig(state, "draft-revision"),
     );
@@ -264,7 +282,7 @@ async function generateDraftResponseWithFeedback(
         "I encountered an issue generating a response. Please try again or rephrase your question.",
     );
   } catch (error) {
-    console.error("Response revision failed:", error);
+    logError("response_revision_failed", { error });
     // Return original draft if revision fails
     return state.draftResponse || "";
   }
@@ -288,9 +306,9 @@ export async function reflectionNode(state: ChatGraphState) {
   // Analyze quality
   const report = await analyzeResponseQuality(draftResponse, state.userMessage);
 
-  console.info("REFLECTION ANALYSIS", {
-    chatId: hashIdentifierForLogging(state.chatId),
-    runId: hashIdentifierForLogging(state.runId),
+  info("reflection_analysis", {
+    chatId: state.chatId,
+    runId: state.runId,
     score: report.score,
     issueCount: report.issues.length,
     suggestRevision: report.suggestRevision,
@@ -315,9 +333,9 @@ export async function reflectionNode(state: ChatGraphState) {
       state.userMessage,
     );
 
-    console.info("REFLECTION REVISION", {
-      chatId: hashIdentifierForLogging(state.chatId),
-      runId: hashIdentifierForLogging(state.runId),
+    info("reflection_revision", {
+      chatId: state.chatId,
+      runId: state.runId,
       originalScore: report.score,
       revisedScore: revisedReport.score,
       iterationCount,
@@ -574,9 +592,9 @@ export async function generateResponseNode(state: ChatGraphState) {
 
         if (firstTokenAt === null) {
           firstTokenAt = Date.now();
-          console.info("FIRST TOKEN SENT (from reflection)", {
-            chatId: hashIdentifierForLogging(state.chatId),
-            runId: hashIdentifierForLogging(state.runId),
+          info("first_token_sent_reflection", {
+            chatId: state.chatId,
+            runId: state.runId,
             ttftMs: firstTokenAt - startedAt,
             reflectionScore: state.reflectionReport?.score,
           });
@@ -585,9 +603,9 @@ export async function generateResponseNode(state: ChatGraphState) {
         graphStreamEventEmitter?.({ type: "token", content: token });
       }
 
-      console.info("STREAM CLOSED (from reflection)", {
-        chatId: hashIdentifierForLogging(state.chatId),
-        runId: hashIdentifierForLogging(state.runId),
+      info("stream_closed_reflection", {
+        chatId: state.chatId,
+        runId: state.runId,
         durationMs: Date.now() - startedAt,
         ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
       });
@@ -614,7 +632,7 @@ export async function generateResponseNode(state: ChatGraphState) {
         latencyMs: Date.now() - startedAt,
       };
     } catch (err) {
-      console.error("Streaming pre-approved response failed:", err);
+      logError("preapproved_streaming_failed", { error: err });
       // Fall through to regenerate
     }
   }
@@ -651,14 +669,13 @@ export async function generateResponseNode(state: ChatGraphState) {
     let tokenStream: AsyncIterable<unknown>;
 
     const modelConfigInTry = modelConfig;
+    const invoker = model as unknown as ModelInvoker;
     if (modelConfigInTry.provider === "ollama") {
-      // For Ollama, use the stream() method for real token streaming
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tokenStream = (model as any).stream(messages as BaseMessage[]);
+      if (!invoker.stream) throw new Error("Ollama provider missing stream implementation");
+      tokenStream = invoker.stream(messages as BaseMessage[]);
     } else {
-      // For Gemini, use native streaming
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tokenStream = (model as any).nativeStream(messages as BaseMessage[]);
+      if (!invoker.nativeStream) throw new Error("Gemini provider missing nativeStream implementation");
+      tokenStream = invoker.nativeStream(messages as BaseMessage[]);
     }
 
     let firstTokenAt: number | null = null;
@@ -670,9 +687,9 @@ export async function generateResponseNode(state: ChatGraphState) {
 
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
-        console.info("FIRST TOKEN SENT (generateResponseNode)", {
-          chatId: hashIdentifierForLogging(state.chatId),
-          runId: hashIdentifierForLogging(state.runId),
+        info("first_token_sent_generate", {
+          chatId: state.chatId,
+          runId: state.runId,
           ttftMs: firstTokenAt - startedAt,
         });
       }
@@ -689,24 +706,27 @@ export async function generateResponseNode(state: ChatGraphState) {
     }
 
     const endedAt = Date.now();
-    console.info("STREAM CLOSED (generateResponseNode)", {
-      chatId: hashIdentifierForLogging(state.chatId),
-      runId: hashIdentifierForLogging(state.runId),
+    info("stream_closed_generate", {
+      chatId: state.chatId,
+      runId: state.runId,
       durationMs: endedAt - startedAt,
       ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
     });
   } catch (err) {
-    console.error(
-      `[CRITICAL] Streaming failed in generateResponseNode. Chat: ${state.chatId}, RunId: ${state.runId}`,
-      err,
-    );
+    logError("streaming_failed_generate", {
+      message: `[CRITICAL] Streaming failed in generateResponseNode. Chat: ${state.chatId}, RunId: ${state.runId}`,
+      error: err,
+    });
   }
 
   // Validate response content extraction
   if (!assistantMessage) {
-    console.error(
-      `[CRITICAL] Model returned null/undefined content. Chat: ${state.chatId}, Intent: ${state.intent}, RunId: ${state.runId}`,
-    );
+    logError("null_model_content", {
+      message: `[CRITICAL] Model returned null/undefined content.`,
+      chatId: state.chatId,
+      intent: state.intent,
+      runId: state.runId,
+    });
   }
 
   // If response is empty but we have tool evidence, use it as fallback
@@ -719,18 +739,15 @@ export async function generateResponseNode(state: ChatGraphState) {
   if (!assistantMessage) {
     assistantMessage =
       "I encountered an issue generating a response. Please try again or rephrase your question.";
-    console.error(
-      JSON.stringify({
-        error: "empty-response",
-        chat_id: state.chatId,
-        run_id: state.runId,
-        intent: state.intent,
-        tools_used: state.toolsUsed || [],
-        has_tool_context: !!state.toolContext,
-        evidence_bundles_count: state.evidenceBundles?.length ?? 0,
-        message_count: state.previousMessages?.length ?? 0,
-      }),
-    );
+    logError("empty_response", {
+      chatId: state.chatId,
+      runId: state.runId,
+      intent: state.intent,
+      toolsUsed: state.toolsUsed || [],
+      hasToolContext: !!state.toolContext,
+      evidenceBundlesCount: state.evidenceBundles?.length ?? 0,
+      messageCount: state.previousMessages?.length ?? 0,
+    });
   }
 
   // GUARANTEE: assistantMessage is always non-empty after fallbacks
@@ -864,12 +881,12 @@ export async function saveMessagesNode(state: ChatGraphState) {
       },
     })
     .catch((error) => {
-      console.warn(`Failed to save chat analytics for ${state.chatId}:`, error);
+      warn("save_chat_analytics_failed", { chatId: state.chatId, error });
     });
 
   // Maintain rolling chat summary in background so stream completion is not delayed.
   void maintainChatSummary(state.chatId).catch((err) => {
-    console.warn(`Failed to maintain chat summary for ${state.chatId}:`, err);
+    warn("maintain_chat_summary_failed", { chatId: state.chatId, error: err });
   });
 
   return {
@@ -906,15 +923,12 @@ export async function planTaskNode(state: ChatGraphState) {
       : state.taskCategory;
 
     if (forceSeniorEngineeringFromCoding) {
-      console.info(
-        JSON.stringify({
-          event: "promptRouting.forcePersona",
-          chatId: hashIdentifierForLogging(state.chatId),
-          runId: hashIdentifierForLogging(state.runId),
-          reason: "selectedOption:coding",
-          forcedPersona: "senior-engineer",
-        }),
-      );
+      info("prompt_routing.force_persona", {
+        chatId: state.chatId,
+        runId: state.runId,
+        reason: "selectedOption:coding",
+        forcedPersona: "senior-engineer",
+      });
     }
     const forcedTool = state.forceTool ?? null;
     const toolsNeeded = forcedTool
@@ -939,17 +953,14 @@ export async function planTaskNode(state: ChatGraphState) {
       executionMode = "multi-parallel";
     }
 
-    console.info(
-      JSON.stringify({
-        event: "toolRouting.decision",
-        chatId: hashIdentifierForLogging(state.chatId),
-        runId: hashIdentifierForLogging(state.runId),
-        queryIntent,
-        forcedTool,
-        toolsNeeded,
-        executionMode,
-      }),
-    );
+    info("tool_routing_decision", {
+      chatId: state.chatId,
+      runId: state.runId,
+      queryIntent,
+      forcedTool,
+      toolsNeeded,
+      executionMode,
+    });
 
     return {
       toolPlan: {
@@ -966,7 +977,7 @@ export async function planTaskNode(state: ChatGraphState) {
       promptBehavior: forcedPromptBehavior,
     };
   } catch (error) {
-    console.error("Tool planning failed:", error);
+    logError("tool_planning_failed", { error });
     return {
       toolPlan: {
         intent: state.intent,
@@ -1040,7 +1051,7 @@ export async function toolRouterNodeImpl(
             toolContext: intermediateContext,
           };
         } catch (err) {
-          console.error(`Forced tool ${forcedName} failed:`, err);
+          logError("forced_tool_failed", { tool: forcedName, error: err });
           // fall through to normal processing (no forced output)
         }
       }
@@ -1066,7 +1077,7 @@ export async function toolRouterNodeImpl(
               timestamp: new Date().toISOString(),
             };
           } catch (err) {
-            console.error(`Tool ${toolName} failed:`, err);
+            logError("tool_execution_failed", { tool: toolName, error: err });
             return null;
           }
         }),
@@ -1112,7 +1123,7 @@ export async function toolRouterNodeImpl(
           // Store result for potential use by next tool without mutating input state
           intermediateContext = toolResultText;
         } catch (err) {
-          console.error(`Tool ${toolName} failed:`, err);
+          logError("tool_execution_failed", { tool: toolName, error: err });
         }
       }
 
@@ -1129,7 +1140,7 @@ export async function toolRouterNodeImpl(
       toolContext: intermediateContext,
     };
   } catch (error) {
-    console.error("Tool router failed:", error);
+    logError("tool_router_failed", { error });
     return {
       toolsUsed: [],
       evidenceBundles: [],
@@ -1179,7 +1190,7 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
       synthesisNote,
     };
   } catch (error) {
-    console.error("Evidence synthesis failed:", error);
+    logError("evidence_synthesis_failed", { error });
     return {
       toolContext: "",
       synthesisNote: "",
@@ -1243,10 +1254,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
                 ? "explanation"
                 : "general";
     } catch (classificationError) {
-      console.warn(
-        "Intent classification model call failed:",
-        classificationError,
-      );
+      warn("intent_classification_model_failed", { error: classificationError });
     }
 
     const queryIntent = deriveQueryIntentFromClassification(classifiedIntent);
@@ -1274,35 +1282,30 @@ export async function classifyIntentNode(state: ChatGraphState) {
       };
     }
 
-    console.info(
-      JSON.stringify({
-        event: "intent.classified",
-        chatId: hashIdentifierForLogging(state.chatId),
-        runId: hashIdentifierForLogging(state.runId),
-        queryIntent,
-        classifiedIntent,
-        structuredIntent,
-        taskCategory,
-        message: state.userMessage,
-      }),
-    );
+    info("intent_classified", {
+      chatId: state.chatId,
+      runId: state.runId,
+      queryIntent,
+      classifiedIntent,
+      structuredIntent,
+      taskCategory,
+      message: state.userMessage,
+    });
 
-    console.info(
-      JSON.stringify({
-        event: "promptRouting.decision",
-        chatId: hashIdentifierForLogging(state.chatId),
-        runId: hashIdentifierForLogging(state.runId),
-        taskCategory,
-        specialistPrompt:
-          taskCategory === "coding"
-            ? "coding"
-            : taskCategory === "reasoning" || taskCategory === "explanation"
-              ? "reasoning"
-              : taskCategory === "planning" || taskCategory === "trading"
-                ? "planning"
-                : "system",
-      }),
-    );
+    info("promptRouting.decision", {
+      event: "promptRouting.decision",
+      chatId: state.chatId,
+      runId: state.runId,
+      taskCategory,
+      specialistPrompt:
+        taskCategory === "coding"
+          ? "coding"
+          : taskCategory === "reasoning" || taskCategory === "explanation"
+            ? "reasoning"
+            : taskCategory === "planning" || taskCategory === "trading"
+              ? "planning"
+              : "system",
+    });
 
     return {
       intent: classifiedIntent?.intent ?? queryIntent.type,
@@ -1320,7 +1323,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
       promptBehavior,
     };
   } catch (error) {
-    console.error("Intent classification failed:", error);
+    logError("intent_classification_failed", { error });
     return {
       intent: "knowledge",
       queryIntent: {
@@ -1381,7 +1384,7 @@ export async function generateTitleNode(state: ChatGraphState) {
       generatedTitle,
     };
   } catch (error) {
-    console.error("Title generation failed:", error);
+    logError("title_generation_failed", { error });
     return {
       generatedTitle: "",
     };
@@ -1414,7 +1417,7 @@ export async function extractMemoryNode(state: ChatGraphState) {
     // Phase 6: Update user memory with extracted fact (deduplicated & ranked)
     if (extractedMemory) {
       await updateUserMemory(extractedMemory).catch((err) => {
-        console.warn("Failed to update user memory:", err);
+        warn("update_user_memory_failed", { error: err });
         // Non-blocking - don't throw
       });
     }
@@ -1423,7 +1426,7 @@ export async function extractMemoryNode(state: ChatGraphState) {
       extractedMemory,
     };
   } catch (error) {
-    console.error("Memory extraction failed:", error);
+    logError("memory_extraction_failed", { error });
     return {
       extractedMemory: "",
     };
