@@ -13,7 +13,6 @@ import {
   MessageSquare,
   MoreHorizontal,
   Settings,
-  Sparkles,
   Trash2,
   Pencil,
 } from "lucide-react";

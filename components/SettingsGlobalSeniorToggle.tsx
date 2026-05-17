@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { Sparkles } from "lucide-react";
 import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 
 export default function SettingsGlobalSeniorToggle() {

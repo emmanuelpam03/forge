@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { SelectedOptionId } from "@/ai/selected-options";
 
 export type OptionId = SelectedOptionId;
@@ -101,8 +101,6 @@ function writeSelectedOptionsStorage(
 }
 
 export function useSelectedOptions(chatId: string) {
-  const [isLoaded, setIsLoaded] = useState(false);
-
   const storageKey = `forge:chat:${chatId}:selected-options`;
 
   const subscribe = useCallback(
@@ -149,7 +147,6 @@ export function useSelectedOptions(chatId: string) {
   // Load from localStorage on mount
   useEffect(() => {
     syncFromStorage();
-    setIsLoaded(true);
   }, [chatId, syncFromStorage]);
 
   useEffect(() => {
@@ -196,6 +193,5 @@ export function useSelectedOptions(chatId: string) {
     removeOption,
     isSelected,
     getSelectedOptionObjects,
-    isLoaded,
   };
 }
