@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const getSeniorModeStorageKey = (chatId: string) =>
   `forge:chat:${chatId}:force-senior-mode`;
@@ -14,29 +14,32 @@ export function useSeniorEngineeringMode(chatId?: string | null) {
   );
 
   const [perChatEnabled, setPerChatEnabled] = useState(false);
-  const [globalEnabled, setGlobalEnabled] = useState(false);
-
-  useEffect(() => {
+  const [globalEnabled, setGlobalEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
       const storedGlobal = window.localStorage.getItem(GLOBAL_SENIOR_MODE_KEY);
-      setGlobalEnabled(storedGlobal === "on");
+      return storedGlobal === "on";
     } catch {
-      setGlobalEnabled(false);
+      return false;
     }
-  }, []);
+  });
+
+  const isPerChatInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!storageKey) {
-      setPerChatEnabled(false);
+    if (!storageKey || isPerChatInitializedRef.current) {
       return;
     }
 
     try {
       const stored = window.localStorage.getItem(storageKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPerChatEnabled(stored === "on");
     } catch {
       setPerChatEnabled(false);
     }
+
+    isPerChatInitializedRef.current = true;
   }, [storageKey]);
 
   useEffect(() => {

@@ -7,6 +7,7 @@ Set environment values in `.env` before running in production.
 Required:
 
 - `GOOGLE_API_KEY`
+- `DATABASE_URL` - Prisma database URL for Accelerate (required for production builds)
 
 Optional:
 

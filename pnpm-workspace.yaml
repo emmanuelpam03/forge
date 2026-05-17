@@ -1,0 +1,8 @@
+allowBuilds:
+  '@prisma/engines': false
+  esbuild: false
+  msw: false
+  prisma: false
+  protobufjs: false
+  sharp: false
+  unrs-resolver: false

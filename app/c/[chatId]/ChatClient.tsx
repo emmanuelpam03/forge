@@ -310,7 +310,6 @@ function MessageBubble({
 
 export function ChatClient({
   chatId,
-  projectId,
   title,
   initialMessages,
   initialMessage,
@@ -318,7 +317,6 @@ export function ChatClient({
   const { showFeedback } = useFeedback();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [reasoning, setReasoning] = useState("");
-  const [message, setMessage] = useState("");
   const [showReasoning, setShowReasoning] = useState(false);
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -354,7 +352,6 @@ export function ChatClient({
 
   const resetStreamBuffers = useCallback(() => {
     setReasoning("");
-    setMessage("");
     setShowReasoning(false);
   }, []);
 
@@ -387,23 +384,15 @@ export function ChatClient({
     [updateAssistantMessage],
   );
 
-  const appendReasoningStep = appendReasoningChunk;
-
   const appendAnswerChunk = useCallback(
     (messageId: string, chunk: string) => {
-      setMessage((currentMessageText) => {
-        const nextMessage = `${currentMessageText}${chunk}`;
-
-        updateAssistantMessage(messageId, (currentMessage) => ({
-          ...currentMessage,
-          content: nextMessage,
-          pending: false,
-          streaming: true,
-          status: undefined,
-        }));
-
-        return nextMessage;
-      });
+      updateAssistantMessage(messageId, (currentMessage) => ({
+        ...currentMessage,
+        content: `${currentMessage.content}${chunk}`,
+        pending: false,
+        streaming: true,
+        status: undefined,
+      }));
     },
     [updateAssistantMessage],
   );
@@ -647,7 +636,6 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let hasReceivedDone = false;
-      let hasLoggedFirstToken = false;
       let streamedReasoning = "";
       let streamedMessage = "";
 
@@ -863,7 +851,6 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let hasReceivedDone = false;
-      let hasLoggedFirstToken = false;
       let streamedReasoning = "";
       let streamedMessage = "";
       let activeAssistantParentId: string | null = null;
@@ -1181,7 +1168,6 @@ export function ChatClient({
         let buffer = "";
         let activeAssistantMessageId = assistantPlaceholderId;
         let hasReceivedDone = false;
-        let hasLoggedFirstToken = false;
         let streamedReasoning = "";
         let streamedMessage = "";
 
@@ -1362,9 +1348,11 @@ export function ChatClient({
       draft,
       isSending,
       selectedModelId,
+      selectedModel.provider,
+      selectedOptionIds,
       isForceSeniorEngineeringMode,
       showFeedback,
-      updateAssistantMessage,
+      finalizeStreamState,
     ],
   );
 

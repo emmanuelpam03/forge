@@ -27,7 +27,7 @@ export function ModesMenu({
   const { showFeedback } = useFeedback();
   const menuRef = useRef<HTMLDivElement>(null);
   const effectiveChatId = chatId || "search-global";
-  const { toggleOption, isSelected, isLoaded } =
+  const { toggleOption, isSelected } =
     useSelectedOptions(effectiveChatId);
 
   // Close when clicking outside
@@ -48,7 +48,7 @@ export function ModesMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose, triggerRef]);
 
-  if (!isOpen || !isLoaded) return null;
+  if (!isOpen) return null;
 
   const handleToggleOption = (optionId: OptionId) => {
     const currentState = isSelected(optionId);
