@@ -168,8 +168,8 @@ export function createForgeTools(
       description:
         "Search for contextual images (provider-agnostic). Returns a JSON ImageSearchResult.",
       schema: imageSearchToolSchema,
-      func: async (args) => {
-        const result = await imageSearchToolAsync(args as any);
+      func: async (args: z.infer<typeof imageSearchToolSchema>) => {
+        const result = await imageSearchToolAsync(args);
         return formatToolOutput(result);
       },
     }),

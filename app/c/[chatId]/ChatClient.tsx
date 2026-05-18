@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
   ChevronDown,
@@ -23,6 +23,7 @@ import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
 import { ModesMenu } from "@/components/ModesMenu";
 import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 import { type StreamEvent } from "@/ai/graph/stream";
+import { type RetrievedImage } from "@/ai/tools/image-types";
 import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 
 type BranchOption = {
@@ -46,6 +47,11 @@ type ChatMessage = {
   reasoning?: string;
   reasoningExpanded?: boolean;
   error?: string;
+  imageBlock?: {
+    images: RetrievedImage[];
+    totalFound?: number;
+    retrievalTimeMs?: number;
+  };
 };
 
 type ChatClientProps = {
@@ -425,7 +431,7 @@ export function ChatClient({
   );
 
   const applyImagesToMessage = useCallback(
-    (messageId: string, images: Array<{ id: string; url: string; thumbnailUrl?: string; title?: string }>) => {
+    (messageId: string, images: RetrievedImage[]) => {
       setMessages((currentMessages) =>
         currentMessages.map((m) =>
           m.id === messageId
@@ -1305,14 +1311,6 @@ export function ChatClient({
                 applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
               }
 
-              if (event.type === "images") {
-                applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
-              }
-
-              if (event.type === "images") {
-                applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
-              }
-
               if (event.type === "reasoning") {
                 applyReasoning(event.content);
               }
@@ -1408,6 +1406,7 @@ export function ChatClient({
       isForceSeniorEngineeringMode,
       showFeedback,
       finalizeStreamState,
+      applyImagesToMessage,
     ],
   );
 
@@ -1460,41 +1459,43 @@ export function ChatClient({
             </div>
           ) : (
             messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                onStartEdit={startEdit}
-                isEditing={editingId === message.id}
-                editingContent={editingContent}
-                setEditingContent={setEditingContent}
-                onSaveEdit={saveEdit}
-                onCancelEdit={cancelEdit}
-                onRegenerate={regenerateMessage}
-                onSwitchBranch={switchBranch}
-                onToggleReasoning={toggleReasoning}
-                onCopyMessage={(content) => {
-                  void copyMessage(content);
-                }}
-                reasoning={
-                  message.role === "assistant" &&
-                  (message.pending || message.streaming)
-                    ? reasoning
-                    : (message.reasoning ?? "")
-                }
-                showReasoning={
-                  message.role === "assistant" &&
-                  (message.pending || message.streaming)
-                    ? showReasoning
-                    : (message.reasoningExpanded ?? false)
-                  {message.imageBlock ? (
-                    message.imageBlock.images?.length > 3 ? (
-                      <ImageGrid images={message.imageBlock.images} />
-                    ) : (
-                      <ImageCarousel images={message.imageBlock.images} />
-                    )
-                  ) : null}
-                }
-              />
+              <React.Fragment key={message.id}>
+                <MessageBubble
+                  message={message}
+                  onStartEdit={startEdit}
+                  isEditing={editingId === message.id}
+                  editingContent={editingContent}
+                  setEditingContent={setEditingContent}
+                  onSaveEdit={saveEdit}
+                  onCancelEdit={cancelEdit}
+                  onRegenerate={regenerateMessage}
+                  onSwitchBranch={switchBranch}
+                  onToggleReasoning={toggleReasoning}
+                  onCopyMessage={(content) => {
+                    void copyMessage(content);
+                  }}
+                  reasoning={
+                    message.role === "assistant" &&
+                    (message.pending || message.streaming)
+                      ? reasoning
+                      : (message.reasoning ?? "")
+                  }
+                  showReasoning={
+                    message.role === "assistant" &&
+                    (message.pending || message.streaming)
+                      ? showReasoning
+                      : (message.reasoningExpanded ?? false)
+                  }
+                />
+
+                {message.imageBlock ? (
+                  message.imageBlock.images?.length > 3 ? (
+                    <ImageGrid images={message.imageBlock.images} />
+                  ) : (
+                    <ImageCarousel images={message.imageBlock.images} />
+                  )
+                ) : null}
+              </React.Fragment>
             ))
           )}
           <div ref={bottomRef} />

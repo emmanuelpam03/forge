@@ -29,6 +29,46 @@ import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
+import type { RetrievedImage } from "@/ai/tools/image-types";
+
+function emitImageSearchEvent(
+  toolName: string,
+  rawResult: unknown,
+  state: ChatGraphState,
+  onEvent?: (event: StreamEvent) => void,
+) {
+  if (toolName !== "imageSearch") return;
+
+  try {
+    const parsed: any = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    const images = parsed?.images ?? [];
+
+    const payload = {
+      type: "images" as const,
+      query: parsed?.queryUsed || buildToolArgs(toolName, state).query || "",
+      provider: parsed?.provider || "",
+      images: images.map((im: RetrievedImage) => ({
+        id: im.id,
+        url: im.url,
+        thumbnailUrl: im.thumbnailUrl,
+        title: im.title,
+        sourcePage: im.sourcePage,
+        width: im.width,
+        height: im.height,
+        provider: im.provider,
+        relevanceScore: im.relevanceScore,
+        safetyScore: im.safetyScore,
+        metadata: im.metadata || {},
+      })),
+      totalFound: parsed?.totalFound ?? images.length,
+      retrievalTimeMs: parsed?.retrievalTimeMs ?? 0,
+    };
+
+    (onEvent ?? graphStreamEventEmitter)?.(payload as StreamEvent);
+  } catch (err) {
+    // silently ignore parse/emit errors
+  }
+}
 import { getReflectionPrompt } from "@/ai/prompts/promptRegistry";
 import {
   parseReflectionReport,
@@ -1071,36 +1111,8 @@ export async function toolRouterNodeImpl(
                 ? rawResult
                 : JSON.stringify(rawResult, null, 2);
 
-            // If tool is the imageSearch tool, attempt to parse and emit images event
-            if (toolName === "imageSearch") {
-              try {
-                const parsed = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
-                // parsed is expected to be ImageSearchResult
-                const images = parsed.images ?? [];
-                (onEvent ?? graphStreamEventEmitter)?.({
-                  type: "images",
-                  query: parsed.queryUsed || (buildToolArgs(toolName, state) as any)?.query || "",
-                  provider: parsed.provider || "",
-                  images: images.map((im: any) => ({
-                    id: im.id,
-                    url: im.url,
-                    thumbnailUrl: im.thumbnailUrl,
-                    title: im.title,
-                    sourcePage: im.sourcePage,
-                    width: im.width,
-                    height: im.height,
-                    provider: im.provider,
-                    relevanceScore: im.relevanceScore,
-                    safetyScore: im.safetyScore,
-                    metadata: im.metadata || {},
-                  })),
-                  totalFound: parsed.totalFound ?? images.length,
-                  retrievalTimeMs: parsed.retrievalTimeMs ?? 0,
-                });
-              } catch (err) {
-                // ignore parse errors; fall back to treating as normal tool output
-              }
-            }
+            // Emit images event if this is an imageSearch tool
+            emitImageSearchEvent(toolName, rawResult, state, onEvent);
 
             return {
               tool: toolName,
@@ -1144,34 +1156,8 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
-          if (toolName === "imageSearch") {
-            try {
-              const parsed = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
-              const images = parsed.images ?? [];
-              (onEvent ?? graphStreamEventEmitter)?.({
-                type: "images",
-                query: parsed.queryUsed || (buildToolArgs(toolName, state) as any)?.query || "",
-                provider: parsed.provider || "",
-                images: images.map((im: any) => ({
-                  id: im.id,
-                  url: im.url,
-                  thumbnailUrl: im.thumbnailUrl,
-                  title: im.title,
-                  sourcePage: im.sourcePage,
-                  width: im.width,
-                  height: im.height,
-                  provider: im.provider,
-                  relevanceScore: im.relevanceScore,
-                  safetyScore: im.safetyScore,
-                  metadata: im.metadata || {},
-                })),
-                totalFound: parsed.totalFound ?? images.length,
-                retrievalTimeMs: parsed.retrievalTimeMs ?? 0,
-              });
-            } catch (err) {
-              // ignore
-            }
-          }
+          // Emit images event if this is an imageSearch tool
+          emitImageSearchEvent(toolName, rawResult, state, onEvent);
 
           toolsUsed.add(toolName);
           evidenceBundles.push({

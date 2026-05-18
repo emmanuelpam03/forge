@@ -6,8 +6,13 @@ export function getRedisClient() {
   if (client) return client;
   const url = process.env.REDIS_URL || process.env.REDIS_TLS_URL || null;
   if (!url) return null;
-  client = new Redis(url);
-  return client;
+  try {
+    client = new Redis(url);
+    return client;
+  } catch (err) {
+    console.error('[Redis] Failed to create client:', err);
+    return null;
+  }
 }
 
 export async function cacheGet(key: string): Promise<string | null> {

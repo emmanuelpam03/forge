@@ -1,11 +1,11 @@
 import type { RetrievedImage, ProviderImage } from "../tools/image-types";
 
-export async function assessSafety(images: ProviderImage[] | RetrievedImage[]) {
+export function assessSafety(images: ProviderImage[] | RetrievedImage[]): Record<string, number> {
   // Placeholder heuristic safety checks. Returns map id -> safetyScore (0-1)
   const out: Record<string, number> = {};
 
   for (const img of images) {
-    const url = (img as any).url || "";
+    const url = img.url || "";
     const lower = url.toLowerCase();
 
     // Hard blocks

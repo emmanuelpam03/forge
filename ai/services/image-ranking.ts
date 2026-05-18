@@ -36,7 +36,7 @@ export function rankImages(
   const imgs = providerImages
     .map((p, idx) => {
       const norm = normalizeUrl(p.url);
-      const titleOrUrl = (p.title || p.url || "").toString();
+      const titleOrUrl = p.title || p.url || "";
       const rel = lexicalScore(input.query, titleOrUrl) || (1 - idx / Math.max(providerImages.length, 1));
       const resolution = (p.width || 0) * (p.height || 0) || 0;
       // aspect bonus
