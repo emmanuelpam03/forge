@@ -8,6 +8,7 @@ import {
   projectContextLookupTool,
   summarizeTextTool,
   webSearchToolAsync,
+  imageSearchToolAsync,
 } from "@/ai/tools/implementations";
 
 export const calculatorToolSchema = z.object({
@@ -46,6 +47,32 @@ export const projectContextLookupToolSchema = z.object({
   query: z.string().min(1),
   maxResults: z.number().int().min(1).max(12).optional(),
   includeDocuments: z.boolean().optional(),
+});
+
+export const imageSearchToolSchema = z.object({
+  query: z.string().min(1),
+  intent: z
+    .enum([
+      "educational",
+      "comparison",
+      "travel",
+      "product",
+      "historical",
+      "person",
+      "nature",
+      "food",
+      "architecture",
+      "ui_reference",
+      "diagram",
+      "inspiration",
+    ])
+    .optional(),
+  count: z.number().int().min(1).max(20).optional(),
+  aspectRatio: z.enum(["square", "landscape", "portrait"]).optional(),
+  safeSearch: z.boolean().optional(),
+  placementHint: z.enum(["inline", "gallery", "hero"]).optional(),
+  freshness: z.enum(["latest", "recent", "any"]).optional(),
+  avoidDuplicates: z.boolean().optional(),
 });
 
 export type ForgeToolContext = {
@@ -133,6 +160,16 @@ export function createForgeTools(
           maxResults,
           includeDocuments,
         });
+        return formatToolOutput(result);
+      },
+    }),
+    new DynamicStructuredTool({
+      name: "imageSearch",
+      description:
+        "Search for contextual images (provider-agnostic). Returns a JSON ImageSearchResult.",
+      schema: imageSearchToolSchema,
+      func: async (args) => {
+        const result = await imageSearchToolAsync(args as any);
         return formatToolOutput(result);
       },
     }),

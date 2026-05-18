@@ -16,6 +16,8 @@ import {
   Plus,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
+import ImageCarousel from "@/components/chat/images/ImageCarousel";
+import ImageGrid from "@/components/chat/images/ImageGrid";
 import { useFeedback } from "@/components/feedback-provider";
 import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
 import { ModesMenu } from "@/components/ModesMenu";
@@ -420,6 +422,22 @@ export function ChatClient({
       }));
     },
     [updateAssistantMessage],
+  );
+
+  const applyImagesToMessage = useCallback(
+    (messageId: string, images: Array<{ id: string; url: string; thumbnailUrl?: string; title?: string }>) => {
+      setMessages((currentMessages) =>
+        currentMessages.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                imageBlock: { images },
+              }
+            : m,
+        ),
+      );
+    },
+    [],
   );
 
   useEffect(() => {
@@ -1283,6 +1301,18 @@ export function ChatClient({
             try {
               const event = JSON.parse(line) as StreamEvent;
 
+              if (event.type === "images") {
+                applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
+              }
+
+              if (event.type === "images") {
+                applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
+              }
+
+              if (event.type === "images") {
+                applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
+              }
+
               if (event.type === "reasoning") {
                 applyReasoning(event.content);
               }
@@ -1456,6 +1486,13 @@ export function ChatClient({
                   (message.pending || message.streaming)
                     ? showReasoning
                     : (message.reasoningExpanded ?? false)
+                  {message.imageBlock ? (
+                    message.imageBlock.images?.length > 3 ? (
+                      <ImageGrid images={message.imageBlock.images} />
+                    ) : (
+                      <ImageCarousel images={message.imageBlock.images} />
+                    )
+                  ) : null}
                 }
               />
             ))

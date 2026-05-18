@@ -1,6 +1,12 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
+import type { ImageSearchInput, ImageSearchResult, RetrievedImage, ProviderImage } from "./image-types";
+import { wikimediaSearch } from "./providers/wikimedia";
+import { serpapiImageSearch } from "./providers/serpapi";
+import { unsplashSearch } from "./providers/unsplash";
+import { rankImages } from "@/ai/services/image-ranking";
+import { assessSafety } from "@/ai/services/image-safety";
 
 export type ToolResult = {
   success: boolean;
@@ -478,6 +484,64 @@ export async function webSearchToolAsync(
       result: "",
       error: `Web search request failed: ${error instanceof Error ? error.message : String(error)}`,
     };
+  }
+}
+
+/**
+ * Image search tool: provider-agnostic image retrieval.
+ * Currently uses a Wikimedia Commons adapter as a free provider.
+ */
+export async function imageSearchToolAsync(
+  input: ImageSearchInput,
+): Promise<ToolResult> {
+  const query = input?.query?.trim();
+  if (!query) {
+    return { success: false, result: "", error: "Image query cannot be empty" };
+  }
+
+  const count = Math.min(Math.max(input.count ?? 6, 1), 20);
+  const start = Date.now();
+
+  try {
+    // Query available providers in parallel (Wikimedia always available; Google/Unsplash used if keys present)
+    const providerPromises = [
+      wikimediaSearch(query, count),
+      serpapiImageSearch(query, count),
+      unsplashSearch(query, count),
+    ];
+
+    const settled = await Promise.allSettled(providerPromises);
+    const providerImages: ProviderImage[] = settled
+      .flatMap((s) => (s.status === "fulfilled" ? s.value : []))
+      .slice(0, Math.max(count * 3, 50));
+
+    // Ranking pipeline: dedupe and score
+    let images = rankImages(providerImages, input);
+
+    // Safety checks (heuristic). Remove images failing safeSearch when requested.
+    const safetyMap = await assessSafety(images as ProviderImage[]);
+    images = images
+      .map((im) => ({ ...im, safetyScore: safetyMap[im.id] ?? 0 }))
+      .filter((im) => {
+        if (input.safeSearch === false) return true;
+        return (im.safetyScore ?? 0) >= 0.5;
+      });
+
+    const result: ImageSearchResult = {
+      success: true,
+      images,
+      queryUsed: query,
+      totalFound: images.length,
+      retrievalTimeMs: Date.now() - start,
+    };
+
+    return {
+      success: true,
+      result: JSON.stringify(result),
+      metadata: { provider: "wikimedia", count: images.length },
+    };
+  } catch (err) {
+    return { success: false, result: "", error: `Image search failed: ${err instanceof Error ? err.message : String(err)}` };
   }
 }
 
