@@ -147,18 +147,18 @@ function MessageBubble({
         tabIndex={0}
       >
         {isEditing && isUser ? (
-          <div className="flex w-full max-w-none flex-col rounded-[1.5rem] bg-[#363636] px-5 py-4 text-white shadow-none">
+          <div className="flex w-full max-w-none flex-col rounded-[1.5rem] bg-card px-5 py-4 text-foreground shadow-none dark:bg-[#363636] dark:text-white">
             <textarea
               autoFocus
               value={editingContent ?? message.content}
               onChange={(e) => setEditingContent(e.target.value)}
-              className="min-h-8 w-full resize-none border-0 bg-transparent p-0 text-[16px] leading-[1.45] text-white outline-none placeholder:text-white/60"
+              className="min-h-8 w-full resize-none border-0 bg-transparent p-0 text-[16px] leading-[1.45] text-foreground outline-none placeholder:text-muted-foreground/60 dark:text-white dark:placeholder:text-white/60"
               rows={1}
             />
             <div className="mt-3 flex items-center justify-end gap-2 self-end">
               <button
                 onClick={onCancelEdit}
-                className="rounded-full bg-black px-3.5 py-1.5 text-[13px] font-medium text-white transition hover:bg-black/90"
+                className="rounded-full bg-muted/10 px-3.5 py-1.5 text-[13px] font-medium text-foreground transition hover:bg-muted/20 dark:bg-black dark:text-white"
               >
                 Cancel
               </button>
