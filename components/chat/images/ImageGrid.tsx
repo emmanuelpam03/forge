@@ -9,8 +9,8 @@ export default function ImageGrid({ images }: { images: Img[] }) {
   return (
     <div className="my-4 grid grid-cols-2 md:grid-cols-3 gap-3">
       {images.map((im) => (
-        <div key={im.id} className="rounded-md overflow-hidden bg-gray-100">
-          <Image src={im.thumbnailUrl || im.url} alt={im.title || "image"} className="w-full h-40 object-cover" />
+        <div key={im.id} className="relative rounded-md overflow-hidden bg-gray-100 h-40">
+          <Image src={im.thumbnailUrl || im.url} alt={im.title || "image"} fill className="object-cover" />
         </div>
       ))}
     </div>

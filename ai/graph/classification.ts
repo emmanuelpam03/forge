@@ -210,7 +210,7 @@ function parseLegacyClassification(text: string): ClassifiedIntent {
   }
 }
 
-function deriveStructuredFromLegacy(
+export function deriveStructuredFromLegacy(
   legacy: ClassifiedIntent,
 ): StructuredIntentClassification {
   const intentMap: Record<

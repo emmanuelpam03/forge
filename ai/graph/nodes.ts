@@ -22,9 +22,12 @@ import { info, warn, error as logError } from "@/lib/logger";
 import {
   parseClassificationText,
   deriveLegacyIntentFromStructured,
+  deriveStructuredFromLegacy,
+  shouldForceWebSearchFromClassification,
   type QueryIntentClassification,
 } from "@/ai/graph/classification.ts";
-import { buildIntentClassificationMessage } from "@/ai/prompts/intent.ts";
+import type { ClassifiedIntent } from "@/ai/graph/state";
+import { buildIntentClassificationMessage, buildFreshnessClassificationMessage } from "@/ai/prompts/intent.ts";
 import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
 import type { ChatGraphState } from "@/ai/graph/state";
@@ -500,26 +503,31 @@ function extractCalculatorExpression(message: string): string {
 }
 
 function mapStructuredToolUsage(toolUsage: string[]): string[] {
-  return toolUsage
-    .map((tool) => {
-      switch (tool) {
-        case "web_search":
-          return "webSearch";
-        case "weather":
-          return "weather";
-        case "datetime":
-          return "currentDateTime";
-        case "project_context":
-          return "projectContextLookup";
-        case "code_execution":
-          return "calculator";
-        case "memory_lookup":
-          return null;
-        default:
-          return null;
-      }
-    })
-    .filter((tool): tool is string => Boolean(tool));
+  const mapped: Array<string | null> = toolUsage.map((tool) => {
+    switch (tool) {
+      case "web_search":
+        return "webSearch";
+      case "weather":
+        return "weather";
+      case "datetime":
+        return "currentDateTime";
+      case "project_context":
+        return "projectContextLookup";
+      case "code_execution":
+      case "calculator":
+        return "calculator";
+      case "memory_lookup":
+        return null;
+      default:
+        return null;
+    }
+  });
+
+  const result: string[] = [];
+  for (const t of mapped) {
+    if (t) result.push(t);
+  }
+  return result;
 }
 
 function extractWeatherLocation(message: string): string {
@@ -889,7 +897,7 @@ export function testResolveToolPlan(
   toolUsage: string[] = [],
   selectedOptions: string[] = [],
 ) {
-  const state: any = {
+  const state: Record<string, unknown> = {
     userMessage,
     structuredIntent: { toolUsage },
     selectedOptions,
@@ -1364,6 +1372,36 @@ export async function classifyIntentNode(state: ChatGraphState) {
             multiIntent: [],
           },
       );
+
+      // Run a separate freshness classifier to catch queries that explicitly
+      // require up-to-date facts (e.g. "Who is the president of the US?"). If
+      // the freshness classifier indicates the query needs fresh data, force
+      // `web_search` into the structured intent so the planner invokes the
+      // web search tool.
+      try {
+        const freshnessPrompt = buildFreshnessClassificationMessage(state.userMessage);
+        const freshnessResp = await model.invoke(
+          [new HumanMessage(freshnessPrompt)],
+          buildLangSmithRunConfig(state, "freshness-classification"),
+        );
+        const freshnessParsed = parseClassificationText(toTextContent(freshnessResp.content));
+
+        if (shouldForceWebSearchFromClassification(freshnessParsed)) {
+          classifiedIntent = {
+            ...(classifiedIntent ?? { intent: "factual", requiresFreshData: true, confidence: "low" }),
+            requiresFreshData: true,
+          };
+          if (!structuredIntent) {
+            structuredIntent = deriveStructuredFromLegacy(classifiedIntent as ClassifiedIntent);
+          }
+          if (!structuredIntent.toolUsage.includes("web_search")) {
+            structuredIntent.toolUsage = [...structuredIntent.toolUsage, "web_search"];
+          }
+        }
+      } catch (freshnessErr) {
+        // Non-fatal: if freshness classification fails, continue with existing intent
+        warn("freshness_classification_failed", { error: freshnessErr });
+      }
 
       taskCategory =
         structuredIntent?.intent === "coding" ||

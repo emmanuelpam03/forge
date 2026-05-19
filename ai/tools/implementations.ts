@@ -698,7 +698,7 @@ export async function imageSearchToolAsync(
         success: false,
         result: "",
         error:
-          "No images found. Check provider configuration (SERPAPI_API_KEY, PEXELS_API_KEY, UNSPLASH_ACCESS_KEY) or try a different query.",
+          "No images found. Check provider configuration (SERPAPI_API_KEY, PEXELS_API_KEY) or try a different query.",
       };
     }
 

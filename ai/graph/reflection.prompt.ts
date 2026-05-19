@@ -105,7 +105,7 @@ export function parseReflectionReport(output: string): ReflectionReport {
     let parsed: ReflectionReport;
     try {
       parsed = JSON.parse(rawJson) as ReflectionReport;
-    } catch (primaryErr) {
+    } catch (_primaryErr) {
       // Attempt lightweight repairs for common model-output issues observed in the wild:
       // - spaces inserted in URLs (e.g. "https: //i. imgur. com/...")
       // - spaces inside numeric tokens (e.g. "0. 96")
@@ -115,8 +115,6 @@ export function parseReflectionReport(output: string): ReflectionReport {
       // Normalize http/https with optional spaces
       repaired = repaired.replace(/(https?)\s*:\s*\/\s*\/+/gi, "$1://");
 
-      // Remove accidental spaces around dots that commonly break domains (i. imgur. com -> i.imgur.com)
-      repaired = repaired.replace(/([a-zA-Z0-9])\s*\.\s*([a-zA-Z0-9])/g, "$1.$2");
 
       // Fix numbers that have spaces after the decimal point (e.g. 0. 96 -> 0.96)
       repaired = repaired.replace(/(\d+\.)\s+(\d+)/g, "$1$2");
@@ -126,9 +124,10 @@ export function parseReflectionReport(output: string): ReflectionReport {
 
       try {
         parsed = JSON.parse(repaired) as ReflectionReport;
-      } catch (repairErr) {
-        // If repair attempt fails, bubble original parsing error for logging
-        throw repairErr;
+      } catch {
+        // If repair attempt fails, re-throw the original primary parse error
+        // so the outer handler can log the original failure context.
+        throw _primaryErr;
       }
     }
 

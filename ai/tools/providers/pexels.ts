@@ -7,15 +7,19 @@ export async function pexelsSearch(query: string, count: number = 6): Promise<Pr
   const key = process.env.PEXELS_API_KEY?.trim();
   if (!key) return [];
 
-  const cacheKey = `pexels:images:${encodeURIComponent(query)}:${count}`;
+  const cacheKey = `pexels:images:${encodeURIComponent(query)}`;
   try {
     const cached = await cacheGet(cacheKey);
-    if (cached) return JSON.parse(cached) as ProviderImage[];
+    if (cached) {
+      const all = JSON.parse(cached) as ProviderImage[];
+      return all.slice(0, count);
+    }
   } catch {}
 
+  const perPage = Math.min(Math.max(count, 1), 80);
   const params = new URLSearchParams({
     query,
-    per_page: String(Math.min(Math.max(count, 1), 80)),
+    per_page: String(perPage),
   });
 
   try {
@@ -43,11 +47,13 @@ export async function pexelsSearch(query: string, count: number = 6): Promise<Pr
     }));
 
     try {
+      // Cache the full fetched array (up to perPage) so future requests
+      // with different counts can slice from the cached set.
       await cacheSet(cacheKey, JSON.stringify(imgs), 3600);
     } catch {}
 
     return imgs.slice(0, count);
-  } catch (_err) {
+  } catch {
     return [];
   }
 }

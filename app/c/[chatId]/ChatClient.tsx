@@ -436,13 +436,22 @@ export function ChatClient({
   );
 
   const applyImagesToMessage = useCallback(
-    (messageId: string, images: RetrievedImage[]) => {
+    (
+      messageId: string,
+      images: RetrievedImage[],
+      totalFound?: number,
+      retrievalTimeMs?: number,
+    ) => {
       setMessages((currentMessages) =>
         currentMessages.map((m) =>
           m.id === messageId
             ? {
                 ...m,
-                imageBlock: { images },
+                imageBlock: {
+                  images,
+                  ...(typeof totalFound === "number" ? { totalFound } : {}),
+                  ...(typeof retrievalTimeMs === "number" ? { retrievalTimeMs } : {}),
+                },
               }
             : m,
         ),
@@ -1313,7 +1322,15 @@ export function ChatClient({
               const event = JSON.parse(line) as StreamEvent;
 
               if (event.type === "images") {
-                applyImagesToMessage(activeAssistantMessageId, event.images ?? []);
+                applyImagesToMessage(
+                  activeAssistantMessageId,
+                  event.images ?? [],
+                  // event.totalFound and event.retrievalTimeMs are optional in
+                  // some stream variants; guard their presence when assigning
+                  // to the message imageBlock.
+                  typeof event.totalFound === "number" ? event.totalFound : undefined,
+                  typeof event.retrievalTimeMs === "number" ? event.retrievalTimeMs : undefined,
+                );
               }
 
               if (event.type === "reasoning") {
@@ -1493,12 +1510,28 @@ export function ChatClient({
                   }
                 />
 
-                {message.imageBlock ? (
-                  message.imageBlock.images?.length > 3 ? (
-                    <ImageGrid images={message.imageBlock.images} />
-                  ) : (
-                    <ImageCarousel images={message.imageBlock.images} />
-                  )
+                {message.imageBlock &&
+                Array.isArray(message.imageBlock.images) &&
+                message.imageBlock.images.length > 0 ? (
+                  <div>
+                    {message.imageBlock.images.length >= 4 ? (
+                      <ImageGrid images={message.imageBlock.images} />
+                    ) : (
+                      <ImageCarousel images={message.imageBlock.images} />
+                    )}
+
+                    {(typeof message.imageBlock.totalFound === "number" || typeof message.imageBlock.retrievalTimeMs === "number") && (
+                      <div className="mt-2 ml-2 text-xs text-muted-foreground">
+                        {typeof message.imageBlock.totalFound === "number" && (
+                          <span>{message.imageBlock.totalFound} images found</span>
+                        )}
+                        {typeof message.imageBlock.totalFound === "number" && typeof message.imageBlock.retrievalTimeMs === "number" && <span> • </span>}
+                        {typeof message.imageBlock.retrievalTimeMs === "number" && (
+                          <span>{message.imageBlock.retrievalTimeMs}ms</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ) : null}
               </React.Fragment>
             ))
