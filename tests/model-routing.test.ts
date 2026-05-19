@@ -18,7 +18,7 @@ test("model routing is DeepSeek-only via OpenRouter", () => {
   assert.doesNotMatch(source, /ollama|google-genai|gemini|llama|claude|gpt/);
 });
 
-test("chat UI displays only DeepSeek (no model picker)", () => {
+test("chat UI displays only DeepSeek (with expandable model picker)", () => {
   const source = readWorkspaceFile("app/c/[chatId]/ChatClient.tsx");
 
   // Verify only one model option exists
@@ -26,9 +26,11 @@ test("chat UI displays only DeepSeek (no model picker)", () => {
   // Should contain DeepSeek
   assert.match(source, /deepseek\/deepseek-v4-flash/);
   assert.match(source, /DeepSeek v4 Flash/);
-  // Verify model picker dropdown is removed
-  assert.doesNotMatch(source, /isModelMenuOpen/);
-  assert.doesNotMatch(source, /modelMenuRef/);
+  // Model picker UI exists (for future expansion)
+  assert.match(source, /isModelMenuOpen/);
+  assert.match(source, /modelMenuRef/);
+  // But only one model in options
+  assert.match(source, /{ id: "deepseek\/deepseek-v4-flash", label: "DeepSeek v4 Flash"/);
   assert.doesNotMatch(source, /CODING_MODEL_OPTION/);
   // No alternate models
   assert.doesNotMatch(source, /Llama|llama|claude|Claude|GPT|gpt/);

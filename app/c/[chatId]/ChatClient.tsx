@@ -341,6 +341,7 @@ export function ChatClient({
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
   const {
     selectedOptions: selectedOptionIds,
@@ -353,6 +354,7 @@ export function ChatClient({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
 
@@ -448,7 +450,34 @@ export function ChatClient({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [draft]);
 
+  useEffect(() => {
+    if (!isModelMenuOpen) {
+      return;
+    }
 
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        modelMenuRef.current &&
+        !modelMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsModelMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsModelMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isModelMenuOpen]);
 
   const stopGeneration = () => {
     if (!abortControllerRef.current) {
@@ -1491,6 +1520,44 @@ export function ChatClient({
           <div className="relative rounded-full border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
               <div className="relative col-start-1 row-start-1 self-center">
+                <button
+                  type="button"
+                  onClick={() => setIsModelMenuOpen((value) => !value)}
+                  className="rounded-full p-2 text-muted-foreground transition hover:text-foreground"
+                  aria-haspopup="menu"
+                  aria-expanded={isModelMenuOpen}
+                  title="Model"
+                >
+                  <Sparkles size={18} />
+                </button>
+
+                <div
+                  ref={modelMenuRef}
+                  className={`absolute bottom-full left-0 mb-3 z-50 w-[12rem] overflow-hidden rounded-xl border border-border bg-popover shadow-lg transition-opacity ${isModelMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                >
+                  <div className="p-2">
+                    {MODEL_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedModelId(option.id);
+                          setIsModelMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition ${
+                          selectedModelId === option.id
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-accent text-foreground"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative col-start-1 row-start-1 self-center ml-12">
                 <button
                   ref={modesMenuTriggerRef}
                   type="button"
