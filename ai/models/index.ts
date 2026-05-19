@@ -16,7 +16,14 @@ export const DEFAULT_OLLAMA_MODEL = "qwen2.5:7b-instruct";
 export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_OPENROUTER_CODE_MODEL =
+  "deepseek/deepseek-v4-flash";
+export const DEFAULT_OPENROUTER_CODING_MODEL =
   "meta-llama/llama-3.3-70b-instruct:free";
+
+const ALLOWED_OPENROUTER_MODELS = new Set([
+  DEFAULT_OPENROUTER_CODE_MODEL,
+  DEFAULT_OPENROUTER_CODING_MODEL,
+]);
 
 export type ChatModelProvider = "google-genai" | "ollama" | "openrouter";
 
@@ -83,39 +90,22 @@ export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
     };
   }
 
-  // Use override provider if provided, otherwise read from env
-  const envProvider = process.env.AI_MODEL_PROVIDER?.trim().toLowerCase();
-  const provider =
-    override?.provider ||
-    (envProvider === "ollama"
-      ? "ollama"
-      : envProvider === "openrouter"
-        ? "openrouter"
-        : "google-genai");
+  // Only allow OpenRouter with the approved model IDs.
+  // Other providers/models are ignored to keep the application locked down.
+  const requestedModel =
+    override?.model ||
+    process.env.OPENROUTER_CODE_MODEL?.trim() ||
+    DEFAULT_OPENROUTER_CODE_MODEL;
 
-  if (provider === "ollama") {
-    return {
-      provider,
-      model: override?.model || process.env.OLLAMA_MODEL?.trim() || DEFAULT_OLLAMA_MODEL,
-      baseUrl: process.env.OLLAMA_BASE_URL?.trim() || DEFAULT_OLLAMA_BASE_URL,
-    };
-  }
-
-  if (provider === "openrouter") {
-    return {
-      provider,
-      model:
-        override?.model ||
-        process.env.OPENROUTER_CODE_MODEL?.trim() ||
-        DEFAULT_OPENROUTER_CODE_MODEL,
-      baseUrl:
-        process.env.OPENROUTER_BASE_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL,
-    };
-  }
+  const resolvedModel = ALLOWED_OPENROUTER_MODELS.has(requestedModel)
+    ? requestedModel
+    : DEFAULT_OPENROUTER_CODE_MODEL;
 
   return {
-    provider,
-    model: override?.model || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+    provider: "openrouter",
+    model: resolvedModel,
+    baseUrl:
+      process.env.OPENROUTER_BASE_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL,
   };
 }
 

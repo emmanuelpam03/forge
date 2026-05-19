@@ -70,8 +70,6 @@ type ModelOption = {
 
 const MODEL_OPTIONS: ModelOption[] = [
   { id: "deepseek/deepseek-v4-flash", label: "Deepseek v4 Flash", provider: "openrouter" },
-  { id: "gpt-oss:120b", label: "GPT-OSS 120B", provider: "ollama" },
-  { id: "gemma-4-31b-it", label: "Gemma 4 31B IT", provider: "google-genai" },
   {
     id: "meta-llama/llama-3.3-70b-instruct:free",
     label: "Llama 3.3 70B Instruct Free",
@@ -86,7 +84,6 @@ const DEFAULT_MODEL_OPTION =
 
 const CODING_MODEL_OPTION =
   MODEL_OPTIONS.find((option) => option.id === "meta-llama/llama-3.3-70b-instruct:free") ||
-  MODEL_OPTIONS.find((option) => option.provider === "openrouter") ||
   MODEL_OPTIONS[0];
 
 function MessageBubble({

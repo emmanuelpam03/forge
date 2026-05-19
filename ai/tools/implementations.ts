@@ -387,28 +387,56 @@ export async function webSearchToolAsync(
     };
   }
 
+  // Retry helper with exponential backoff for transient network issues
+  async function fetchWithRetries(url: string, opts: RequestInit, retries = 3) {
+    let attempt = 0;
+    let lastErr: unknown = null;
+    while (attempt < retries) {
+      try {
+        const resp = await fetch(url, opts);
+        if (!resp.ok && resp.status >= 500 && attempt < retries - 1) {
+          // transient server error, retry
+          attempt++;
+          await new Promise((r) => setTimeout(r, 200 * Math.pow(2, attempt)));
+          continue;
+        }
+        return resp;
+      } catch (err) {
+        lastErr = err;
+        attempt++;
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 150 * Math.pow(2, attempt)));
+        }
+      }
+    }
+
+    throw lastErr;
+  }
+
   try {
     // Qualify query for freshness (e.g., add year, "today", etc.)
     const qualifiedQuery = qualifyQueryForFreshness(query);
     // Use advanced search depth for current information queries
     const searchDepth = isCurrentInfoQuery(query) ? "advanced" : "basic";
 
-    const response = await fetch(`${tavilyBaseUrl}/search`, {
+    const body = JSON.stringify({
+      api_key: apiKey,
+      query: qualifiedQuery,
+      max_results: Math.min(Math.max(maxResults, 1), 10),
+      search_depth: searchDepth,
+      include_answer: true,
+    });
+
+    const response = await fetchWithRetries(`${tavilyBaseUrl}/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query: qualifiedQuery,
-        max_results: Math.min(Math.max(maxResults, 1), 10),
-        search_depth: searchDepth,
-        include_answer: true,
-      }),
+      body,
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text().catch(() => "");
       return {
         success: false,
         result: "",
@@ -416,7 +444,7 @@ export async function webSearchToolAsync(
       };
     }
 
-    const payload = (await response.json()) as {
+    const payload = (await response.json().catch(() => ({}))) as {
       answer?: string;
       results?: Array<{
         title?: string;
@@ -518,6 +546,62 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
   }
 
   try {
+    // Prefer OpenWeather when API key is provided for consistent, feature-rich data
+    const openWeatherKey = process.env.OPENWEATHER_API_KEY?.trim();
+    if (openWeatherKey) {
+      const owUrl = new URL("https://api.openweathermap.org/data/2.5/weather");
+      owUrl.search = new URLSearchParams({
+        q: query,
+        appid: openWeatherKey,
+        units: "metric",
+      }).toString();
+
+      const owResp = await fetch(owUrl);
+      if (!owResp.ok) {
+        const errText = await owResp.text().catch(() => "");
+        return {
+          success: false,
+          result: "",
+          error: `OpenWeather API failed (${owResp.status}): ${errText}`,
+        };
+      }
+
+      const owJson = await owResp.json().catch(() => null);
+      if (!owJson) {
+        return {
+          success: false,
+          result: "",
+          error: "OpenWeather returned invalid data",
+        };
+      }
+
+      const placeLabel = [owJson.name, owJson.sys?.country].filter(Boolean).join(", ");
+      const condition = owJson.weather && owJson.weather[0]
+        ? String(owJson.weather[0].description)
+        : "unknown";
+      const temp = typeof owJson.main?.temp === "number" ? `${owJson.main.temp}°C` : "unknown";
+      const wind = typeof owJson.wind?.speed === "number" ? `${owJson.wind.speed} m/s` : "unknown";
+      const time = owJson.dt ? new Date(owJson.dt * 1000).toISOString() : null;
+
+      return {
+        success: true,
+        result: [
+          `Current weather for ${placeLabel || query}:`,
+          `Temperature: ${temp}`,
+          `Condition: ${condition}`,
+          `Wind: ${wind}`,
+          time ? `Observed at: ${time}` : null,
+          "Source: OpenWeather",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        metadata: {
+          provider: "openweathermap",
+          location: placeLabel || query,
+        },
+      };
+    }
+    // Primary: Open-Meteo geocoding
     const geocodeUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
     geocodeUrl.search = new URLSearchParams({
       name: query,
@@ -526,26 +610,44 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
       format: "json",
     }).toString();
 
-    const geocodeResponse = await fetch(geocodeUrl);
-    if (!geocodeResponse.ok) {
-      return {
-        success: false,
-        result: "",
-        error: `Weather geocoding failed (${geocodeResponse.status})`,
-      };
+    let geocodePayload: any = {};
+    let geocodeResponse = await fetch(geocodeUrl).catch(() => null);
+    if (geocodeResponse && geocodeResponse.ok) {
+      geocodePayload = await geocodeResponse.json().catch(() => ({}));
     }
 
-    const geocodePayload = (await geocodeResponse.json()) as {
-      results?: Array<{
-        name?: string;
-        country?: string;
-        admin1?: string;
-        latitude?: number;
-        longitude?: number;
-      }>;
-    };
+    let place = geocodePayload.results?.[0];
+    // Fallback: Try Nominatim if Open-Meteo geocoding returns nothing
+    if (!place) {
+      try {
+        const nominatim = new URL("https://nominatim.openstreetmap.org/search");
+        nominatim.search = new URLSearchParams({
+          q: query,
+          format: "json",
+          limit: "1",
+          addressdetails: "0",
+        }).toString();
 
-    const place = geocodePayload.results?.[0];
+        const nomResp = await fetch(nominatim, {
+          headers: { "User-Agent": "forge/1.0 (contact@example.com)" },
+        }).catch(() => null);
+        if (nomResp && nomResp.ok) {
+          const nomJson = await nomResp.json().catch(() => []);
+          const first = nomJson?.[0];
+          if (first) {
+            place = {
+              name: first.display_name,
+              country: undefined,
+              admin1: undefined,
+              latitude: parseFloat(first.lat),
+              longitude: parseFloat(first.lon),
+            };
+          }
+        }
+      } catch {
+        // ignore fallback errors
+      }
+    }
     if (
       !place ||
       typeof place.latitude !== "number" ||

@@ -1304,10 +1304,39 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
 
     emitStatus(undefined, "Analyzing results...");
 
-    // Format evidence bundles into a clear context (exclude imageSearch output)
+    // Format evidence bundles into a clear, sentence-oriented context
+    // (exclude imageSearch output). Use explicit sentences so the
+    // output sanitizer recognizes these as visible answer content.
     const contextLines = state.evidenceBundles
       .filter((bundle) => bundle.tool !== "imageSearch")
-      .map((bundle) => `## ${bundle.tool.toUpperCase()}\n${bundle.content}`);
+      .map((bundle) => {
+        const toolLabel =
+          bundle.tool === "webSearch"
+            ? "Web search"
+            : bundle.tool === "projectContextLookup"
+            ? "Project context"
+            : bundle.tool === "currentDateTime"
+            ? "Current date/time"
+            : bundle.tool === "weather"
+            ? "Weather"
+            : bundle.tool;
+
+        // Ensure the bundle content is rendered as one or more full sentences
+        // that the sanitizer will treat as visible answer text.
+        const content = (bundle.content || "").toString().trim();
+        const firstLine = content.split(/\r?\n/)[0] || content;
+        const sentencePrefix = `${toolLabel} returned:`;
+
+        // If the first line already looks sentence-like, keep it; otherwise
+        // prefix to form a clear declarative sentence.
+        const primary = /[\.\!\?]$/.test(firstLine)
+          ? firstLine
+          : `${sentencePrefix} ${firstLine}`;
+
+        // Include any additional details after a blank line for readability
+        const rest = content.split(/\r?\n/).slice(1).join("\n").trim();
+        return rest ? `${primary}\n\n${rest}` : primary;
+      });
 
     const toolContext = contextLines.join("\n\n");
 
