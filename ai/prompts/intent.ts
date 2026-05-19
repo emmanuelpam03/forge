@@ -26,7 +26,7 @@ const INTENT_ROUTER_EXAMPLES = `Examples:
 - "Compare Next.js and Remix for a dashboard" => {"intent":"comparison","difficulty":"medium","verbosity":"detailed","audience_level":"intermediate","tool_usage":["web_search"],"response_mode":"compare","confidence":"high","memory_relevance":false,"reasoning_depth":"deep","multi_intent":["analysis"]}
 - "I feel overwhelmed and need some encouragement" => {"intent":"emotional_support","difficulty":"easy","verbosity":"balanced","audience_level":"general","tool_usage":[],"response_mode":"support","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}
 - "What's the weather like in Flic en Flac, Mauritius?" => {"intent":"research","difficulty":"easy","verbosity":"balanced","audience_level":"intermediate","tool_usage":["weather"],"response_mode":"analyze","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}
-- "Is it raining in London right now?" => {"intent":"factual","difficulty":"easy","verbosity":"concise","audience_level":"general","tool_usage":["weather"],"response_mode":"chat","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}`;
+- "Is it raining in London right now?" => {"intent":"research","difficulty":"easy","verbosity":"concise","audience_level":"general","tool_usage":["weather"],"response_mode":"chat","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}`;
 
 const FRESHNESS_CLASSIFICATION_LAYER = `Return JSON ONLY in this exact shape:
 {"intent":"factual|reasoning|code|creative","requiresFreshData":true|false,"confidence":"high|medium|low"}

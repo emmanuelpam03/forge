@@ -4,7 +4,6 @@ import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import prisma from "@/lib/prisma";
 import {
   createGeminiModel,
-  extractTextFromModelChunk,
   getChatModelConfig,
   type ModelOverride,
 } from "@/ai/models";
@@ -188,8 +187,6 @@ function buildLangSmithRunConfig(
 async function generateDraftResponse(state: ChatGraphState): Promise<string> {
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
-    provider:
-      (state.provider as "google-genai" | "ollama" | "openrouter" | undefined) || undefined,
   };
   const model = createGeminiModel(override);
   const messages = buildChatMessages(state);
@@ -292,8 +289,6 @@ async function generateDraftResponseWithFeedback(
 ): Promise<string> {
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
-    provider:
-      (state.provider as "google-genai" | "ollama" | "openrouter" | undefined) || undefined,
   };
   const model = createGeminiModel(override);
   const messages = buildChatMessages(state);
@@ -736,7 +731,7 @@ export async function generateResponseNode(state: ChatGraphState) {
       return {
         assistantMessage,
         modelUsed: state.modelUsed || "",
-        provider: state.provider || "",
+        provider: "openrouter",
         inputTokens,
         outputTokens,
         latencyMs: Date.now() - startedAt,
@@ -769,30 +764,25 @@ export async function generateResponseNode(state: ChatGraphState) {
 
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
-    provider:
-      (state.provider as "google-genai" | "ollama" | "openrouter" | undefined) || undefined,
   };
   const model = createGeminiModel(override);
   const modelConfig = getChatModelConfig(override);
 
   try {
-    let tokenStream: AsyncIterable<unknown>;
-
-    const modelConfigInTry = modelConfig;
     const invoker = model as unknown as ModelInvoker;
-    if (modelConfigInTry.provider === "ollama") {
-      if (!invoker.stream) throw new Error("Ollama provider missing stream implementation");
-      tokenStream = invoker.stream(messages as BaseMessage[]);
-    } else {
-      if (!invoker.nativeStream) throw new Error("Gemini provider missing nativeStream implementation");
-      tokenStream = invoker.nativeStream(messages as BaseMessage[]);
+    if (!invoker.stream) {
+      throw new Error("DeepSeek model missing stream implementation");
     }
+    const tokenStream = invoker.stream(messages as BaseMessage[]);
 
     let firstTokenAt: number | null = null;
     for await (const token of tokenStream) {
-      const chunkText = extractTextFromModelChunk(token);
-      if (!chunkText.trim()) {
-        continue;
+      let chunkText = "";
+      if (typeof token === "string") {
+        chunkText = token;
+      } else if (token && typeof token === "object") {
+        const chunk = token as { content?: string; text?: string; [key: string]: unknown };
+        chunkText = chunk.content || chunk.text || "";
       }
 
       if (firstTokenAt === null) {
@@ -884,7 +874,7 @@ export async function generateResponseNode(state: ChatGraphState) {
   return {
     assistantMessage,
     modelUsed: modelConfig.model,
-    provider: modelConfig.provider,
+    provider: "openrouter",
     inputTokens,
     outputTokens,
     latencyMs: Date.now() - startedAt,
@@ -956,7 +946,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
     parentId: createdUserMessageId ?? state.parentMessageId ?? null,
     branchId: state.branchId ?? undefined,
     modelUsed: state.modelUsed || null,
-    provider: state.provider || null,
+    provider: "openrouter" as const,
     tokensInput: state.inputTokens || null,
     tokensOutput: state.outputTokens || null,
     latencyMs: state.latencyMs || null,
@@ -999,7 +989,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
       data: {
         chatId: state.chatId,
         modelUsed: state.modelUsed || null,
-        provider: state.provider || null,
+        provider: "openrouter" as const,
         latencyMs: state.latencyMs || null,
         tokensInput: state.inputTokens || null,
         tokensOutput: state.outputTokens || null,

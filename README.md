@@ -1,22 +1,29 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## AI Architecture
+
+Forge uses **DeepSeek v4 Flash** exclusively via **OpenRouter** for all AI inference. There is no model selection, no provider switching, and no alternate LLMs.
+
+- **Model**: `deepseek/deepseek-v4-flash` (only model)
+- **Provider**: OpenRouter only
+- **Coding Mode**: Prompt-based behavioral orchestration (not model swapping)
+
 ## Environment
 
 Set environment values in `.env` before running in production.
 
 Required:
 
-- `GOOGLE_API_KEY`
+- `OPENROUTER_API_KEY` - DeepSeek v4 Flash inference
 - `DATABASE_URL` - Prisma database URL for Accelerate (required for production builds)
 
 Optional:
 
-- `GEMINI_MODEL`
-- `OPENROUTER_CODE_MODEL`
-- `OPENROUTER_BASE_URL`
-- `OPENROUTER_API_KEY`
-- `TAVILY_API_KEY`
-- `TAVILY_API_BASE_URL`
+- `OPENROUTER_BASE_URL` - Defaults to `https://openrouter.ai/api/v1`
+- `OPENROUTER_HTTP_REFERER` - For OpenRouter tracking
+- `OPENROUTER_APP_TITLE` - For OpenRouter tracking
+- `TAVILY_API_KEY` - Web search tool
+- Other tool APIs (weather, images, etc.)
 
 ## Getting Started
 

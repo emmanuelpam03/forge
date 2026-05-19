@@ -65,26 +65,15 @@ type ChatClientProps = {
 type ModelOption = {
   id: string;
   label: string;
-  provider: "google-genai" | "ollama" | "openrouter";
+  provider: "openrouter";
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
-  { id: "deepseek/deepseek-v4-flash", label: "Deepseek v4 Flash", provider: "openrouter" },
-  {
-    id: "meta-llama/llama-3.3-70b-instruct:free",
-    label: "Llama 3.3 70B Instruct Free",
-    provider: "openrouter",
-  },
+  { id: "deepseek/deepseek-v4-flash", label: "DeepSeek v4 Flash", provider: "openrouter" },
 ];
 
 const DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
-const DEFAULT_MODEL_OPTION =
-  MODEL_OPTIONS.find((option) => option.id === DEFAULT_MODEL_ID) ||
-  MODEL_OPTIONS[0];
-
-const CODING_MODEL_OPTION =
-  MODEL_OPTIONS.find((option) => option.id === "meta-llama/llama-3.3-70b-instruct:free") ||
-  MODEL_OPTIONS[0];
+const DEFAULT_MODEL_OPTION = MODEL_OPTIONS[0];
 
 function MessageBubble({
   message,
@@ -352,9 +341,7 @@ export function ChatClient({
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState(
-    DEFAULT_MODEL_OPTION?.id ?? "claude-3-5-sonnet",
-  );
+  const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
   const {
     selectedOptions: selectedOptionIds,
     getSelectedOptionObjects,
@@ -363,25 +350,14 @@ export function ChatClient({
   const selectedOptions = getSelectedOptionObjects();
   const { isEnabled: isForceSeniorEngineeringMode } =
     useSeniorEngineeringMode(chatId);
-  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
 
-  const selectedModel =
-    MODEL_OPTIONS.find((model) => model.id === selectedModelId) ??
-    DEFAULT_MODEL_OPTION;
-  const initialDefaultModelId = DEFAULT_MODEL_OPTION.id;
-  const isUsingAppDefaultModel = selectedModelId === initialDefaultModelId;
-
-  // Use OpenRouter for coding only when the user didn't explicitly pick another model.
-  const requestModel =
-    selectedOptionIds.includes("coding") && isUsingAppDefaultModel
-      ? CODING_MODEL_OPTION
-      : selectedModel;
+  const selectedModel = DEFAULT_MODEL_OPTION;
+  const requestModel = selectedModel;
 
   const hasMessages = messages.length > 0;
 
@@ -472,34 +448,7 @@ export function ChatClient({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [draft]);
 
-  useEffect(() => {
-    if (!isModelMenuOpen) {
-      return;
-    }
 
-    const handlePointerDown = (event: MouseEvent) => {
-      if (
-        modelMenuRef.current &&
-        !modelMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsModelMenuOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsModelMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isModelMenuOpen]);
 
   const stopGeneration = () => {
     if (!abortControllerRef.current) {
@@ -1596,70 +1545,8 @@ export function ChatClient({
                   <Mic size={18} />
                 </button>
 
-                <div className="relative" ref={modelMenuRef}>
-                  <button
-                    type="button"
-                    title="Select model"
-                    aria-label="Select model"
-                    aria-expanded={isModelMenuOpen}
-                    aria-haspopup="menu"
-                    onClick={() => setIsModelMenuOpen((value) => !value)}
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3.5 py-2 text-[12px] font-medium text-muted-foreground shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/70 hover:text-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                  >
-                    <span className="truncate">{selectedModel.label}</span>
-                    <ChevronDown
-                      size={16}
-                      className={`transition-transform duration-200 ${
-                        isModelMenuOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
 
-                  {isModelMenuOpen ? (
-                    <div
-                      role="menu"
-                      className="absolute right-0 bottom-full mb-2 w-56 overflow-hidden rounded-2xl border border-border bg-popover p-1 shadow-xl"
-                    >
-                      {MODEL_OPTIONS.map((option) => {
-                        const isActive = option.id === selectedModelId;
 
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={isActive}
-                            onClick={() => {
-                              setSelectedModelId(option.id);
-                              setIsModelMenuOpen(false);
-                            }}
-                            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-foreground ${
-                              isActive ? "bg-accent text-foreground" : ""
-                            }`}
-                          >
-                            <span className="pr-3">{option.label}</span>
-                            {isActive ? (
-                              <span className="text-[10px] uppercase tracking-[0.3em] text-primary">
-                                Active
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
-
-                {isUsingAppDefaultModel && selectedOptionIds.includes("coding") ? (
-                  <div className="hidden md:flex items-center ml-2">
-                    <span
-                      title={`Using coding default: ${requestModel.label}`}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-muted/10 px-3 py-1 text-[11px] text-muted-foreground"
-                    >
-                      <span>Code default: {requestModel.label}</span>
-                    </span>
-                  </div>
-                ) : null}
 
                 {isSending ? (
                   <button

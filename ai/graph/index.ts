@@ -220,10 +220,7 @@ export async function runChatGraphStream(
   Object.assign(state, {
     assistantMessage,
     modelUsed: input.model ?? state.modelUsed ?? "",
-    provider:
-      (input.provider as "google-genai" | "ollama" | "openrouter" | undefined) ??
-      state.provider ??
-      "",
+    provider: "openrouter",
     inputTokens,
     outputTokens,
     latencyMs: Date.now() - startedAt,
