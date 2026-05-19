@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -228,12 +228,9 @@ export function MessageRenderer({
           {children}
         </a>
       ),
-      code: (props: { inline?: boolean; className?: string; children: React.ReactNode } & Record<string, unknown>) => {
-        const { className, children, inline, ...restProps } = props as {
-          className?: string;
-          children: React.ReactNode;
-          inline?: boolean;
-        } & Record<string, unknown>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      code: (props: any) => {
+        const { className, children, inline, ...restProps } = props;
         const languageMatch = /language-(\w+)/.exec(className ?? "");
         const language = languageMatch?.[1];
         const codeText = String(children).replace(/\n$/, "");

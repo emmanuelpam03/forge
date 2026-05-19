@@ -18,7 +18,7 @@ import {
 } from "@/ai/context/engine";
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
-import { info, warn, error as logError, debug } from "@/lib/logger";
+import { info, warn, error as logError } from "@/lib/logger";
 import {
   parseClassificationText,
   deriveLegacyIntentFromStructured,
@@ -40,14 +40,14 @@ function emitImageSearchEvent(
   if (toolName !== "imageSearch") return;
 
   try {
-    const parsed: any = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
-    const images = parsed?.images ?? [];
+    const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
 
     const payload = {
       type: "images" as const,
       query: parsed?.queryUsed || buildToolArgs(toolName, state).query || "",
       provider: parsed?.provider || "",
-      images: images.map((im: RetrievedImage) => ({
+      images: images.map((im) => ({
         id: im.id,
         url: im.url,
         thumbnailUrl: im.thumbnailUrl,
@@ -65,7 +65,7 @@ function emitImageSearchEvent(
     };
 
     (onEvent ?? graphStreamEventEmitter)?.(payload as StreamEvent);
-  } catch (err) {
+  } catch {
     // silently ignore parse/emit errors
   }
 }
@@ -420,11 +420,14 @@ function resolveToolPlanForQueryIntent(
   queryIntent: QueryIntentClassification,
 ): string[] {
   const message = state.userMessage;
+  const structuredTools = mapStructuredToolUsage(
+    state.structuredIntent?.toolUsage ?? [],
+  );
   // If intent does not need tools, still allow user-selected options to
   // force use of tools. We merge inferred tools with any selected options
   // provided by the client (UI chips).
   const inferredTools: string[] = [];
-  if (queryIntent.needsTools) {
+  if (queryIntent.needsTools && structuredTools.length === 0) {
     if (queryIntent.type === "real_time") {
       inferredTools.push(
         looksLikeDateTimeQuery(message) ? "currentDateTime" : "webSearch",
@@ -465,8 +468,16 @@ function resolveToolPlanForQueryIntent(
     selectedTools.push("projectContextLookup");
   }
 
+  // Heuristic: If the message looks like it would benefit from visual context, add imageSearch.
+  const visualContextPattern = /\b(explain|diagram|how does|how do|visualize|show|illustrate|architecture|structure|design|flow|process|system|bridge|map|picture|image|images|photo|photos|visual|draw|sketch|render|display|suspension bridge|circuit|layout|ui|interface|pattern|component|example|inspire|reference)\b/i;
+  if (visualContextPattern.test(message)) {
+    selectedTools.push("imageSearch");
+  }
+
   // Combine inferred and selected tools, preserving order but removing duplicates
-  const final = Array.from(new Set([...selectedTools, ...inferredTools]));
+  const final = Array.from(
+    new Set([...structuredTools, ...selectedTools, ...inferredTools]),
+  );
   return final;
 }
 
@@ -488,6 +499,49 @@ function extractCalculatorExpression(message: string): string {
   return normalized || message;
 }
 
+function mapStructuredToolUsage(toolUsage: string[]): string[] {
+  return toolUsage
+    .map((tool) => {
+      switch (tool) {
+        case "web_search":
+          return "webSearch";
+        case "weather":
+          return "weather";
+        case "datetime":
+          return "currentDateTime";
+        case "project_context":
+          return "projectContextLookup";
+        case "code_execution":
+          return "calculator";
+        case "memory_lookup":
+          return null;
+        default:
+          return null;
+      }
+    })
+    .filter((tool): tool is string => Boolean(tool));
+}
+
+function extractWeatherLocation(message: string): string {
+  const cleaned = message.trim();
+
+  const locationMatch = cleaned.match(
+    /\b(?:weather|forecast|temperature|conditions?)\b.*?\b(?:in|for|at|near)\s+([^?.!;]+?)(?:\s+(?:today|tomorrow|now|currently|right now)\b|[?.!;]|$)/i,
+  );
+  if (locationMatch?.[1]) {
+    return locationMatch[1].trim().replace(/^(the|a|an)\s+/i, "");
+  }
+
+  const fallbackMatch = cleaned.match(
+    /\b(?:in|for|at|near)\s+([^?.!;]+?)(?:\s+(?:today|tomorrow|now|currently|right now)\b|[?.!;]|$)/i,
+  );
+  if (fallbackMatch?.[1]) {
+    return fallbackMatch[1].trim().replace(/^(the|a|an)\s+/i, "");
+  }
+
+  return cleaned;
+}
+
 function buildToolArgs(
   toolName: string,
   state: ChatGraphState,
@@ -500,6 +554,10 @@ function buildToolArgs(
 
   if (toolName === "webSearch") {
     return { query: message, maxResults: 5 };
+  }
+
+  if (toolName === "weather") {
+    return { location: extractWeatherLocation(message) };
   }
 
   if (toolName === "currentDateTime") {
@@ -524,6 +582,10 @@ function buildToolArgs(
 
   if (toolName === "projectContextLookup") {
     return { query: message, maxResults: 5 };
+  }
+
+  if (toolName === "imageSearch") {
+    return { query: message };
   }
 
   return {};
@@ -819,6 +881,24 @@ export async function generateResponseNode(state: ChatGraphState) {
     outputTokens,
     latencyMs: Date.now() - startedAt,
   };
+}
+
+// Test helper: expose planner resolution for local testing.
+export function testResolveToolPlan(
+  userMessage: string,
+  toolUsage: string[] = [],
+  selectedOptions: string[] = [],
+) {
+  const state: any = {
+    userMessage,
+    structuredIntent: { toolUsage },
+    selectedOptions,
+  };
+
+  // Force query intent to real_time to allow inferred tools when needed.
+  const queryIntent: QueryIntentClassification = { needsTools: true, type: "real_time" };
+
+  return resolveToolPlanForQueryIntent(state, queryIntent);
 }
 
 export async function saveMessagesNode(state: ChatGraphState) {
@@ -1216,10 +1296,10 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
 
     emitStatus(undefined, "Analyzing results...");
 
-    // Format evidence bundles into a clear context
-    const contextLines = state.evidenceBundles.map(
-      (bundle) => `## ${bundle.tool.toUpperCase()}\n${bundle.content}`,
-    );
+    // Format evidence bundles into a clear context (exclude imageSearch output)
+    const contextLines = state.evidenceBundles
+      .filter((bundle) => bundle.tool !== "imageSearch")
+      .map((bundle) => `## ${bundle.tool.toUpperCase()}\n${bundle.content}`);
 
     const toolContext = contextLines.join("\n\n");
 
@@ -1229,7 +1309,9 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
     );
     const synthesisNote = hasFreshSearch
       ? "Results include recent web search data."
-      : "Results from local tools and project context.";
+      : toolContext
+        ? "Results from local tools and project context."
+        : "Visual results delivered separately.";
 
     return {
       toolContext,

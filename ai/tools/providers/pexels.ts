@@ -26,6 +26,7 @@ export async function pexelsSearch(query: string, count: number = 6): Promise<Pr
     const payload = await res.json();
     const photos = payload.photos || [];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const imgs: ProviderImage[] = photos.map((p: any) => ({
       id: String(p.id),
       url: p.src?.large2x || p.src?.large || p.src?.original || undefined,
@@ -46,7 +47,7 @@ export async function pexelsSearch(query: string, count: number = 6): Promise<Pr
     } catch {}
 
     return imgs.slice(0, count);
-  } catch (err) {
+  } catch (_err) {
     return [];
   }
 }

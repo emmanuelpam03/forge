@@ -98,7 +98,39 @@ export function parseReflectionReport(output: string): ReflectionReport {
     if (!jsonMatch) {
       throw new Error("No JSON found in reflection output");
     }
-    const parsed = JSON.parse(jsonMatch[0]) as ReflectionReport;
+
+    const rawJson = jsonMatch[0];
+
+    // First, attempt a direct parse which should succeed for well-formed outputs
+    let parsed: ReflectionReport;
+    try {
+      parsed = JSON.parse(rawJson) as ReflectionReport;
+    } catch (primaryErr) {
+      // Attempt lightweight repairs for common model-output issues observed in the wild:
+      // - spaces inserted in URLs (e.g. "https: //i. imgur. com/...")
+      // - spaces inside numeric tokens (e.g. "0. 96")
+      // - trailing commas before closing objects/arrays
+      let repaired = rawJson;
+
+      // Normalize http/https with optional spaces
+      repaired = repaired.replace(/(https?)\s*:\s*\/\s*\/+/gi, "$1://");
+
+      // Remove accidental spaces around dots that commonly break domains (i. imgur. com -> i.imgur.com)
+      repaired = repaired.replace(/([a-zA-Z0-9])\s*\.\s*([a-zA-Z0-9])/g, "$1.$2");
+
+      // Fix numbers that have spaces after the decimal point (e.g. 0. 96 -> 0.96)
+      repaired = repaired.replace(/(\d+\.)\s+(\d+)/g, "$1$2");
+
+      // Remove trailing commas before } or ]
+      repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+
+      try {
+        parsed = JSON.parse(repaired) as ReflectionReport;
+      } catch (repairErr) {
+        // If repair attempt fails, bubble original parsing error for logging
+        throw repairErr;
+      }
+    }
 
     // Validate top-level structure
     if (

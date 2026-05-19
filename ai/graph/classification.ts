@@ -62,6 +62,7 @@ const KNOWN_INTENTS = new Set([
 
 const KNOWN_TOOL_USAGE = new Set([
   "web_search",
+  "weather",
   "calculator",
   "datetime",
   "memory_lookup",

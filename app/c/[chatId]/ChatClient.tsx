@@ -79,6 +79,11 @@ const MODEL_OPTIONS: ModelOption[] = [
   },
 ];
 
+const DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
+const DEFAULT_MODEL_OPTION =
+  MODEL_OPTIONS.find((option) => option.id === DEFAULT_MODEL_ID) ||
+  MODEL_OPTIONS[0];
+
 const CODING_MODEL_OPTION =
   MODEL_OPTIONS.find((option) => option.id === "meta-llama/llama-3.3-70b-instruct:free") ||
   MODEL_OPTIONS.find((option) => option.provider === "openrouter") ||
@@ -351,7 +356,7 @@ export function ChatClient({
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState(
-    MODEL_OPTIONS[0]?.id ?? "claude-3-5-sonnet",
+    DEFAULT_MODEL_OPTION?.id ?? "claude-3-5-sonnet",
   );
   const {
     selectedOptions: selectedOptionIds,
@@ -371,8 +376,8 @@ export function ChatClient({
 
   const selectedModel =
     MODEL_OPTIONS.find((model) => model.id === selectedModelId) ??
-    MODEL_OPTIONS[0];
-  const initialDefaultModelId = MODEL_OPTIONS[0].id;
+    DEFAULT_MODEL_OPTION;
+  const initialDefaultModelId = DEFAULT_MODEL_OPTION.id;
   const isUsingAppDefaultModel = selectedModelId === initialDefaultModelId;
 
   // Use OpenRouter for coding only when the user didn't explicitly pick another model.

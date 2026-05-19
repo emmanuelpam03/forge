@@ -439,6 +439,16 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.persona": resolvedPersonaRole,
       },
     },
+    // --- Inject Visual Context Tool prompt for imageSearch autonomy ---
+    {
+      id: "visual-context-tool",
+      layer: "task",
+      priority: 83,
+      content: require("@/ai/prompts/promptRegistry").getVisualContextToolPrompt(),
+      directives: {
+        "tools.visual-context": "image-search-autonomy",
+      },
+    },
     {
       id: "tools-policy",
       layer: "task",

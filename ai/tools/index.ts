@@ -8,6 +8,7 @@ import {
   projectContextLookupTool,
   summarizeTextTool,
   webSearchToolAsync,
+  weatherToolAsync,
   imageSearchToolAsync,
 } from "@/ai/tools/implementations";
 
@@ -18,6 +19,10 @@ export const calculatorToolSchema = z.object({
 export const webSearchToolSchema = z.object({
   query: z.string().min(1),
   maxResults: z.number().int().min(1).max(10).optional(),
+});
+
+export const weatherToolSchema = z.object({
+  location: z.string().min(1),
 });
 
 export const datetimeToolSchema = z.object({
@@ -112,6 +117,16 @@ export function createForgeTools(
       schema: webSearchToolSchema,
       func: async ({ query, maxResults }) => {
         const result = await webSearchToolAsync(query, maxResults ?? 5);
+        return formatToolOutput(result);
+      },
+    }),
+    new DynamicStructuredTool({
+      name: "weather",
+      description:
+        "Get the current weather for a specific location. Uses Open-Meteo and does not require an API key.",
+      schema: weatherToolSchema,
+      func: async ({ location }) => {
+        const result = await weatherToolAsync(location);
         return formatToolOutput(result);
       },
     }),

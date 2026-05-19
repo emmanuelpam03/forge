@@ -25,6 +25,7 @@ export async function unsplashSearch(query: string, count: number = 6): Promise<
     if (!res.ok) return [];
     const payload = await res.json();
     const results = payload.results || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const imgs: ProviderImage[] = results.map((r: any) => ({
       id: r.id,
       url: r.urls?.regular || r.urls?.full || r.urls?.raw,
@@ -41,7 +42,7 @@ export async function unsplashSearch(query: string, count: number = 6): Promise<
     } catch {}
 
     return imgs.slice(0, count);
-  } catch (err) {
+  } catch (_err) {
     return [];
   }
 }

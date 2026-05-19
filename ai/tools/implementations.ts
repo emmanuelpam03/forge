@@ -1,9 +1,8 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
-import type { ImageSearchInput, ImageSearchResult, RetrievedImage, ProviderImage } from "./image-types";
+import type { ImageSearchInput, ImageSearchResult, ProviderImage } from "./image-types";
 import { serpapiImageSearch } from "./providers/serpapi";
-import { unsplashSearch } from "./providers/unsplash";
 import { pexelsSearch } from "./providers/pexels";
 import { rankImages } from "@/ai/services/image-ranking";
 import { assessSafety } from "@/ai/services/image-safety";
@@ -348,37 +347,7 @@ export function datetimeTool(action: DateTimeAction = "now"): ToolResult {
  * Detect if a query is asking for current/dynamic information
  * Examples: president, stock price, bitcoin, latest, current, today, now, weather
  */
-function isCurrentInfoQuery(text: string): boolean {
-  const dynamicPatterns = [
-    /\b(who|what|current|latest|today|now|recent|trending|president|stock|price|btc|crypto|weather|news|release|earnings|rank|top|best)\b/i,
-  ];
-  return dynamicPatterns.some((p) => p.test(text));
-}
 
-/**
- * Qualify query for freshness: auto-add year/month for time-sensitive queries
- * Example: "president" → "president of the US 2025"
- */
-function qualifyQueryForFreshness(originalQuery: string): string {
-  if (!isCurrentInfoQuery(originalQuery)) {
-    return originalQuery;
-  }
-
-  // Add year context if not already present
-  const year = new Date().getFullYear();
-  if (!originalQuery.toLowerCase().includes(String(year))) {
-    // For president/leader questions, add location + year
-    if (/president|leader|prime minister|governor/i.test(originalQuery)) {
-      return `${originalQuery} ${year}`;
-    }
-    // For price/market questions, add "today" or current year
-    if (/price|market|cost|value|rate/i.test(originalQuery)) {
-      return `${originalQuery} today`;
-    }
-  }
-
-  return originalQuery;
-}
 
 /**
  * Web Search tool: Stub implementation for Phase 2
@@ -487,9 +456,198 @@ export async function webSearchToolAsync(
   }
 }
 
+function describeWeatherCode(code: number, isDay: boolean): string {
+  const suffix = isDay ? "" : " at night";
+
+  switch (code) {
+    case 0:
+      return `clear sky${suffix}`;
+    case 1:
+      return `mainly clear${suffix}`;
+    case 2:
+      return `partly cloudy${suffix}`;
+    case 3:
+      return `overcast${suffix}`;
+    case 45:
+    case 48:
+      return `foggy${suffix}`;
+    case 51:
+    case 53:
+    case 55:
+      return `light drizzle${suffix}`;
+    case 56:
+    case 57:
+      return `freezing drizzle${suffix}`;
+    case 61:
+    case 63:
+    case 65:
+      return `rainy${suffix}`;
+    case 66:
+    case 67:
+      return `freezing rain${suffix}`;
+    case 71:
+    case 73:
+    case 75:
+    case 77:
+      return `snowing${suffix}`;
+    case 80:
+    case 81:
+    case 82:
+      return `rain showers${suffix}`;
+    case 85:
+    case 86:
+      return `snow showers${suffix}`;
+    case 95:
+      return `thunderstorms${suffix}`;
+    case 96:
+    case 99:
+      return `thunderstorms with hail${suffix}`;
+    default:
+      return `weather code ${code}${suffix}`;
+  }
+}
+
+export async function weatherToolAsync(location: string): Promise<ToolResult> {
+  const query = location.trim();
+  if (!query) {
+    return {
+      success: false,
+      result: "",
+      error: "Location cannot be empty",
+    };
+  }
+
+  try {
+    const geocodeUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+    geocodeUrl.search = new URLSearchParams({
+      name: query,
+      count: "1",
+      language: "en",
+      format: "json",
+    }).toString();
+
+    const geocodeResponse = await fetch(geocodeUrl);
+    if (!geocodeResponse.ok) {
+      return {
+        success: false,
+        result: "",
+        error: `Weather geocoding failed (${geocodeResponse.status})`,
+      };
+    }
+
+    const geocodePayload = (await geocodeResponse.json()) as {
+      results?: Array<{
+        name?: string;
+        country?: string;
+        admin1?: string;
+        latitude?: number;
+        longitude?: number;
+      }>;
+    };
+
+    const place = geocodePayload.results?.[0];
+    if (
+      !place ||
+      typeof place.latitude !== "number" ||
+      typeof place.longitude !== "number"
+    ) {
+      return {
+        success: false,
+        result: "",
+        error: `Could not find a weather location for "${query}". Try a more specific place name.`,
+      };
+    }
+
+    const forecastUrl = new URL("https://api.open-meteo.com/v1/forecast");
+    forecastUrl.search = new URLSearchParams({
+      latitude: String(place.latitude),
+      longitude: String(place.longitude),
+      current_weather: "true",
+      timezone: "auto",
+      forecast_days: "1",
+    }).toString();
+
+    const forecastResponse = await fetch(forecastUrl);
+    if (!forecastResponse.ok) {
+      return {
+        success: false,
+        result: "",
+        error: `Weather forecast failed (${forecastResponse.status})`,
+      };
+    }
+
+    const forecastPayload = (await forecastResponse.json()) as {
+      current_weather?: {
+        temperature?: number;
+        windspeed?: number;
+        winddirection?: number;
+        weathercode?: number;
+        is_day?: 0 | 1;
+        time?: string;
+      };
+    };
+
+    const current = forecastPayload.current_weather;
+    if (!current) {
+      return {
+        success: false,
+        result: "",
+        error: `No current weather data returned for "${query}".`,
+      };
+    }
+
+    const placeLabel = [place.name, place.admin1, place.country]
+      .filter(Boolean)
+      .join(", ");
+    const condition = describeWeatherCode(
+      current.weathercode ?? -1,
+      current.is_day === 1,
+    );
+
+    return {
+      success: true,
+      result: [
+        `Current weather for ${placeLabel || query}:`,
+        `Temperature: ${current.temperature ?? "unknown"}°C`,
+        `Condition: ${condition}`, 
+        `Wind: ${current.windspeed ?? "unknown"} km/h`,
+        current.time ? `Observed at: ${current.time}` : null,
+        "Source: Open-Meteo",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      metadata: {
+        provider: "open-meteo",
+        location: placeLabel || query,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      result: "",
+      error: `Weather lookup failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Deprecated helpers: routing and freshness qualification should be
+ * handled by the planner/model. Keep minimal stubs to avoid accidental
+ * usage elsewhere.
+ */
+function isCurrentInfoQuery(_text: string): boolean {
+  // Planner-driven routing should decide if a query requires fresh info.
+  return false;
+}
+
+function qualifyQueryForFreshness(originalQuery: string): string {
+  // No-op: planner/tool args should provide any necessary temporal context.
+  return originalQuery;
+}
+
 /**
  * Image search tool: provider-agnostic image retrieval.
- * Currently uses a Wikimedia Commons adapter as a free provider.
+ * Queries multiple providers and aggregates ranked, safety-filtered results.
  */
 export async function imageSearchToolAsync(
   input: ImageSearchInput,
@@ -503,10 +661,9 @@ export async function imageSearchToolAsync(
   const start = Date.now();
 
   try {
-    // Query available providers in parallel (Wikimedia always available; Google/Unsplash used if keys present)
+    // Query available providers in parallel (SerpAPI, Pexels)
     const providerPromises = [
       serpapiImageSearch(query, count),
-      unsplashSearch(query, count),
       pexelsSearch(query, count),
     ];
 
@@ -534,6 +691,16 @@ export async function imageSearchToolAsync(
       totalFound: images.length,
       retrievalTimeMs: Date.now() - start,
     };
+    // If no images were found, surface a helpful error so the assistant can
+    // explain why images aren't available (e.g., missing API keys or no results).
+    if (!images || images.length === 0) {
+      return {
+        success: false,
+        result: "",
+        error:
+          "No images found. Check provider configuration (SERPAPI_API_KEY, PEXELS_API_KEY, UNSPLASH_ACCESS_KEY) or try a different query.",
+      };
+    }
 
     return {
       success: true,
@@ -885,39 +1052,21 @@ export async function projectContextLookupTool(
  * Execute tool by intent and return result
  */
 export async function executeToolByIntent(
-  intent: string,
-  userMessage: string,
+  _intent: string,
+  _userMessage: string,
 ): Promise<{ toolsRun: string[]; toolResults: Record<string, ToolResult> }> {
-  const toolResults: Record<string, ToolResult> = {};
-  const toolsRun: string[] = [];
+  // Legacy heuristic routing removed.
+  // Tool execution must be driven by the planner using structured
+  // `tool_usage` produced by the intent classifier. Return a clear
+  // indicator so callers know to use the planner path.
+  const toolResults: Record<string, ToolResult> = {
+    planner_required: {
+      success: false,
+      result: "",
+      error:
+        "Legacy executeToolByIntent heuristics removed. Use planner-driven tool routing with structured tool_usage.",
+    },
+  };
 
-  if (intent === "calculation") {
-    const result = calculatorTool(userMessage);
-    toolResults.calculator = result;
-    toolsRun.push("calculator");
-  } else if (intent === "datetime-query") {
-    // Try to infer the action from the message
-    const action: DateTimeAction = userMessage.toLowerCase().includes("time")
-      ? "time"
-      : userMessage.toLowerCase().includes("date")
-        ? "date"
-        : userMessage.toLowerCase().includes("timezone")
-          ? "timezone"
-          : "now";
-
-    const result = datetimeTool(action);
-    toolResults.datetime = result;
-    toolsRun.push("datetime");
-  } else if (intent === "information-search") {
-    // Extract query from message (remove common search phrases)
-    const query = userMessage
-      .replace(/^(search for|find|look up|search)\s+/i, "")
-      .trim();
-
-    const result = await webSearchToolAsync(query);
-    toolResults.websearch = result;
-    toolsRun.push("websearch");
-  }
-
-  return { toolsRun, toolResults };
+  return { toolsRun: [], toolResults };
 }

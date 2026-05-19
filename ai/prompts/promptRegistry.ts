@@ -2,6 +2,7 @@ import { SYSTEM_PROMPT } from "./system.prompt.ts";
 import { SAFETY_PROMPT } from "./safety.prompt.ts";
 import { CLASSIFIER_PROMPT } from "./classifier.prompt.ts";
 import { TOOLS_PROMPT } from "./tools.prompt.ts";
+import { VISUAL_CONTEXT_TOOL_PROMPT } from "./visual-context-tool.prompt.ts";
 import { FORMATTER_PROMPT, buildFormatterPrompt } from "./formatter.prompt.ts";
 import { CODING_PROMPT } from "./coding.prompt.ts";
 import { REASONING_PROMPT } from "./reasoning.prompt.ts";
@@ -105,6 +106,13 @@ const UTILITY_PROMPTS = {
     version: "2.0.0",
     content: TOOLS_PROMPT,
   },
+  visualContextTool: {
+    id: "utility.visual-context-tool.v1",
+    layer: "utility",
+    version: "1.0.0",
+    content: VISUAL_CONTEXT_TOOL_PROMPT,
+    tags: ["image-search", "visual-retrieval", "subsystem"],
+  },
   selfImprove: {
     id: "utility.self-improve.v1",
     layer: "utility",
@@ -181,6 +189,10 @@ export function getToolsPrompt(): string {
   return UTILITY_PROMPTS.tools.content;
 }
 
+export function getVisualContextToolPrompt(): string {
+  return UTILITY_PROMPTS.visualContextTool.content;
+}
+
 export function getReflectionPrompt(): string {
   return UTILITY_PROMPTS.reflection.content;
 }
@@ -190,6 +202,7 @@ export const PROMPTS = {
   safety: getSafetyPrompt(),
   classifier: UTILITY_PROMPTS.classifier.content,
   tools: getToolsPrompt(),
+  visualContextTool: getVisualContextToolPrompt(),
   formatter: getFormatterPrompt(),
   humanization: getHumanizationPrompt(),
   reflection: getReflectionPrompt(),

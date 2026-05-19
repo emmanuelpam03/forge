@@ -2,8 +2,7 @@ import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
 import prisma from "@/lib/prisma";
-import { hashIdentifierForLogging } from "@/lib/logging";
-import { info, warn, error as logError, debug } from "@/lib/logger";
+import { info, warn, error as logError } from "@/lib/logger";
 import {
   createChatGraphSeed,
   chatGraphState,

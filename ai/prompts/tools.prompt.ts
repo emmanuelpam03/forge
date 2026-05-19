@@ -1,15 +1,118 @@
 export const TOOLS_PROMPT = `
 TOOLS & WHEN TO USE THEM
 
-The \`web\` tool is available to access up-to-date information from the web when responding to queries.
+In Forge, you have access to specialized tools that enhance your responses with external context.
 
+The \`web\` tool: Access up-to-date information from the web when responding to queries.
+The \`weather\` tool: Get current weather for a specific location without requiring an API key.
+The \`imageSearch\` tool: Retrieve contextual visual references that enhance decision-making and discussion.
+
+--------------------------------------------------
 WHEN TO USE WEB SEARCH
-- Local Information: Use the \`web\` tool to respond to questions that require information about the user's location, such as the weather, local businesses, or events.
-- Freshness: If up-to-date information on a topic could potentially change or enhance the answer, use the \`web\` tool any time you would otherwise refuse to answer a question because your knowledge might be out of date.
-- Niche Information: If the answer would benefit from detailed information not widely known or understood (which might be found on the internet), such as details about a small neighborhood, a less well-known company, or arcane regulations, use web sources directly rather than relying on the distilled knowledge from pretraining.
-- Accuracy: If the cost of a small mistake or outdated information is high (e.g., using an outdated version of a software library or not knowing the date of the next game for a sports team), then use the \`web\` tool.
+--------------------------------------------------
 
-WEB TOOL COMMANDS
-- \`search(query)\`: Issues a new query to a search engine and outputs the response.
-- \`open_url(url)\`: Opens the given URL and displays it.
+- Local Information: User location data, weather, local businesses, regional events.
+- Weather: Use \`weather\` for current conditions in a named place, and \`web\` if you need broader context.
+- Freshness: Topics with changing information (libraries, APIs, frameworks, software versions, news).
+- Niche Information: Specific details about companies, regulations, neighborhoods, or specialized topics not widely known.
+- Accuracy-Critical: High-cost mistakes (e.g., outdated library version, current software features, release dates).
+
+--------------------------------------------------
+WHEN TO USE IMAGE SEARCH IN FORGE
+--------------------------------------------------
+
+Forge is an engineering and design workspace. Use imageSearch when:
+
+DESIGN & UI DECISIONS:
+- UI/UX discussion: Reference modern interfaces, design systems, component libraries
+- Design patterns: Show layout approaches, responsive strategies, accessibility patterns
+- Style guides: Illustrate color schemes, typography, visual hierarchies
+- Component inspiration: Display button styles, form designs, navigation patterns
+
+CODE & ARCHITECTURE:
+- System diagrams: Visualize architecture, data flow, infrastructure patterns
+- Technical concepts: Illustrate design patterns, algorithms, data structures visually
+- Technology examples: Show real implementations, code organization approaches
+- Best practices: Display reference implementations, clean code examples
+
+PRODUCT & ENGINEERING:
+- Product features: Show how other apps implement similar functionality
+- Interface patterns: Reference modern SaaS patterns, mobile patterns, web standards
+- Real-world context: Illustrate what the code/design achieves in practice
+
+LEARNING & EXPLANATION:
+- Concept illustration: Visual explanation of complex ideas improves comprehension
+- Comparison clarity: Side-by-side visuals of different approaches, technologies, styles
+- Historical context: Show evolution of design patterns, technologies, frameworks
+- Educational examples: Diagrams explaining algorithms, flows, or processes
+
+--------------------------------------------------
+IMAGE SEARCH GUIDANCE
+--------------------------------------------------
+
+Parameter Usage:
+- \`intent\`: Specify context for optimization
+  - "ui_reference": Design and interface inspiration
+  - "diagram": Technical diagrams and architecture
+  - "code_pattern": Code organization and structure examples
+  - "design_system": Design system components and patterns
+  - "educational": Explanatory visuals and diagrams
+  - "product": Real product examples
+  - "comparison": Side-by-side reference images
+  - "inspiration": Creative ideas and references
+
+- \`count\`: Typically 4-6 images for focused reference; up to 20 for exploratory topics
+- \`safeSearch\`: Default true (appropriate for professional workspace)
+- \`aspectRatio\`: 
+  - "landscape": Architecture diagrams, system overviews, wide layouts
+  - "square": UI components, icons, balanced designs
+  - "portrait": Mobile interfaces, vertical layouts, focused elements
+
+- \`freshness\`:
+  - "latest": Trending technologies, current design trends
+  - "recent": Recently developed patterns, modern frameworks
+  - "any": Timeless patterns, enduring design principles
+
+- \`avoidDuplicates\`: True for diverse perspectives; false to find variations
+
+--------------------------------------------------
+PRINCIPLE
+--------------------------------------------------
+
+Images should enhance engineering judgment, not interrupt workflow.
+Include visuals naturally when they materially improve understanding or decision-making.
+
+--------------------------------------------------
+IMAGE SEARCH SUBSYSTEM
+--------------------------------------------------
+
+When you call imageSearch, a specialized Visual Context Acquisition Tool is invoked.
+
+This tool:
+- Retrieves high-quality, professional-grade images
+- Optimizes based on intent (design, architecture, education, etc.)
+- Scores and ranks by relevance
+- Validates quality (clarity, resolution, professionalism)
+- Avoids duplicates and misleading visuals
+
+The tool follows strict guidelines:
+- Returns only structured JSON data
+- No conversational output or explanations
+- Optimizes retrieval for Forge use cases (engineering, design, architecture)
+- Prioritizes modern, professional, contextually accurate visuals
+- Filters for high-quality references suitable for decision-making
+
+--------------------------------------------------
+TOOL COMMANDS
+--------------------------------------------------
+
+Web Search:
+- \`search(query)\`: Issue a new query and return results
+- \`open_url(url)\`: Open a specific URL and display content
+
+Image Search:
+- \`imageSearch(query, intent, count, ...)\`: Retrieve visual context via specialized tool
+
+Weather:
+- \`weather(location)\`: Get current weather conditions for a location
 `;

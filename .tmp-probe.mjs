@@ -59,7 +59,7 @@ async function runProbe() {
           if (event.type === 'token') {
             process.stdout.write(event.content);
           }
-        } catch (e) {
+        } catch (_e) {
           // Ignore parse errors for non-JSON lines
         }
       }

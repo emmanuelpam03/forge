@@ -8,7 +8,7 @@ Rules:
 - difficulty: one of "easy", "medium", "hard".
 - verbosity: one of "concise", "balanced", "detailed".
 - audience_level: one of "beginner", "intermediate", "expert".
-- tool_usage: include only tools that are clearly useful, such as web_search, calculator, datetime, memory_lookup, project_context, code_execution.
+- tool_usage: include only tools that are clearly useful, such as web_search, weather, calculator, datetime, memory_lookup, project_context, code_execution.
 - response_mode: one of "code", "teach", "plan", "analyze", "summarize", "compare", "support", "chat".
 - confidence: one of "high", "medium", "low".
 - memory_relevance: true when prior user preferences, project history, or long-term context should influence the answer.
@@ -23,7 +23,8 @@ const INTENT_ROUTER_EXAMPLES = `Examples:
 - "Help me debug this hook and explain why it breaks" => {"intent":"debugging","difficulty":"medium","verbosity":"balanced","audience_level":"intermediate","tool_usage":["code_execution"],"response_mode":"teach","confidence":"high","memory_relevance":false,"reasoning_depth":"deep","multi_intent":["teaching"]}
 - "Plan a rollout for the new auth flow" => {"intent":"planning","difficulty":"medium","verbosity":"balanced","audience_level":"intermediate","tool_usage":[],"response_mode":"plan","confidence":"high","memory_relevance":true,"reasoning_depth":"standard","multi_intent":[]}
 - "Compare Next.js and Remix for a dashboard" => {"intent":"comparison","difficulty":"medium","verbosity":"detailed","audience_level":"intermediate","tool_usage":["web_search"],"response_mode":"compare","confidence":"high","memory_relevance":false,"reasoning_depth":"deep","multi_intent":["analysis"]}
-- "I feel overwhelmed and need some encouragement" => {"intent":"emotional_support","difficulty":"easy","verbosity":"balanced","audience_level":"general","tool_usage":[],"response_mode":"support","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}`;
+- "I feel overwhelmed and need some encouragement" => {"intent":"emotional_support","difficulty":"easy","verbosity":"balanced","audience_level":"general","tool_usage":[],"response_mode":"support","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}
+- "What's the weather like in Flic en Flac, Mauritius?" => {"intent":"research","difficulty":"easy","verbosity":"balanced","audience_level":"intermediate","tool_usage":["weather"],"response_mode":"analyze","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}`;
 
 const FRESHNESS_CLASSIFICATION_LAYER = `Return JSON ONLY in this exact shape:
 {"intent":"factual|reasoning|code|creative","requiresFreshData":true|false,"confidence":"high|medium|low"}
@@ -44,6 +45,7 @@ Examples:
 - User: "Bitcoin price right now" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
 - User: "Mention some incidents of insecurity in Nigeria this year" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
 - User: "What were the major earthquakes in 2024?" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
+- User: "What's the weather like in Flic en Flac, Mauritius?" => {"intent":"factual","requiresFreshData":true,"confidence":"high"}
 - User: "Explain quantum computing" => {"intent":"reasoning","requiresFreshData":false,"confidence":"high"}
 - User: "Write a React button component" => {"intent":"code","requiresFreshData":false,"confidence":"high"}`;
 

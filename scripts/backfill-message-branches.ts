@@ -7,7 +7,7 @@ const BATCH_SIZE = 250;
 async function backfillMessageBranches() {
   console.log("\n🌿 Backfilling message branch metadata\n");
 
-  const chats = await prisma.chat.findMany({
+  const chats = (await prisma.chat.findMany({
     select: {
       id: true,
       messages: {
@@ -22,7 +22,16 @@ async function backfillMessageBranches() {
       },
     },
     orderBy: { createdAt: "asc" },
-  });
+  })) as unknown as Array<{
+    id: string;
+    messages: Array<{
+      id: string;
+      role: string;
+      parentId: string | null;
+      branchId: string | null;
+      createdAt: Date;
+    }>;
+  }>;
 
   let updatedMessages = 0;
 

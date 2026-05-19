@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+// React default import not required with new JSX transform
 import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 
 export default function SettingsGlobalSeniorToggle() {

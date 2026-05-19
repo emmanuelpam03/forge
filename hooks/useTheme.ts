@@ -15,14 +15,7 @@ function getSystemPreference(): Theme {
     : "light";
 }
 
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-  const stored = localStorage.getItem("theme");
-  if (isValidTheme(stored)) {
-    return stored;
-  }
-  return getSystemPreference();
-}
+// `getInitialTheme` removed — logic consolidated in useEffect to avoid unused symbol
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>("dark");
@@ -33,8 +26,10 @@ export function useTheme() {
       ? stored
       : getSystemPreference();
 
-    setTheme(initialTheme);
-  }, []);
+    if (initialTheme !== theme) {
+      setTheme(initialTheme);
+    }
+  }, [theme]);
 
   // Apply theme to DOM when it changes
   useEffect(() => {
