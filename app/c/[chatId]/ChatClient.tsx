@@ -331,6 +331,7 @@ export function ChatClient({
 }: ChatClientProps) {
   const { showFeedback } = useFeedback();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [chatTitle, setChatTitle] = useState(title);
   const [reasoning, setReasoning] = useState("");
   const [showReasoning, setShowReasoning] = useState(false);
   const [draft, setDraft] = useState("");
@@ -754,7 +755,7 @@ export function ChatClient({
           if (!line) continue;
 
           try {
-            const event = JSON.parse(line) as StreamEvent;
+              const event = JSON.parse(line) as StreamEvent;
 
             if (event.type === "status") {
               // Update transient status on the active assistant placeholder
@@ -765,6 +766,18 @@ export function ChatClient({
                     : m,
                 ),
               );
+            }
+
+            if (event.type === "title") {
+              const newTitle = event.title;
+              setChatTitle(newTitle);
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("chat:title-updated", {
+                    detail: { chatId, title: newTitle },
+                  }),
+                );
+              } catch {}
             }
 
             if (event.type === "reasoning") {
@@ -1050,6 +1063,10 @@ export function ChatClient({
               );
             }
 
+            if (event.type === "title") {
+              setChatTitle(event.title);
+            }
+
             if (event.type === "placeholder") {
               applyPlaceholder(event);
             }
@@ -1326,6 +1343,10 @@ export function ChatClient({
               );
             }
 
+            if (event.type === "title") {
+              setChatTitle(event.title);
+            }
+
               if (event.type === "images") {
                 applyImagesToMessage(
                   activeAssistantMessageId,
@@ -1462,7 +1483,7 @@ export function ChatClient({
             <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
               Chat
             </p>
-            <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+            <h1 className="text-lg font-semibold text-foreground">{chatTitle}</h1>
           </div>
 
           <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">

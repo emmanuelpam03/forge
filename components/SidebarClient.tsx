@@ -466,11 +466,19 @@ export function SidebarClient({
         return [{ id, title }, ...filtered];
       });
     }
+    function handleTitleUpdated(e: CustomEvent) {
+      const { chatId, title } = e.detail;
+      setRecentChats((prev) =>
+        prev.map((c) => (c.id === chatId ? { ...c, title } : c)),
+      );
+    }
     window.addEventListener("chat:created", handleChatCreated as EventListener);
     window.addEventListener("chat:confirmed", handleChatConfirmed as EventListener);
+    window.addEventListener("chat:title-updated", handleTitleUpdated as EventListener);
     return () => {
       window.removeEventListener("chat:created", handleChatCreated as EventListener);
       window.removeEventListener("chat:confirmed", handleChatConfirmed as EventListener);
+      window.removeEventListener("chat:title-updated", handleTitleUpdated as EventListener);
     };
   }, []);
 

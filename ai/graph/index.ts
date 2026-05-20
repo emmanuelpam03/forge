@@ -186,21 +186,32 @@ export async function runChatGraphStream(
   }
 
   // Run non-critical post-processing in background to avoid delaying the
-  // response to clients (title generation and memory extraction).
-  void (async () => {
-    try {
-      const titleResult = await generateTitleNode(state);
-      Object.assign(state, titleResult);
-      if (titleResult.generatedTitle) {
+  // Generate title synchronously so callers (and clients) can receive it
+  // immediately via the stream event. Do memory extraction in background.
+  try {
+    const titleResult = await generateTitleNode(state);
+    Object.assign(state, titleResult);
+    if (titleResult.generatedTitle) {
+      try {
+        // Persist title so metadata is up-to-date for clients that fetch it
         await prisma.chat.update({
           where: { id: state.chatId },
           data: { title: titleResult.generatedTitle },
         });
+      } catch (err) {
+        logError("persist_title_failed", { chatId: input.chatId, error: err });
       }
-      } catch (error) {
-      logError("generate_title_failed", { chatId: input.chatId, error });
-    }
 
+      // Notify the caller (API route) that a title is available so it can
+      // forward it to the client immediately without requiring a refresh.
+      onEvent?.({ type: "title", title: titleResult.generatedTitle });
+    }
+  } catch (error) {
+    logError("generate_title_failed", { chatId: input.chatId, error });
+  }
+
+  // Run memory extraction in background to avoid delaying the response.
+  void (async () => {
     try {
       const memoryResult = await extractMemoryNode(state);
       Object.assign(state, memoryResult);

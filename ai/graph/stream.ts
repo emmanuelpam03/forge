@@ -45,4 +45,5 @@ export type StreamEvent =
       userMessageId?: string;
       response?: string;
       suggestions?: string[];
-    };
+    }
+  | { type: "title"; title: string };
