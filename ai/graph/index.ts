@@ -2,7 +2,7 @@ import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
 import prisma from "@/lib/prisma";
-import { info, warn, error as logError } from "@/lib/logger";
+import { info, error as logError } from "@/lib/logger";
 import {
   createChatGraphSeed,
   chatGraphState,
@@ -22,41 +22,9 @@ import {
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
-  normalizeAssistantResponseText,
 } from "@/ai/graph/nodes";
-import { buildChatMessages } from "@/ai/prompts/router.ts";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
-
-function toTextContent(content: unknown): string {
-  if (typeof content === "string") {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === "string") {
-          return part;
-        }
-
-        if (part && typeof part === "object") {
-          const textPart = part as { text?: string; content?: string };
-          return textPart.text ?? textPart.content ?? "";
-        }
-
-        return "";
-      })
-      .join("")
-      .trim();
-  }
-
-  return "";
-}
-
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
 
 type GraphStateWithDiagnostics = ReturnType<typeof createChatGraphSeed> & {
   __preResponseMs?: number;
@@ -124,8 +92,6 @@ export async function runChatGraphStream(
   onEvent?: (event: StreamEvent) => void,
 ) {
   const state = await runGraphPreResponse(input, onEvent);
-
-  const messages = buildChatMessages(state);
   const startedAt = Date.now();
   info("pre_response_ms", {
     chatId: input.chatId,
@@ -141,34 +107,33 @@ export async function runChatGraphStream(
   let assistantMessage = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let firstTokenAt: number | null = null;
 
   try {
     onEvent?.({ type: "status", message: "Generating response..." });
-    let firstTokenAt: number | null = null;
-    const reflectedMessage = state.assistantMessage?.trim();
 
-    if (reflectedMessage) {
-      const tokens = reflectedMessage.split(/(\s+)/);
-
-      for (const token of tokens) {
-        if (!token) {
-          continue;
-        }
-
-        if (firstTokenAt === null) {
-          firstTokenAt = Date.now();
-          info("first_token_sent", {
-            chatId: input.chatId,
-            runId: input.runId,
-            ttftMs: firstTokenAt - startedAt,
-            reflectionScore: state.reflectionReport?.score ?? null,
-          });
-        }
-
-        assistantMessage += token;
-        onEvent?.({ type: "token", content: token });
+    setGraphStreamEventEmitter((event) => {
+      if (event.type === "token" && firstTokenAt === null) {
+        firstTokenAt = Date.now();
+        info("first_token_sent", {
+          chatId: input.chatId,
+          runId: input.runId,
+          ttftMs: firstTokenAt - startedAt,
+          reflectionScore: state.reflectionReport?.score ?? null,
+        });
       }
-    }
+
+      onEvent?.(event);
+    });
+
+    const generatedResponse = await generateResponseNode({
+      ...state,
+      assistantMessage: "",
+    });
+
+    assistantMessage = generatedResponse.assistantMessage;
+    inputTokens = generatedResponse.inputTokens;
+    outputTokens = generatedResponse.outputTokens;
 
     if (!assistantMessage.trim()) {
       assistantMessage =
@@ -196,26 +161,9 @@ export async function runChatGraphStream(
     });
   } catch (error) {
     throw error;
+  } finally {
+    setGraphStreamEventEmitter(undefined);
   }
-
-  assistantMessage = await normalizeAssistantResponseText(assistantMessage);
-
-  // Stream validation: log if response is empty
-  if (!assistantMessage.trim()) {
-    warn("stream_validation_empty_response", {
-      chatId: input.chatId,
-      intent: state.intent,
-    });
-  }
-
-  outputTokens = estimateTokens(assistantMessage);
-  inputTokens = estimateTokens(
-    messages
-      .map((message) =>
-        toTextContent((message as { content?: unknown }).content),
-      )
-      .join("\n"),
-  );
 
   Object.assign(state, {
     assistantMessage,

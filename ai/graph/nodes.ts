@@ -19,6 +19,11 @@ import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import { info, warn, error as logError } from "@/lib/logger";
 import {
+  consumeModelStream,
+  extractTextFromModelChunk,
+  toTextContent,
+} from "@/ai/graph/stream-consumer";
+import {
   parseClassificationText,
   deriveLegacyIntentFromStructured,
   deriveStructuredFromLegacy,
@@ -29,6 +34,7 @@ import type { ClassifiedIntent } from "@/ai/graph/state";
 import { buildIntentClassificationMessage, buildFreshnessClassificationMessage } from "@/ai/prompts/intent.ts";
 import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import { sanitizeAssistantOutput } from "@/ai/graph/output-sanitizer";
+import { shouldPreserveLongFormDraft } from "@/ai/graph/response-shaping";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { RetrievedImage } from "@/ai/tools/image-types";
@@ -82,8 +88,14 @@ import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 // the minimal surface used by this module: `invoke`, `stream`, and `nativeStream`.
 type ModelInvoker = {
   invoke?: (messages: BaseMessage[] | unknown, opts?: unknown) => Promise<unknown>;
-  stream?: (messages: BaseMessage[]) => AsyncIterable<unknown>;
-  nativeStream?: (messages: BaseMessage[]) => AsyncIterable<unknown>;
+  stream?: (
+    messages: BaseMessage[],
+    opts?: unknown,
+  ) => AsyncIterable<unknown> | PromiseLike<AsyncIterable<unknown>>;
+  nativeStream?: (
+    messages: BaseMessage[],
+    opts?: unknown,
+  ) => AsyncIterable<unknown> | PromiseLike<AsyncIterable<unknown>>;
 };
 
 export function normalizeAssistantResponseText(text: string): string {
@@ -206,21 +218,17 @@ async function generateDraftResponse(state: ChatGraphState): Promise<string> {
     draftText = extractTextFromModelChunk(response);
 
     if (!draftText?.trim()) {
-      if (state.toolContext) {
-        draftText = "Based on the information I found:\n\n" + state.toolContext;
-      } else {
-        draftText =
-          "I encountered an issue generating a response. Please try again or rephrase your question.";
-      }
+      // Do not expose raw tool context as a draft. Use an explicit marker
+      // so the reflection node treats this as an empty/failed draft and
+      // triggers a regeneration attempt instead of leaking tool outputs.
+      draftText = "[DRAFT_EMPTY]";
     }
 
     return normalizeAssistantResponseText(draftText);
   } catch (error) {
     logError("draft_generation_failed", { error });
-    return (
-      state.toolContext ||
-      "I encountered an issue generating a response. Please try again or rephrase your question."
-    );
+    // Return a sterile marker on failure rather than tool context
+    return "[DRAFT_ERROR]";
   }
 }
 
@@ -314,11 +322,9 @@ async function generateDraftResponseWithFeedback(
     );
     const revisedText = extractTextFromModelChunk(response);
 
-    return normalizeAssistantResponseText(
-      revisedText ||
-        state.toolContext ||
-        "I encountered an issue generating a response. Please try again or rephrase your question.",
-    );
+    // Never fall back to raw toolContext here; return empty string to indicate
+    // the revision did not produce usable text so higher-level logic can handle it.
+    return normalizeAssistantResponseText(revisedText || "");
   } catch (error) {
     logError("response_revision_failed", { error });
     // Return original draft if revision fails
@@ -333,6 +339,7 @@ async function generateDraftResponseWithFeedback(
  */
 export async function reflectionNode(state: ChatGraphState) {
   const startedAt = Date.now();
+  const preserveLongFormDraft = shouldPreserveLongFormDraft(state.userMessage);
 
   // Generate initial draft (non-streaming)
   let draftResponse = state.draftResponse;
@@ -342,7 +349,15 @@ export async function reflectionNode(state: ChatGraphState) {
   }
 
   // Analyze quality
-  const report = await analyzeResponseQuality(draftResponse, state.userMessage);
+  let report = await analyzeResponseQuality(draftResponse, state.userMessage);
+
+  if (preserveLongFormDraft && draftResponse.trim().length > 0) {
+    report = {
+      ...report,
+      suggestRevision: false,
+      revisionFocus: undefined,
+    };
+  }
 
   info("reflection_analysis", {
     chatId: state.chatId,
@@ -594,32 +609,6 @@ function buildToolArgs(
   return {};
 }
 
-function toTextContent(content: unknown): string {
-  if (typeof content === "string") {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === "string") {
-          return part;
-        }
-
-        if (part && typeof part === "object") {
-          const textPart = part as { text?: string; content?: string };
-          return textPart.text ?? textPart.content ?? "";
-        }
-
-        return "";
-      })
-      .join("")
-      .trim();
-  }
-
-  return "";
-}
-
 function estimateTokens(text: string): number {
   return Math.ceil((text?.length ?? 0) / 4);
 }
@@ -773,18 +762,9 @@ export async function generateResponseNode(state: ChatGraphState) {
     if (!invoker.stream) {
       throw new Error("DeepSeek model missing stream implementation");
     }
-    const tokenStream = invoker.stream(messages as BaseMessage[]);
 
     let firstTokenAt: number | null = null;
-    for await (const token of tokenStream) {
-      let chunkText = "";
-      if (typeof token === "string") {
-        chunkText = token;
-      } else if (token && typeof token === "object") {
-        const chunk = token as { content?: string; text?: string; [key: string]: unknown };
-        chunkText = chunk.content || chunk.text || "";
-      }
-
+    await consumeModelStream(invoker.stream(messages as BaseMessage[]), (chunkText) => {
       if (firstTokenAt === null) {
         firstTokenAt = Date.now();
         info("first_token_sent_generate", {
@@ -803,7 +783,7 @@ export async function generateResponseNode(state: ChatGraphState) {
 
       // Forward the (possibly prefixed) emitted chunk to stream listeners
       graphStreamEventEmitter?.({ type: "token", content: emitted });
-    }
+    });
 
     const endedAt = Date.now();
     info("stream_closed_generate", {
@@ -829,16 +809,20 @@ export async function generateResponseNode(state: ChatGraphState) {
     });
   }
 
-  // If response is empty but we have tool evidence, use it as fallback
-  if (!assistantMessage && state.toolContext) {
-    assistantMessage =
-      "Based on the information I found:\n\n" + state.toolContext;
-  }
-
-  // If response still empty after all fallbacks, use explicit message
+  // Never expose raw tool outputs directly to the user. If the model failed
+  // to produce content, return a safe, assistant-composed fallback message
+  // that invites the user to retry or request a summary.
   if (!assistantMessage) {
+    logError("null_model_content", {
+      message: `[CRITICAL] Model returned null/undefined content.`,
+      chatId: state.chatId,
+      intent: state.intent,
+      runId: state.runId,
+    });
+
     assistantMessage =
-      "I encountered an issue generating a response. Please try again or rephrase your question.";
+      "I wasn't able to generate a full answer right now. I can try again or summarize the findings if you'd like.";
+
     logError("empty_response", {
       chatId: state.chatId,
       runId: state.runId,
@@ -887,11 +871,11 @@ export function testResolveToolPlan(
   toolUsage: string[] = [],
   selectedOptions: string[] = [],
 ) {
-  const state: Record<string, unknown> = {
+  const state = {
     userMessage,
     structuredIntent: { toolUsage },
     selectedOptions,
-  };
+  } as unknown as ChatGraphState;
 
   // Force query intent to real_time to allow inferred tools when needed.
   const queryIntent: QueryIntentClassification = { needsTools: true, type: "real_time" };
@@ -1364,6 +1348,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
     const classificationPrompt = buildIntentClassificationMessage(
       state.userMessage,
     );
+    const preserveLongFormDraft = shouldPreserveLongFormDraft(state.userMessage);
 
     let classifiedIntent = null;
     let structuredIntent = null;
@@ -1456,6 +1441,18 @@ export async function classifyIntentNode(state: ChatGraphState) {
         }
       : state.promptBehavior;
 
+    if (preserveLongFormDraft) {
+      promptBehavior = {
+        ...(promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
+        responseMode: "creative",
+        verbosity: "detailed",
+        audience: "general",
+        teachingDepth: "standard",
+        formatting: "auto",
+        persona: requestedPersona,
+      };
+    }
+
     const forceSeniorEngineeringFromCoding = (
       state.selectedOptions ?? []
     ).includes("coding");
@@ -1535,23 +1532,28 @@ export async function classifyIntentNode(state: ChatGraphState) {
  */
 export async function generateTitleNode(state: ChatGraphState) {
   try {
-    // Only generate title if chat has no messages (first exchange)
-    if (state.previousMessages.length > 0) {
-      return {
-        generatedTitle: "",
-      };
+    // Generate a context-aware title. Include any available conversation
+    // context (project context, memory summary, chat summary) so the model
+    // can prefer contextually-relevant titles over single-turn phrasing.
+    const model = createGeminiModel();
+    let prompt = TITLE_GENERATION_PROMPT.replace(/"{USER_MESSAGE}"/g, state.userMessage).replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage);
+
+    const contextParts: string[] = [];
+    if (state.selectedContext?.projectContext) {
+      contextParts.push(`Project context: ${toTextContent(state.selectedContext.projectContext)}`);
+    }
+    if (state.selectedContext?.chatSummary) {
+      contextParts.push(`Chat summary: ${toTextContent(state.selectedContext.chatSummary)}`);
+    }
+    if (state.memorySummary) {
+      contextParts.push(`Relevant memory: ${toTextContent(state.memorySummary)}`);
     }
 
-    const model = createGeminiModel();
-    const prompt = TITLE_GENERATION_PROMPT.replace(
-      /"{USER_MESSAGE}"/g,
-      state.userMessage,
-    ).replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage);
+    if (contextParts.length > 0) {
+      prompt += `\n\nContext:\n${contextParts.join("\n\n")}\n\nUse this context when creating a concise, descriptive title.`;
+    }
 
-    const response = await model.invoke(
-      [new HumanMessage(prompt)],
-      buildLangSmithRunConfig(state, "title-generation"),
-    );
+    const response = await model.invoke([new HumanMessage(prompt)], buildLangSmithRunConfig(state, "title-generation"));
     const generatedTitle = toTextContent(response.content)
       .toLowerCase()
       .trim()

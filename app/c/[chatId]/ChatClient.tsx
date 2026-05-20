@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -757,6 +756,17 @@ export function ChatClient({
           try {
             const event = JSON.parse(line) as StreamEvent;
 
+            if (event.type === "status") {
+              // Update transient status on the active assistant placeholder
+              setMessages((currentMessages) =>
+                currentMessages.map((m) =>
+                  m.id === activeAssistantMessageId
+                    ? { ...m, status: event.message }
+                    : m,
+                ),
+              );
+            }
+
             if (event.type === "reasoning") {
               applyReasoning(event.content);
             }
@@ -1030,6 +1040,16 @@ export function ChatClient({
           try {
             const event = JSON.parse(line) as StreamEvent;
 
+            if (event.type === "status") {
+              setMessages((currentMessages) =>
+                currentMessages.map((m) =>
+                  m.id === activeAssistantMessageId
+                    ? { ...m, status: event.message }
+                    : m,
+                ),
+              );
+            }
+
             if (event.type === "placeholder") {
               applyPlaceholder(event);
             }
@@ -1296,6 +1316,16 @@ export function ChatClient({
             try {
               const event = JSON.parse(line) as StreamEvent;
 
+            if (event.type === "status") {
+              setMessages((currentMessages) =>
+                currentMessages.map((m) =>
+                  m.id === activeAssistantMessageId
+                    ? { ...m, status: event.message }
+                    : m,
+                ),
+              );
+            }
+
               if (event.type === "images") {
                 applyImagesToMessage(
                   activeAssistantMessageId,
@@ -1443,7 +1473,7 @@ export function ChatClient({
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-40">
-        <div className="mx-auto w-full max-w-[52rem] space-y-4">
+        <div className="mx-auto w-full max-w-208 space-y-4">
           {!hasMessages ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <MessageSquare size={32} className="mb-3 text-muted-foreground" />
@@ -1516,7 +1546,7 @@ export function ChatClient({
       </div>
 
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
-        <div className="mx-auto w-full max-w-[52rem] px-6 pointer-events-auto">
+        <div className="mx-auto w-full max-w-208 px-6 pointer-events-auto">
           <div className="relative rounded-full border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
               <div className="relative col-start-1 row-start-1 self-center">
@@ -1533,7 +1563,7 @@ export function ChatClient({
 
                 <div
                   ref={modelMenuRef}
-                  className={`absolute bottom-full left-0 mb-3 z-50 w-[12rem] overflow-hidden rounded-xl border border-border bg-popover shadow-lg transition-opacity ${isModelMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                  className={`absolute bottom-full left-0 mb-3 z-50 w-48 overflow-hidden rounded-xl border border-border bg-popover shadow-lg transition-opacity ${isModelMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
                 >
                   <div className="p-2">
                     {MODEL_OPTIONS.map((option) => (

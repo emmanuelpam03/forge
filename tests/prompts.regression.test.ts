@@ -9,6 +9,7 @@ import {
   buildIntentClassificationMessage,
 } from "../ai/prompts/intent.ts";
 import { PROMPTS } from "../ai/prompts/promptRegistry.ts";
+import { shouldPreserveLongFormDraft } from "../ai/graph/response-shaping.ts";
 
 function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -209,6 +210,38 @@ test("router wires explicit-only humanization prompt activation", () => {
   assert.match(source, /layer: "humanization"/);
   assert.match(source, /enabled: humanizationEnabled/);
   assert.match(source, /response\.humanization/);
+});
+
+test("long-form writing requests preserve the generated draft", () => {
+  assert.equal(
+    shouldPreserveLongFormDraft("Write an essay on the problems of our leaders today"),
+    true,
+  );
+  assert.equal(
+    shouldPreserveLongFormDraft("Draft an article about civic leadership"),
+    true,
+  );
+  assert.equal(
+    shouldPreserveLongFormDraft("Summarize this article"),
+    true,
+  );
+  assert.equal(shouldPreserveLongFormDraft("Help me debug this hook"), false);
+});
+
+test("classify node forces long-form writing into creative mode", () => {
+  const source = readWorkspaceFile("ai/graph/nodes.ts");
+
+  assert.match(source, /shouldPreserveLongFormDraft\(state\.userMessage\)/);
+  assert.match(source, /responseMode: "creative"/);
+  assert.match(source, /verbosity: "detailed"/);
+});
+
+test("streaming path uses the actual generation node output", () => {
+  const source = readWorkspaceFile("ai/graph/index.ts");
+
+  assert.match(source, /generateResponseNode\(/);
+  assert.match(source, /assistantMessage:\s*""/);
+  assert.doesNotMatch(source, /const reflectedMessage = state\.assistantMessage\?\.trim\(\)/);
 });
 
 test("nodes apply sanitizer only for explicit humanization mode", () => {
