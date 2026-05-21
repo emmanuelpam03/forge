@@ -32,3 +32,11 @@ test("smoke: sanitizer cleans up drafting artifacts when humanize is used", () =
   assert.ok(!cleaned.includes("Check:"));
   assert.ok(cleaned.includes("This is the actual answer."));
 });
+
+test("smoke: sanitizer unwraps single-asterisk emphasis and removes stray asterisks", () => {
+  const raw = "This looks biased: *Prejudice* and some stray * stars.";
+  const cleaned = sanitizeAssistantOutput(raw);
+
+  assert.ok(!cleaned.includes("*"));
+  assert.ok(cleaned.trim().length > 0);
+});

@@ -1,6 +1,7 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
+import fetchWithTimeout from "@/lib/fetchWithTimeout";
 import type { ImageSearchInput, ImageSearchResult, ProviderImage } from "./image-types";
 import { serpapiImageSearch } from "./providers/serpapi";
 import { pexelsSearch } from "./providers/pexels";
@@ -556,7 +557,7 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
         units: "metric",
       }).toString();
 
-      const owResp = await fetch(owUrl);
+      const owResp = await fetchWithTimeout(owUrl.toString());
       if (!owResp.ok) {
         const errText = await owResp.text().catch(() => "");
         return {
@@ -611,7 +612,7 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
     }).toString();
 
     let geocodePayload: any = {};
-    let geocodeResponse = await fetch(geocodeUrl).catch(() => null);
+    let geocodeResponse = await fetchWithTimeout(geocodeUrl.toString()).catch(() => null);
     if (geocodeResponse && geocodeResponse.ok) {
       geocodePayload = await geocodeResponse.json().catch(() => ({}));
     }
@@ -628,7 +629,7 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
           addressdetails: "0",
         }).toString();
 
-        const nomResp = await fetch(nominatim, {
+        const nomResp = await fetchWithTimeout(nominatim.toString(), {
           headers: { "User-Agent": "forge/1.0 (contact@example.com)" },
         }).catch(() => null);
         if (nomResp && nomResp.ok) {
@@ -669,7 +670,7 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
       forecast_days: "1",
     }).toString();
 
-    const forecastResponse = await fetch(forecastUrl);
+    const forecastResponse = await fetchWithTimeout(forecastUrl.toString());
     if (!forecastResponse.ok) {
       return {
         success: false,

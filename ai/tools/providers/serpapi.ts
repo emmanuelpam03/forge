@@ -1,5 +1,6 @@
 import type { ProviderImage } from "../image-types";
 import { cacheGet, cacheSet } from "@/lib/redis";
+import fetchWithTimeout from "@/lib/fetchWithTimeout";
 
 const SERPAPI_BASE = "https://serpapi.com/search";
 
@@ -27,7 +28,7 @@ export async function serpapiImageSearch(query: string, count: number = 6): Prom
   const url = `${SERPAPI_BASE}?${params.toString()}`;
 
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return [];
     const payload = await res.json();
     const items = payload.images_results || payload.image_results || [];

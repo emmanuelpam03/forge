@@ -15,6 +15,7 @@ import {
   getSafetyPrompt,
   getTaskPrompt,
   getToolsPrompt,
+  getVisualContextToolPrompt,
 } from "@/ai/prompts/promptRegistry";
 import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
 import {
@@ -27,6 +28,7 @@ import {
   type VerbosityLevel,
 } from "@/ai/prompts/control.types";
 import { buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
+import { info } from "@/lib/logger";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 import { SELECTED_OPTION_LABELS } from "@/ai/selected-options";
@@ -444,7 +446,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       id: "visual-context-tool",
       layer: "task",
       priority: 83,
-      content: require("@/ai/prompts/promptRegistry").getVisualContextToolPrompt(),
+      content: getVisualContextToolPrompt(),
       directives: {
         "tools.visual-context": "image-search-autonomy",
       },
@@ -528,26 +530,23 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
       ? "coding"
       : state.taskCategory;
 
-  console.info(
-    JSON.stringify({
-      event: "promptComposition.summary",
-      runId: state.runId,
-      chatId: state.chatId,
-      selectedSegments: composition.diagnostics.selectedSegmentIds,
-      skippedSegments: composition.diagnostics.skippedSegmentIds,
-      conflicts: composition.diagnostics.conflicts,
-      resolvedDirectiveCount: composition.diagnostics.resolvedDirectiveCount,
-      behaviorControls,
-      effectiveTaskCategory,
-      precedence: [
-        "System Prompt",
-        "Safety",
-        "Task Prompt",
-        "Runtime Context",
-        "User Input",
-      ],
-    }),
-  );
+  info("prompt_composition_summary", {
+    runId: state.runId,
+    chatId: state.chatId,
+    selectedSegments: composition.diagnostics.selectedSegmentIds,
+    skippedSegments: composition.diagnostics.skippedSegmentIds,
+    conflicts: composition.diagnostics.conflicts,
+    resolvedDirectiveCount: composition.diagnostics.resolvedDirectiveCount,
+    behaviorControls,
+    effectiveTaskCategory,
+    precedence: [
+      "System Prompt",
+      "Safety",
+      "Task Prompt",
+      "Runtime Context",
+      "User Input",
+    ],
+  });
 
   return [
     new SystemMessage(composition.prompt),

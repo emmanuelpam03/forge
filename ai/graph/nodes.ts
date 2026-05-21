@@ -1,23 +1,23 @@
 import "server-only";
 
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
-import prisma from "@/lib/prisma";
 import {
   createGeminiModel,
   getChatModelConfig,
   type ModelOverride,
 } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router.ts";
-import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { MEMORY_EXTRACTION_PROMPT } from "@/ai/prompts/memory";
 import {
-  loadContextForChat,
-  maintainChatSummary,
+  loadContextFastPath,
+  enrichContextInBackground,
   updateUserMemory,
 } from "@/ai/context/engine";
+import { queueJob, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
-import { info, warn, error as logError } from "@/lib/logger";
+import { info, warn, error as logError, debug } from "@/lib/logger";
+import { startTimer, endTimer } from "@/lib/metrics";
 import {
   consumeModelStream,
   extractTextFromModelChunk,
@@ -197,6 +197,7 @@ function buildLangSmithRunConfig(
  * Returns just the text without token emission
  */
 async function generateDraftResponse(state: ChatGraphState): Promise<string> {
+  const draftTimer = startTimer("generateDraftResponse", { chatId: state.chatId, runId: state.runId });
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
   };
@@ -229,6 +230,8 @@ async function generateDraftResponse(state: ChatGraphState): Promise<string> {
     logError("draft_generation_failed", { error });
     // Return a sterile marker on failure rather than tool context
     return "[DRAFT_ERROR]";
+  } finally {
+    void endTimer(draftTimer, {});
   }
 }
 
@@ -338,6 +341,7 @@ async function generateDraftResponseWithFeedback(
  * Runs before tokens are emitted to user
  */
 export async function reflectionNode(state: ChatGraphState) {
+  const timer = startTimer("reflectionNode", { chatId: state.chatId, runId: state.runId });
   const startedAt = Date.now();
   const preserveLongFormDraft = shouldPreserveLongFormDraft(state.userMessage);
 
@@ -402,13 +406,17 @@ export async function reflectionNode(state: ChatGraphState) {
     }
   }
 
-  return {
-    draftResponse: finalResponse,
-    reflectionReport: report,
-    responseRevisionFeedback: report.revisionFocus,
-    reflectionIterationCount: iterationCount,
-    assistantMessage: finalResponse,
-  };
+  try {
+    return {
+      draftResponse: finalResponse,
+      reflectionReport: report,
+      responseRevisionFeedback: report.revisionFocus,
+      reflectionIterationCount: iterationCount,
+      assistantMessage: finalResponse,
+    };
+  } finally {
+    void endTimer(timer, { score: report.score, iterationCount });
+  }
 }
 
 function deriveQueryIntentFromClassification(
@@ -643,13 +651,53 @@ function deriveFormattingProfile(
  */
 export async function loadContextNode(state: ChatGraphState) {
   emitStatus(undefined, "Loading context...");
-  const selectedContext = await loadContextForChat(
+  // Use fast path: Load only recent turns for quick model start (~1-2ms)
+  const selectedContext = await loadContextFastPath(
     state.chatId,
     state.parentMessageId ?? null,
   );
 
+  // Queue background enrichment (loads project context, user memory, preferences)
+  // This runs asynchronously and doesn't block model response start
+  void queueJob("enrichContext", {
+    chatId: state.chatId,
+    runId: state.runId,
+  });
+
+  // Enrich the live state asynchronously so later prompt assembly can pick up
+  // project context, summaries, and user memory when the background fetch wins.
+  void (async () => {
+    const enrichment = await enrichContextInBackground(
+      state.chatId,
+      state.parentMessageId ?? null,
+    );
+
+    if (!state.selectedContext) {
+      return;
+    }
+
+    const mergedSelectedContext = {
+      ...state.selectedContext,
+      ...enrichment,
+    };
+
+    state.selectedContext = mergedSelectedContext;
+    state.preferences = enrichment.preferences ?? state.preferences;
+    state.memorySummary = enrichment.memorySummary ?? state.memorySummary;
+
+    if (enrichment.projectContext || enrichment.chatSummary || enrichment.userMemory) {
+      state.memorySummary = enrichment.memorySummary ?? state.memorySummary;
+    }
+  })().catch((error) => {
+    logError("live_context_enrichment_failed", {
+      chatId: state.chatId,
+      runId: state.runId,
+      error,
+    });
+  });
+
   // Derive memorySummary from selectedContext to indicate if context is available
-  // Prioritize: projectContext > userMemory > chatSummary
+  // Prioritize: projectContext > userMemory > chatSummary (currently empty from fast path)
   const memorySummary =
     selectedContext.projectContext ||
     selectedContext.userMemory ||
@@ -666,9 +714,11 @@ export async function loadContextNode(state: ChatGraphState) {
 }
 
 export async function generateResponseNode(state: ChatGraphState) {
-  emitStatus(undefined, "Writing response...");
+  const genTimer = startTimer("generateResponseNode", { chatId: state.chatId, runId: state.runId });
+  try {
+    emitStatus(undefined, "Writing response...");
 
-  const startedAt = Date.now();
+    const startedAt = Date.now();
   let assistantMessage = state.assistantMessage || "";
   const messages = buildChatMessages(state);
 
@@ -863,6 +913,9 @@ export async function generateResponseNode(state: ChatGraphState) {
     outputTokens,
     latencyMs: Date.now() - startedAt,
   };
+  } finally {
+    void endTimer(genTimer, { modelUsed: state.modelUsed || null });
+  }
 }
 
 // Test helper: expose planner resolution for local testing.
@@ -884,119 +937,53 @@ export function testResolveToolPlan(
 }
 
 export async function saveMessagesNode(state: ChatGraphState) {
-  const now = new Date();
-  let persistedAssistantMessageId: string | null =
-    state.assistantMessageId ?? null;
-  let createdUserMessageId: string | null = null;
+  const saveTimer = startTimer("saveMessagesNode", { chatId: state.chatId, runId: state.runId });
+  try {
+    // Determine if user message should be created (avoid duplication in edit flows)
+    const lastPrev = state.previousMessages?.[state.previousMessages.length - 1];
+    const shouldCreateUser = !(
+      lastPrev &&
+      lastPrev.role === "user" &&
+      lastPrev.content.trim() === state.userMessage.trim()
+    );
+    const willCreateUser = shouldCreateUser && !state.skipUserCreate;
 
-  await prisma.chat.upsert({
-    where: { id: state.chatId },
-    create: {
-      id: state.chatId,
-      title: state.generatedTitle?.trim() || "New Chat",
-    },
-    update: {},
-  });
-  // Avoid duplicating the user message when the database already contains
-  // the edited user turn (edit flow). If the last previous message is a
-  // user message with identical content, skip creating a new user row.
-  const lastPrev = state.previousMessages?.[state.previousMessages.length - 1];
-  const shouldCreateUser = !(
-    lastPrev &&
-    lastPrev.role === "user" &&
-    lastPrev.content.trim() === state.userMessage.trim()
-  );
+    // Pre-allocate user message ID for immediate response
+    const preAllocatedUserMessageId = willCreateUser ? crypto.randomUUID() : null;
+    
+    // Queue background job for actual DB persistence
+    // This runs asynchronously after response stream completes
+    const jobData: SaveMessagesJobData = {
+      chatId: state.chatId,
+      userMessage: state.userMessage,
+      assistantMessage: state.assistantMessage,
+      assistantMessageId: state.assistantMessageId,
+      parentMessageId: state.parentMessageId ?? null,
+      branchId: state.branchId,
+      skipUserCreate: !willCreateUser,
+      modelUsed: state.modelUsed || null,
+      inputTokens: state.inputTokens || null,
+      outputTokens: state.outputTokens || null,
+      latencyMs: state.latencyMs || null,
+      runId: state.runId,
+      traceId: state.traceId || null,
+      generatedTitle: state.generatedTitle,
+    };
 
-  // Honor explicit skip flag for flows that already reference an existing user turn
-  const willCreateUser = shouldCreateUser && !state.skipUserCreate;
+    void queueJob("saveMessages", jobData);
 
-  if (willCreateUser) {
-    const userMessage = await prisma.message.create({
-      data: {
-        chatId: state.chatId,
-        role: "user",
-        content: state.userMessage,
-        parentId: state.parentMessageId ?? null,
-        branchId: state.branchId ?? undefined,
-      },
-    });
-    createdUserMessageId = userMessage.id;
+    // Return immediately with pre-allocated IDs
+    // Actual persistence happens in background
+    return {
+      traceId: state.traceId,
+      assistantMessageId: state.assistantMessageId,
+      userMessageId: preAllocatedUserMessageId,
+    };
+  } finally {
+    void endTimer(saveTimer);
   }
-
-  const assistantData = {
-    chatId: state.chatId,
-    role: "assistant" as const,
-    content: state.assistantMessage,
-    parentId: createdUserMessageId ?? state.parentMessageId ?? null,
-    branchId: state.branchId ?? undefined,
-    modelUsed: state.modelUsed || null,
-    provider: "openrouter" as const,
-    tokensInput: state.inputTokens || null,
-    tokensOutput: state.outputTokens || null,
-    latencyMs: state.latencyMs || null,
-    runId: state.runId || null,
-    traceId: state.traceId || null,
-  };
-
-  if (state.assistantMessageId) {
-    const assistantMessage = await prisma.message.upsert({
-      where: { id: state.assistantMessageId },
-      create: {
-        id: state.assistantMessageId,
-        ...assistantData,
-      },
-      update: assistantData,
-    });
-    persistedAssistantMessageId = assistantMessage.id;
-  } else {
-    const assistantMessage = await prisma.message.create({
-      data: assistantData,
-    });
-    persistedAssistantMessageId = assistantMessage.id;
-  }
-
-  // Persist generated title if available (only on first turn)
-  const chatUpdateData: Record<string, unknown> = {
-    lastMessageAt: now,
-  };
-  if (state.generatedTitle && state.previousMessages.length === 0) {
-    chatUpdateData.title = state.generatedTitle;
-  }
-
-  await prisma.chat.update({
-    where: { id: state.chatId },
-    data: chatUpdateData,
-  });
-
-  await prisma.chatRunAnalytics
-    .create({
-      data: {
-        chatId: state.chatId,
-        modelUsed: state.modelUsed || null,
-        provider: "openrouter" as const,
-        latencyMs: state.latencyMs || null,
-        tokensInput: state.inputTokens || null,
-        tokensOutput: state.outputTokens || null,
-        runId: state.runId || null,
-        traceId: state.traceId || null,
-        status: "completed",
-      },
-    })
-    .catch((error) => {
-      warn("save_chat_analytics_failed", { chatId: state.chatId, error });
-    });
-
-  // Maintain rolling chat summary in background so stream completion is not delayed.
-  void maintainChatSummary(state.chatId).catch((err) => {
-    warn("maintain_chat_summary_failed", { chatId: state.chatId, error: err });
-  });
-
-  return {
-    traceId: state.traceId,
-    assistantMessageId: persistedAssistantMessageId,
-    userMessageId: createdUserMessageId,
-  };
 }
+
 
 /**
  * Phase 2 Nodes: Intent classification, tool execution, title generation, memory extraction
@@ -1464,17 +1451,18 @@ export async function classifyIntentNode(state: ChatGraphState) {
       };
     }
 
-    info("intent_classified", {
+    // Log intent classification results at debug level to reduce hot-path verbosity
+    // Only errors are logged at info level
+    debug("intent_classified", {
       chatId: state.chatId,
       runId: state.runId,
       queryIntent,
       classifiedIntent,
       structuredIntent,
       taskCategory,
-      message: state.userMessage,
     });
 
-    info("promptRouting.decision", {
+    debug("promptRouting.decision", {
       event: "promptRouting.decision",
       chatId: state.chatId,
       runId: state.runId,
@@ -1531,51 +1519,26 @@ export async function classifyIntentNode(state: ChatGraphState) {
  * Output: generatedTitle field
  */
 export async function generateTitleNode(state: ChatGraphState) {
-  try {
-    // Generate a context-aware title. Include any available conversation
-    // context (project context, memory summary, chat summary) so the model
-    // can prefer contextually-relevant titles over single-turn phrasing.
-    const model = createGeminiModel();
-    let prompt = TITLE_GENERATION_PROMPT.replace(/"{USER_MESSAGE}"/g, state.userMessage).replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage);
+  // Queue title generation as background job (don't block response stream)
+  // Title will be generated and persisted asynchronously
+  // For first turn, we could emit title later; for subsequent turns it's optional
+  const titleJobData: GenerateTitleJobData = {
+    chatId: state.chatId,
+    userMessage: state.userMessage,
+    assistantMessage: state.assistantMessage,
+    projectContext: state.selectedContext?.projectContext,
+    chatSummary: state.selectedContext?.chatSummary,
+    memorySummary: state.memorySummary,
+    runId: state.runId,
+  };
 
-    const contextParts: string[] = [];
-    if (state.selectedContext?.projectContext) {
-      contextParts.push(`Project context: ${toTextContent(state.selectedContext.projectContext)}`);
-    }
-    if (state.selectedContext?.chatSummary) {
-      contextParts.push(`Chat summary: ${toTextContent(state.selectedContext.chatSummary)}`);
-    }
-    if (state.memorySummary) {
-      contextParts.push(`Relevant memory: ${toTextContent(state.memorySummary)}`);
-    }
+  void queueJob("generateTitle", titleJobData);
 
-    if (contextParts.length > 0) {
-      prompt += `\n\nContext:\n${contextParts.join("\n\n")}\n\nUse this context when creating a concise, descriptive title.`;
-    }
-
-    const response = await model.invoke([new HumanMessage(prompt)], buildLangSmithRunConfig(state, "title-generation"));
-    const generatedTitle = toTextContent(response.content)
-      .toLowerCase()
-      .trim()
-      .replace(/^["']|["']$/g, "") // Remove quotes if model added them
-      .replace(/[—–-].*$/, "")
-      .replace(
-        /\b(straight to the point|quick take|in brief|explained simply)\b.*$/i,
-        "",
-      )
-      .replace(/\s{2,}/g, " ")
-      .replace(/[^\p{L}\p{N}\s'-]/gu, "")
-      .trim();
-
-    return {
-      generatedTitle,
-    };
-  } catch (error) {
-    logError("title_generation_failed", { error });
-    return {
-      generatedTitle: "",
-    };
-  }
+  // Return empty title immediately; actual generation happens asynchronously
+  // This prevents blocking the response stream
+  return {
+    generatedTitle: "",
+  };
 }
 
 /**

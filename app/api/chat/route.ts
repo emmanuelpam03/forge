@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { info, error as logError, debug } from "@/lib/logger";
+import { initializeBackgroundWorkers } from "@/lib/background-worker";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 import { toResponse, ApiError } from "@/lib/error-response";
@@ -22,6 +23,9 @@ const chatRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Initialize background workers on first request (lazy initialization)
+  initializeBackgroundWorkers();
+
   try {
     const body = await request.json();
     const parsedBody = chatRequestSchema.safeParse(body);

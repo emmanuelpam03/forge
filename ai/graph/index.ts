@@ -1,7 +1,6 @@
 import "server-only";
 
 import { END, START, StateGraph } from "@langchain/langgraph";
-import prisma from "@/lib/prisma";
 import { info, error as logError } from "@/lib/logger";
 import {
   createChatGraphSeed,
@@ -33,9 +32,15 @@ type GraphStateWithDiagnostics = ReturnType<typeof createChatGraphSeed> & {
 async function runGraphPreResponse(
   input: ChatGraphInput,
   onEvent?: (event: StreamEvent) => void,
+  requestStartedAt?: number,
 ) {
   const state = createChatGraphSeed(input) as GraphStateWithDiagnostics;
   const _preResponseStart = Date.now();
+  state._timings = {
+    ...(state._timings ?? {}),
+    requestStartedAt,
+    preResponseStartedAt: _preResponseStart,
+  };
 
   // Register a run-scoped emitter so nodes can call `emitStatus` without
   // changing their LangGraph-compatible signatures.
@@ -57,7 +62,13 @@ async function runGraphPreResponse(
   setGraphStreamEventEmitter(undefined);
 
   // annotate duration for diagnostics
-  state.__preResponseMs = Date.now() - _preResponseStart;
+  const preResponseCompletedAt = Date.now();
+  state.__preResponseMs = preResponseCompletedAt - _preResponseStart;
+  state._timings = {
+    ...(state._timings ?? {}),
+    preResponseCompletedAt,
+    preResponseMs: state.__preResponseMs,
+  };
 
   return state;
 }
@@ -91,17 +102,29 @@ export async function runChatGraphStream(
   input: ChatGraphInput,
   onEvent?: (event: StreamEvent) => void,
 ) {
-  const state = await runGraphPreResponse(input, onEvent);
+  const requestStart = Date.now();
+  const state = await runGraphPreResponse(input, onEvent, requestStart);
+  const preResponseEnd = Date.now();
+  const preResponseMs = preResponseEnd - requestStart;
+  
   const startedAt = Date.now();
+  state._timings = {
+    ...(state._timings ?? {}),
+    requestStartedAt: requestStart,
+    preResponseCompletedAt: preResponseEnd,
+    modelStreamStartedAt: startedAt,
+    preResponseMs,
+  };
   info("pre_response_ms", {
     chatId: input.chatId,
     runId: input.runId,
     preResponseMs: state.__preResponseMs ?? null,
+    actualPreResponseMs: preResponseMs,
   });
   info("model_stream_start", {
     chatId: input.chatId,
     runId: input.runId,
-    timestamp: Date.now(),
+    timeUntilStreamMs: preResponseMs,
   });
 
   let assistantMessage = "";
@@ -115,10 +138,19 @@ export async function runChatGraphStream(
     setGraphStreamEventEmitter((event) => {
       if (event.type === "token" && firstTokenAt === null) {
         firstTokenAt = Date.now();
+        const ttftMs = firstTokenAt - startedAt;
+        const totalPreStreamMs = firstTokenAt - requestStart;
+        state._timings = {
+          ...(state._timings ?? {}),
+          firstTokenAt,
+          preResponseToFirstTokenMs: totalPreStreamMs - preResponseMs,
+        };
         info("first_token_sent", {
           chatId: input.chatId,
           runId: input.runId,
-          ttftMs: firstTokenAt - startedAt,
+          ttftMs,
+          preResponseMs: state.__preResponseMs,
+          totalPreStreamMs,
           reflectionScore: state.reflectionReport?.score ?? null,
         });
       }
@@ -142,22 +174,40 @@ export async function runChatGraphStream(
     }
 
     const endedAt = Date.now();
+    const totalStreamMs = endedAt - startedAt;
+    const totalMs = endedAt - requestStart;
+    state._timings = {
+      ...(state._timings ?? {}),
+      streamCompletedAt: endedAt,
+      requestCompletedAt: endedAt,
+      streamDurationMs: totalStreamMs,
+      totalLatencyMs: totalMs,
+      preResponseMs,
+    };
+    
     info("stream_closed", {
       chatId: input.chatId,
       runId: input.runId,
-      durationMs: endedAt - startedAt,
+      streamDurationMs: totalStreamMs,
       ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+      totalLatencyMs: totalMs,
     });
     info("stream_completed", {
       chatId: input.chatId,
       runId: input.runId,
-      durationMs: endedAt - startedAt,
+      durationMs: totalStreamMs,
       ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
+      totalRequestMs: totalMs,
     });
     info("graph_complete", {
       chatId: input.chatId,
       runId: input.runId,
-      durationMs: endedAt - startedAt,
+      durationMs: totalStreamMs,
+      latencyBreakdown: {
+        preResponse: preResponseMs,
+        modelStream: totalStreamMs,
+        total: totalMs,
+      },
     });
   } catch (error) {
     throw error;
@@ -176,36 +226,32 @@ export async function runChatGraphStream(
 
   // Run persistence and post-processing in the background so the stream can
   // complete immediately after the model finishes.
+  const saveStart = Date.now();
   try {
-    // Persist messages synchronously so callers (API routes) receive
-    // persisted IDs in their final 'done' event.
+    // Queue message persistence (returns immediately with pre-allocated IDs)
     const saveResult = await saveMessagesNode(state);
     Object.assign(state, saveResult);
+    const saveEndMs = Date.now() - saveStart;
+    info("save_messages_queued", {
+      chatId: input.chatId,
+      runId: input.runId,
+      queueTimeMs: saveEndMs,
+    });
   } catch (error) {
     logError("save_messages_failed", { chatId: input.chatId, error });
   }
 
-  // Run non-critical post-processing in background to avoid delaying the
-  // Generate title synchronously so callers (and clients) can receive it
-  // immediately via the stream event. Do memory extraction in background.
+  // Queue title generation in background (non-blocking)
+  const titleStart = Date.now();
   try {
     const titleResult = await generateTitleNode(state);
     Object.assign(state, titleResult);
-    if (titleResult.generatedTitle) {
-      try {
-        // Persist title so metadata is up-to-date for clients that fetch it
-        await prisma.chat.update({
-          where: { id: state.chatId },
-          data: { title: titleResult.generatedTitle },
-        });
-      } catch (err) {
-        logError("persist_title_failed", { chatId: input.chatId, error: err });
-      }
-
-      // Notify the caller (API route) that a title is available so it can
-      // forward it to the client immediately without requiring a refresh.
-      onEvent?.({ type: "title", title: titleResult.generatedTitle });
-    }
+    const titleEndMs = Date.now() - titleStart;
+    info("generate_title_queued", {
+      chatId: input.chatId,
+      runId: input.runId,
+      queueTimeMs: titleEndMs,
+    });
   } catch (error) {
     logError("generate_title_failed", { chatId: input.chatId, error });
   }

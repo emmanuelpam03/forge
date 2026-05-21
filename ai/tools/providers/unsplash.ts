@@ -1,5 +1,6 @@
 import type { ProviderImage } from "../image-types";
 import { cacheGet, cacheSet } from "@/lib/redis";
+import fetchWithTimeout from "@/lib/fetchWithTimeout";
 
 const UNSPLASH_API = "https://api.unsplash.com/search/photos";
 
@@ -19,7 +20,7 @@ export async function unsplashSearch(query: string, count: number = 6): Promise<
   });
 
   try {
-    const res = await fetch(`${UNSPLASH_API}?${params.toString()}`, {
+    const res = await fetchWithTimeout(`${UNSPLASH_API}?${params.toString()}`, {
       headers: { Authorization: `Client-ID ${key}` },
     });
     if (!res.ok) return [];

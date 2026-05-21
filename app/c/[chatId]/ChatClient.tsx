@@ -1064,7 +1064,15 @@ export function ChatClient({
             }
 
             if (event.type === "title") {
-              setChatTitle(event.title);
+              const newTitle = event.title;
+              setChatTitle(newTitle);
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("chat:title-updated", {
+                    detail: { chatId, title: newTitle },
+                  }),
+                );
+              } catch {}
             }
 
             if (event.type === "placeholder") {
@@ -1344,7 +1352,15 @@ export function ChatClient({
             }
 
             if (event.type === "title") {
-              setChatTitle(event.title);
+              const newTitle = event.title;
+              setChatTitle(newTitle);
+              try {
+                window.dispatchEvent(
+                  new CustomEvent("chat:title-updated", {
+                    detail: { chatId, title: newTitle },
+                  }),
+                );
+              } catch {}
             }
 
               if (event.type === "images") {

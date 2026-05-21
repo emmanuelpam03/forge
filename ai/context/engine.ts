@@ -1,6 +1,8 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
+import { startTimer, endTimer } from "@/lib/metrics";
+import { error as logError } from "@/lib/logger";
 import type { Prisma } from "@/app/generated/prisma/client";
 import type {
   ChatMessageSnapshot,
@@ -38,8 +40,9 @@ export type SelectedContext = {
   budgetUsed: number; // percentage
 };
 
-const TOKEN_BUDGET = 2000; // tokens reserved for context (system + history + prefs) — reduced to speed context assembly
-const RECENT_TURN_WINDOW = 3; // keep last 3 turns by default — reduced to minimize DB queries
+const TOKEN_BUDGET = 1200; // tokens reserved for context (reduced for faster assembly)
+const RECENT_TURN_WINDOW = 2; // keep last 2 turns for fast path (minimum needed for coherence)
+const RECENT_TURN_WINDOW_FULL = 3; // keep last 3 turns for full context assembly
 
 /**
  * Rough token estimation for text.
@@ -348,6 +351,88 @@ function applyTokenBudget(
 
   return selected;
 }
+
+/**
+ * Fast path context loading: Load ONLY recent turns for quick model start.
+ * Minimal DB queries (~1-2ms). Safe for all responses.
+ * Enrichment happens asynchronously in background.
+ */
+export async function loadContextFastPath(
+  chatId: string,
+  cutoffMessageId?: string | null,
+): Promise<SelectedContext> {
+  const ctxTimer = startTimer("loadContextFastPath", { chatId });
+  try {
+    // Load only recent turns (2 messages) - minimal DB hit
+    const recentTurns = await loadRecentTurns(chatId, RECENT_TURN_WINDOW, cutoffMessageId);
+
+    return {
+      recentTurns,
+      chatSummary: null,
+      projectContext: null,
+      preferences: [],
+      userMemory: null,
+      retrievedSnippets: null,
+      sections: recentTurns.length > 0 ? [
+        {
+          name: "Recent Conversation",
+          content: recentTurns.map((msg) => `${msg.role}: ${msg.content}`).join("\n"),
+          priority: 1,
+          estimatedTokens: estimateTokens(
+            recentTurns.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
+          ),
+        },
+      ] : [],
+      totalEstimatedTokens: 0,
+      budgetUsed: 0,
+    };
+  } finally {
+    void endTimer(ctxTimer);
+  }
+}
+
+/**
+ * Background enrichment: Load full context asynchronously.
+ * Called after model starts streaming. Results enrich state for future turns.
+ */
+export async function enrichContextInBackground(
+  chatId: string,
+  cutoffMessageId?: string | null,
+): Promise<Partial<SelectedContext> & { memorySummary: MemorySummarySnapshot | null }> {
+  const enrichTimer = startTimer("enrichContextInBackground", { chatId });
+  try {
+    // Parallel load of context sources (skip recent turns - already loaded)
+    const [
+      preferences,
+      userMemory,
+      projectContext,
+      chatSummary,
+    ] = await Promise.all([
+      loadUserPreferences(),
+      loadUserMemorySummary(),
+      loadProjectContext(chatId),
+      loadChatSummary(chatId),
+    ]);
+
+    const userMemoryText = userMemory
+      ? `Version ${userMemory.version}: ${userMemory.summary}`
+      : null;
+
+    return {
+      chatSummary,
+      projectContext,
+      preferences,
+      userMemory: userMemoryText,
+      memorySummary: userMemory,
+    };
+  } catch (err) {
+    logError("enrich_context_failed", { chatId, error: err });
+    return { memorySummary: null }; // Return empty enrichment on error; don't crash
+  } finally {
+    void endTimer(enrichTimer);
+  }
+}
+
 /**
  * Main context loading function.
  * Orchestrates all context loading and selection.
@@ -357,6 +442,9 @@ export async function loadContextForChat(
   chatId: string,
   cutoffMessageId?: string | null,
 ): Promise<SelectedContext> {
+  const ctxTimer = startTimer("loadContextForChat", { chatId });
+  let totalTokens = 0;
+  try {
   // Load project info first to decide what to load next
   const projectInfo = await loadProjectInfo(chatId);
 
@@ -369,7 +457,7 @@ export async function loadContextForChat(
     chatSummary,
     projectMemory,
   ] = await Promise.all([
-    loadRecentTurns(chatId, RECENT_TURN_WINDOW, cutoffMessageId),
+    loadRecentTurns(chatId, RECENT_TURN_WINDOW_FULL, cutoffMessageId),
     loadUserPreferences(),
     loadUserMemorySummary(),
     loadProjectContext(chatId),
@@ -398,10 +486,7 @@ export async function loadContextForChat(
   const selectedSections = applyTokenBudget(allSections);
 
   // Calculate total tokens used
-  const totalTokens = selectedSections.reduce(
-    (sum, s) => sum + s.estimatedTokens,
-    0,
-  );
+  totalTokens = selectedSections.reduce((sum, s) => sum + s.estimatedTokens, 0);
   const budgetPercentage = Math.round((totalTokens / TOKEN_BUDGET) * 100);
 
   return {
@@ -415,6 +500,9 @@ export async function loadContextForChat(
     totalEstimatedTokens: totalTokens,
     budgetUsed: budgetPercentage,
   };
+  } finally {
+    void endTimer(ctxTimer, { budgetUsed: Math.round((totalTokens / TOKEN_BUDGET) * 100) });
+  }
 }
 
 /**

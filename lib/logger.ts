@@ -52,15 +52,25 @@ function output(entry: Record<string, unknown>, level: LogLevel) {
 
     return value;
   });
+  // Write logs asynchronously to avoid blocking the request path.
+  // Use setImmediate where available; fallback to setTimeout for environments without it.
+  const asyncLog = (fn: () => void) => {
+    if (typeof setImmediate !== "undefined") {
+      setImmediate(fn);
+    } else {
+      setTimeout(fn, 0);
+    }
+  };
+
   if (level === "error") {
     // eslint-disable-next-line no-console
-    console.error(line);
+    asyncLog(() => console.error(line));
   } else if (level === "warn") {
     // eslint-disable-next-line no-console
-    console.warn(line);
+    asyncLog(() => console.warn(line));
   } else {
     // eslint-disable-next-line no-console
-    console.info(line);
+    asyncLog(() => console.info(line));
   }
 }
 

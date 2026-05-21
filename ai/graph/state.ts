@@ -63,6 +63,20 @@ export type MemorySummarySnapshot = {
   updatedAt: string;
 };
 
+export type ChatPipelineTimings = {
+  requestStartedAt?: number;
+  preResponseStartedAt?: number;
+  preResponseCompletedAt?: number;
+  modelStreamStartedAt?: number;
+  firstTokenAt?: number;
+  streamCompletedAt?: number;
+  requestCompletedAt?: number;
+  preResponseMs?: number;
+  preResponseToFirstTokenMs?: number;
+  streamDurationMs?: number;
+  totalLatencyMs?: number;
+};
+
 export type ToolPlan = {
   intent: string;
   toolsNeeded: string[];
@@ -89,6 +103,7 @@ export type ChatGraphState = {
   preferences: PreferenceSnapshot[];
   memorySummary: MemorySummarySnapshot | null;
   selectedContext?: SelectedContext;
+  _timings?: ChatPipelineTimings;
   contextBudgetTokens?: number;
   retrievedSnippets?: string[];
   assistantMessage: string;
@@ -346,6 +361,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   preferences: [],
   memorySummary: null,
   selectedContext: undefined,
+  _timings: undefined,
   contextBudgetTokens: undefined,
   retrievedSnippets: undefined,
   assistantMessage: "",

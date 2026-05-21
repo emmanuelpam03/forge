@@ -1,5 +1,6 @@
 import type { ProviderImage } from "../image-types";
 import { cacheGet, cacheSet } from "@/lib/redis";
+import fetchWithTimeout from "@/lib/fetchWithTimeout";
 
 const PEXELS_SEARCH = "https://api.pexels.com/v1/search";
 
@@ -23,7 +24,7 @@ export async function pexelsSearch(query: string, count: number = 6): Promise<Pr
   });
 
   try {
-    const res = await fetch(`${PEXELS_SEARCH}?${params.toString()}`, {
+    const res = await fetchWithTimeout(`${PEXELS_SEARCH}?${params.toString()}`, {
       headers: { Authorization: key },
     });
     if (!res.ok) return [];
