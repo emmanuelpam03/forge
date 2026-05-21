@@ -75,6 +75,8 @@ export type ChatPipelineTimings = {
   preResponseToFirstTokenMs?: number;
   streamDurationMs?: number;
   totalLatencyMs?: number;
+  liveContextEnrichmentStartedAt?: number;
+  liveContextEnrichmentCompletedAt?: number;
 };
 
 export type ToolPlan = {

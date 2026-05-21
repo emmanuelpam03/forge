@@ -13,6 +13,7 @@ import {
   enrichContextInBackground,
   updateUserMemory,
 } from "@/ai/context/engine";
+import { persistSaveMessagesJobData } from "@/lib/background-worker";
 import { queueJob, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
@@ -666,13 +667,21 @@ export async function loadContextNode(state: ChatGraphState) {
 
   // Enrich the live state asynchronously so later prompt assembly can pick up
   // project context, summaries, and user memory when the background fetch wins.
+  const liveEnrichmentStartedAt = Date.now();
+  state._timings ??= {};
+  state._timings.liveContextEnrichmentStartedAt = liveEnrichmentStartedAt;
+
   void (async () => {
     const enrichment = await enrichContextInBackground(
       state.chatId,
       state.parentMessageId ?? null,
     );
 
-    if (!state.selectedContext) {
+    const currentTimings = state._timings;
+    const isLatestEnrichment =
+      currentTimings?.liveContextEnrichmentStartedAt === liveEnrichmentStartedAt;
+
+    if (!state.selectedContext || !isLatestEnrichment || !currentTimings) {
       return;
     }
 
@@ -688,6 +697,8 @@ export async function loadContextNode(state: ChatGraphState) {
     if (enrichment.projectContext || enrichment.chatSummary || enrichment.userMemory) {
       state.memorySummary = enrichment.memorySummary ?? state.memorySummary;
     }
+
+    currentTimings.liveContextEnrichmentCompletedAt = Date.now();
   })().catch((error) => {
     logError("live_context_enrichment_failed", {
       chatId: state.chatId,
@@ -703,6 +714,9 @@ export async function loadContextNode(state: ChatGraphState) {
     selectedContext.userMemory ||
     selectedContext.chatSummary ||
     null;
+
+  state.selectedContext = selectedContext;
+  state.preferences = selectedContext.preferences;
 
   return {
     selectedContext,
@@ -958,6 +972,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
       userMessage: state.userMessage,
       assistantMessage: state.assistantMessage,
       assistantMessageId: state.assistantMessageId,
+      userMessageId: preAllocatedUserMessageId,
       parentMessageId: state.parentMessageId ?? null,
       branchId: state.branchId,
       skipUserCreate: !willCreateUser,
@@ -970,7 +985,24 @@ export async function saveMessagesNode(state: ChatGraphState) {
       generatedTitle: state.generatedTitle,
     };
 
-    void queueJob("saveMessages", jobData);
+    const queuedJobId = await queueJob("saveMessages", jobData);
+
+    if (queuedJobId === "no-redis") {
+      try {
+        const persisted = await persistSaveMessagesJobData(jobData);
+        return {
+          traceId: state.traceId,
+          assistantMessageId: persisted.assistantMessageId ?? state.assistantMessageId,
+          userMessageId: persisted.userMessageId ?? preAllocatedUserMessageId,
+        };
+      } catch (error) {
+        logError("save_messages_sync_fallback_failed", {
+          chatId: state.chatId,
+          runId: state.runId,
+          error,
+        });
+      }
+    }
 
     // Return immediately with pre-allocated IDs
     // Actual persistence happens in background

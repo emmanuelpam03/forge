@@ -23,91 +23,7 @@ async function processSaveMessagesJob(job: Job<SaveMessagesJobData>): Promise<vo
   const timer = startTimer("process_save_messages", { chatId: data.chatId });
 
   try {
-    const now = new Date();
-
-    // Ensure chat exists
-    await prisma.chat.upsert({
-      where: { id: data.chatId },
-      create: {
-        id: data.chatId,
-        title: data.generatedTitle?.trim() || "New Chat",
-      },
-      update: {},
-    });
-
-    // Create user message if needed
-    let createdUserMessageId: string | null = null;
-    if (!data.skipUserCreate) {
-      const userMessage = await prisma.message.create({
-        data: {
-          chatId: data.chatId,
-          role: "user",
-          content: data.userMessage ?? "",
-          parentId: data.parentMessageId,
-          branchId: data.branchId ?? undefined,
-        },
-      });
-      createdUserMessageId = userMessage.id;
-    }
-
-    // Persist assistant message
-    const assistantData = {
-      chatId: data.chatId,
-      role: "assistant" as const,
-      content: data.assistantMessage ?? "",
-      parentId: createdUserMessageId ?? data.parentMessageId ?? undefined,
-      branchId: data.branchId ?? undefined,
-      modelUsed: data.modelUsed,
-      provider: "openrouter" as const,
-      tokensInput: data.inputTokens,
-      tokensOutput: data.outputTokens,
-      latencyMs: data.latencyMs,
-      runId: data.runId,
-      traceId: data.traceId,
-    };
-
-    if (data.assistantMessageId) {
-      await prisma.message.upsert({
-        where: { id: data.assistantMessageId },
-        create: {
-          id: data.assistantMessageId,
-          ...assistantData,
-        },
-        update: assistantData,
-      });
-    } else {
-      await prisma.message.create({
-        data: assistantData,
-      });
-    }
-
-    // Update chat metadata
-    const chatUpdateData: Record<string, unknown> = {
-      lastMessageAt: now,
-    };
-    if (data.generatedTitle) {
-      chatUpdateData.title = data.generatedTitle;
-    }
-
-    await prisma.chat.update({
-      where: { id: data.chatId },
-      data: chatUpdateData,
-    });
-
-    // Persist analytics
-    await prisma.chatRunAnalytics.create({
-      data: {
-        chatId: data.chatId,
-        modelUsed: data.modelUsed,
-        provider: "openrouter",
-        latencyMs: data.latencyMs,
-        tokensInput: data.inputTokens,
-        tokensOutput: data.outputTokens,
-        runId: data.runId,
-        traceId: data.traceId,
-        status: "completed",
-      },
-    });
+    await persistSaveMessagesJobData(data);
 
     info("job_saveMessages_completed", {
       jobId: job.id,
@@ -122,6 +38,110 @@ async function processSaveMessagesJob(job: Job<SaveMessagesJobData>): Promise<vo
   } finally {
     void endTimer(timer);
   }
+}
+
+export async function persistSaveMessagesJobData(
+  data: SaveMessagesJobData,
+): Promise<{ userMessageId: string | null; assistantMessageId: string | null }> {
+  const now = new Date();
+
+  await prisma.chat.upsert({
+    where: { id: data.chatId },
+    create: {
+      id: data.chatId,
+      title: data.generatedTitle?.trim() || "New Chat",
+    },
+    update: {},
+  });
+
+  let createdUserMessageId: string | null = null;
+  if (!data.skipUserCreate) {
+    const userMessagePayload = {
+      chatId: data.chatId,
+      role: "user" as const,
+      content: data.userMessage ?? "",
+      parentId: data.parentMessageId,
+      branchId: data.branchId ?? undefined,
+    };
+
+    if (data.userMessageId) {
+      const userMessage = await prisma.message.upsert({
+        where: { id: data.userMessageId },
+        create: { id: data.userMessageId, ...userMessagePayload },
+        update: userMessagePayload,
+      });
+      createdUserMessageId = userMessage.id;
+    } else {
+      const userMessage = await prisma.message.create({
+        data: userMessagePayload,
+      });
+      createdUserMessageId = userMessage.id;
+    }
+  }
+
+  const assistantData = {
+    chatId: data.chatId,
+    role: "assistant" as const,
+    content: data.assistantMessage ?? "",
+    parentId: createdUserMessageId ?? data.parentMessageId ?? undefined,
+    branchId: data.branchId ?? undefined,
+    modelUsed: data.modelUsed,
+    provider: "openrouter" as const,
+    tokensInput: data.inputTokens,
+    tokensOutput: data.outputTokens,
+    latencyMs: data.latencyMs,
+    runId: data.runId,
+    traceId: data.traceId,
+  };
+
+  let persistedAssistantMessageId = data.assistantMessageId ?? null;
+  if (data.assistantMessageId) {
+    const assistantMessage = await prisma.message.upsert({
+      where: { id: data.assistantMessageId },
+      create: {
+        id: data.assistantMessageId,
+        ...assistantData,
+      },
+      update: assistantData,
+    });
+    persistedAssistantMessageId = assistantMessage.id;
+  } else {
+    const assistantMessage = await prisma.message.create({
+      data: assistantData,
+    });
+    persistedAssistantMessageId = assistantMessage.id;
+  }
+
+  const chatUpdateData: Record<string, unknown> = {
+    lastMessageAt: now,
+  };
+  if (data.generatedTitle) {
+    chatUpdateData.title = data.generatedTitle;
+  }
+
+  await prisma.chat.update({
+    where: { id: data.chatId },
+    data: chatUpdateData,
+  });
+
+  await prisma.chatRunAnalytics.create({
+    data: {
+      chatId: data.chatId,
+      modelUsed: data.modelUsed,
+      provider: "openrouter",
+      latencyMs: data.latencyMs,
+      tokensInput: data.inputTokens,
+      tokensOutput: data.outputTokens,
+      runId: data.runId,
+      traceId: data.traceId,
+      status: "completed",
+    },
+  });
+
+  return {
+    userMessageId: createdUserMessageId,
+    assistantMessageId: persistedAssistantMessageId,
+  };
 }
 
 async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<void> {
@@ -215,11 +235,31 @@ async function processEnrichContextJob(job: Job<EnrichContextJobData>): Promise<
 }
 
 /**
+ * Placeholder handler for extractMemory jobs.
+ * Currently extractMemory is produced inline by the graph; if queued jobs
+ * appear in the future this handler will ensure they are acknowledged.
+ */
+async function processExtractMemoryJob(job: Job<unknown>): Promise<void> {
+  const timer = startTimer("process_extract_memory", {});
+  try {
+    info("process_extract_memory_noop", { jobId: job.id });
+    // Acknowledge the job so it doesn't remain pending. If a real handler is
+    // needed later, replace this implementation with actual processing logic.
+    await completeJob(job.id, "extractMemory");
+  } catch (err) {
+    logError("job_extractMemory_failed", { jobId: job.id, error: err });
+    await requeueJobWithBackoff(job as Job);
+  } finally {
+    void endTimer(timer);
+  }
+}
+
+/**
  * Main worker loop: Continuously process jobs from the queue.
  * Each job type is processed by its own worker.
  */
 async function startWorkerForQueue<T>(
-  jobType: "saveMessages" | "generateTitle" | "enrichContext",
+  jobType: "saveMessages" | "generateTitle" | "enrichContext" | "extractMemory",
   processor: (job: Job<T>) => Promise<void>,
 ): Promise<void> {
   while (true) {
@@ -257,11 +297,12 @@ export function initializeBackgroundWorkers(): void {
   void startWorkerForQueue("saveMessages", processSaveMessagesJob);
   void startWorkerForQueue("generateTitle", processGenerateTitleJob);
   void startWorkerForQueue("enrichContext", processEnrichContextJob);
+  void startWorkerForQueue("extractMemory", processExtractMemoryJob);
 
   info("background_workers_initialized", {
-    jobTypes: ["saveMessages", "generateTitle", "enrichContext"],
+    jobTypes: ["saveMessages", "generateTitle", "enrichContext", "extractMemory"],
   });
 }
 
 // Export for testing
-export { processSaveMessagesJob, processGenerateTitleJob, processEnrichContextJob };
+export { processSaveMessagesJob, processGenerateTitleJob, processEnrichContextJob, processExtractMemoryJob };

@@ -88,6 +88,7 @@ export interface SaveMessagesJobData {
   userMessage: string | null;
   assistantMessage: string | null;
   assistantMessageId: string | null | undefined;
+  userMessageId?: string | null;
   parentMessageId: string | null;
   branchId: string | undefined | null;
   skipUserCreate: boolean;
@@ -174,15 +175,70 @@ export async function dequeueJob(
 
   try {
     const queueKey = `queue:${type}`;
+    const delayedKey = `delayed:${type}`;
+
+    const claimDueDelayedJob = async (): Promise<Job | null> => {
+      const jobJson = (await redis.eval(
+        `local delayedKey = KEYS[1]\nlocal now = tonumber(ARGV[1])\nlocal jobs = redis.call("ZRANGEBYSCORE", delayedKey, "-inf", now, "LIMIT", 0, 1)\nif #jobs == 0 then return nil end\nredis.call("ZREM", delayedKey, jobs[1])\nreturn jobs[1]`,
+        1,
+        delayedKey,
+        Date.now().toString(),
+      )) as string | null;
+
+      if (!jobJson) {
+        return null;
+      }
+
+      return JSON.parse(jobJson) as Job;
+    };
+
+    const nextDelayedAt = async (): Promise<number | null> => {
+      const next = (await redis.zrange(delayedKey, 0, 0, "WITHSCORES")) as string[];
+      if (!next || next.length < 2) {
+        return null;
+      }
+
+      const scheduledAt = Number(next[1]);
+      return Number.isFinite(scheduledAt) ? scheduledAt : null;
+    };
+
+    const dueDelayedJob = await claimDueDelayedJob();
+    if (dueDelayedJob) {
+      return dueDelayedJob;
+    }
+
+    const nextScheduledAt = await nextDelayedAt();
+    const waitSeconds =
+      nextScheduledAt !== null
+        ? Math.max(1, Math.min(timeoutSeconds, Math.ceil((nextScheduledAt - Date.now()) / 1000)))
+        : timeoutSeconds;
+
     // BRPOP blocks until a job is available or timeout expires
-    const result = await redis.brpop(queueKey, timeoutSeconds);
+    const result = await redis.brpop(queueKey, waitSeconds);
 
     if (!result || result.length < 2) {
+      return await claimDueDelayedJob();
+    }
+
+    const raw = result[1] as string;
+    const parsedJob = JSON.parse(raw) as Job & { scheduledAt?: number };
+
+    // Legacy support: if a scheduled job is still sitting in the immediate queue,
+    // move it into the delayed sorted set and let the next dequeue attempt pick it up.
+    if (parsedJob.scheduledAt && Date.now() < parsedJob.scheduledAt) {
+      try {
+        await redis.zadd(delayedKey, parsedJob.scheduledAt, raw);
+        await redis.expire(delayedKey, 7 * 24 * 60 * 60);
+        debug("job_not_ready_requeued", { jobId: parsedJob.id, scheduledAt: parsedJob.scheduledAt });
+      } catch (err) {
+        logError("requeue_scheduled_job_failed", { error: err, jobId: parsedJob.id });
+      }
+
+      // Indicate no ready job was returned (caller may wait or retry)
       return null;
     }
 
-    const jobData = JSON.parse(result[1] as string) as Job;
-    return jobData;
+    return parsedJob;
   } catch (err) {
     logError("dequeue_job_failed", { type, error: err });
     return null;
@@ -242,10 +298,12 @@ export async function requeueJobWithBackoff(
     // Exponential backoff: 2^retries seconds
     const backoffSeconds = Math.pow(2, job.retries);
 
-    // Re-queue by adding back to queue with delay metadata
-    const requeueKey = `queue:${job.type}`;
+    // Re-queue into a delayed sorted set so workers don't keep popping the same
+    // job before its scheduled time.
+    const delayedKey = `delayed:${job.type}`;
     const delayedJob = { ...job, scheduledAt: Date.now() + backoffSeconds * 1000 };
-    await redis.lpush(requeueKey, JSON.stringify(delayedJob));
+    await redis.zadd(delayedKey, delayedJob.scheduledAt, JSON.stringify(delayedJob));
+    await redis.expire(delayedKey, 7 * 24 * 60 * 60);
 
     info("job_requeued_with_backoff", {
       jobId: job.id,

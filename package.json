@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start-worker": "tsx scripts/background-worker.ts",
     "lint": "eslint",
     "prisma:seed": "prisma db seed",
     "test": "node --test tests/**/*.ts"
