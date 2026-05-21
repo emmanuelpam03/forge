@@ -4,7 +4,7 @@ export const CHAT_GRAPH_NODES = {
   planTask: "planTask",
   toolRouter: "toolRouter",
   synthesizeEvidence: "synthesizeEvidence",
-  reflectOnResponse: "reflectOnResponse",
+  // reflectOnResponse removed: post-generation reflection disabled
   generateResponse: "generateResponse",
   saveMessages: "saveMessages",
   generateTitle: "generateTitle",
@@ -22,8 +22,7 @@ export const CHAT_GRAPH_EDGE_LIST = [
   [CHAT_GRAPH_NODES.classifyIntent, CHAT_GRAPH_NODES.planTask],
   [CHAT_GRAPH_NODES.planTask, CHAT_GRAPH_NODES.toolRouter],
   [CHAT_GRAPH_NODES.toolRouter, CHAT_GRAPH_NODES.synthesizeEvidence],
-  [CHAT_GRAPH_NODES.synthesizeEvidence, CHAT_GRAPH_NODES.reflectOnResponse],
-  [CHAT_GRAPH_NODES.reflectOnResponse, CHAT_GRAPH_NODES.generateResponse],
+  [CHAT_GRAPH_NODES.synthesizeEvidence, CHAT_GRAPH_NODES.generateResponse],
   [CHAT_GRAPH_NODES.generateResponse, CHAT_GRAPH_NODES.saveMessages],
   [CHAT_GRAPH_NODES.saveMessages, CHAT_GRAPH_NODES.generateTitle],
   [CHAT_GRAPH_NODES.generateTitle, CHAT_GRAPH_NODES.extractMemory],

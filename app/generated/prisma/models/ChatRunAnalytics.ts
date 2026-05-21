@@ -9,8 +9,8 @@
  * 🟢 You can import this file directly.
  */
 import type * as runtime from "@prisma/client/runtime/client"
-import type * as $Enums from "../enums"
-import type * as Prisma from "../internal/prismaNamespace"
+import type * as $Enums from "../enums.ts"
+import type * as Prisma from "../internal/prismaNamespace.ts"
 
 /**
  * Model ChatRunAnalytics
@@ -305,6 +305,7 @@ export type ChatRunAnalyticsOrderByWithRelationInput = {
 
 export type ChatRunAnalyticsWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  runId?: string
   AND?: Prisma.ChatRunAnalyticsWhereInput | Prisma.ChatRunAnalyticsWhereInput[]
   OR?: Prisma.ChatRunAnalyticsWhereInput[]
   NOT?: Prisma.ChatRunAnalyticsWhereInput | Prisma.ChatRunAnalyticsWhereInput[]
@@ -315,12 +316,11 @@ export type ChatRunAnalyticsWhereUniqueInput = Prisma.AtLeast<{
   tokensInput?: Prisma.IntNullableFilter<"ChatRunAnalytics"> | number | null
   tokensOutput?: Prisma.IntNullableFilter<"ChatRunAnalytics"> | number | null
   estimatedCost?: Prisma.FloatNullableFilter<"ChatRunAnalytics"> | number | null
-  runId?: Prisma.StringNullableFilter<"ChatRunAnalytics"> | string | null
   traceId?: Prisma.StringNullableFilter<"ChatRunAnalytics"> | string | null
   status?: Prisma.StringNullableFilter<"ChatRunAnalytics"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ChatRunAnalytics"> | Date | string
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
-}, "id">
+}, "id" | "runId">
 
 export type ChatRunAnalyticsOrderByWithAggregationInput = {
   id?: Prisma.SortOrder

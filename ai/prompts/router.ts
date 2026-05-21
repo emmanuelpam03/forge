@@ -17,7 +17,7 @@ import {
   getToolsPrompt,
   getVisualContextToolPrompt,
 } from "@/ai/prompts/promptRegistry";
-import { shouldUseHumanizationMode } from "@/ai/prompts/humanization.prompt";
+// humanization routing removed from live prompt assembly
 import {
   DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
   type AudienceLevel,
@@ -377,7 +377,6 @@ function looksLikeCodeRequest(message: string): boolean {
 
 function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const controls = state.promptBehavior ?? resolveBehaviorControls(state);
-  const humanizationEnabled = shouldUseHumanizationMode(state.userMessage);
 
   // Log anonymized teaching depth choice for ML feedback
   logTeachingDepthTelemetry(state, controls.teachingDepth);
@@ -476,11 +475,11 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       priority: 78,
       content: getHumanizationPrompt(),
       directives: {
-        "response.humanization": humanizationEnabled
+        "response.humanization": false
           ? "explicit-request"
           : "disabled",
       },
-      enabled: humanizationEnabled,
+      enabled: false,
     },
     {
       id: "formatter-default",

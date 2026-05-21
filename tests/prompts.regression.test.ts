@@ -201,17 +201,6 @@ test("router supports auto persona for coding and explicit overrides", () => {
   assert.match(source, /looksLikeCodeRequest/);
 });
 
-test("router wires explicit-only humanization prompt activation", () => {
-  const source = readWorkspaceFile("ai/prompts/router.ts");
-
-  assert.match(source, /shouldUseHumanizationMode/);
-  assert.match(source, /humanizationEnabled/);
-  assert.match(source, /id: "humanization-explicit"/);
-  assert.match(source, /layer: "humanization"/);
-  assert.match(source, /enabled: humanizationEnabled/);
-  assert.match(source, /response\.humanization/);
-});
-
 test("long-form writing requests preserve the generated draft", () => {
   assert.equal(
     shouldPreserveLongFormDraft("Write an essay on the problems of our leaders today"),
@@ -244,13 +233,7 @@ test("streaming path uses the actual generation node output", () => {
   assert.doesNotMatch(source, /const reflectedMessage = state\.assistantMessage\?\.trim\(\)/);
 });
 
-test("nodes apply sanitizer only for explicit humanization mode", () => {
-  const source = readWorkspaceFile("ai/graph/nodes.ts");
-
-  assert.match(source, /humanizeAssistantResponseText/);
-  assert.match(source, /sanitizeAssistantOutput/);
-  assert.match(source, /shouldUseHumanizationMode\(state\.userMessage\)/);
-});
+// Sanitization and auto-reflection removed from runtime; related assertions omitted.
 
 test("chat API accepts persona opt-in payload", () => {
   const source = readWorkspaceFile("app/api/chat/route.ts");

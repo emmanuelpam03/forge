@@ -233,7 +233,7 @@ export function MessageRenderer({
         const { className, children, inline, ...restProps } = props;
         const languageMatch = /language-(\w+)/.exec(className ?? "");
         const language = languageMatch?.[1];
-        const codeText = String(children).replace(/\n$/, "");
+        const codeText = String(children);
         const isBlockCode = !Boolean(inline);
 
         if (!isBlockCode) {

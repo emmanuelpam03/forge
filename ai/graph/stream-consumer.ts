@@ -17,8 +17,7 @@ export function toTextContent(content: unknown): string {
 
         return "";
       })
-      .join("")
-      .trim();
+      .join("");
   }
 
   return "";

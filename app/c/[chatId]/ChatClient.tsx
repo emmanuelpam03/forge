@@ -692,7 +692,7 @@ export function ChatClient({
         persistedMessageId?: string,
         persistedUserMessageId?: string,
       ) => {
-        const finalContent = (content || streamedMessage || "").trim();
+        const finalContent = content || streamedMessage || "";
         const nextAssistantMessageId =
           persistedMessageId && persistedMessageId.trim().length > 0
             ? persistedMessageId
@@ -966,7 +966,7 @@ export function ChatClient({
       };
 
       const applyDone = (content: string, persistedMessageId?: string) => {
-        const finalContent = (content || streamedMessage || "").trim();
+        const finalContent = content || streamedMessage || "";
         const nextAssistantMessageId =
           persistedMessageId && persistedMessageId.trim().length > 0
             ? persistedMessageId
@@ -1269,7 +1269,7 @@ export function ChatClient({
           persistedMessageId?: string,
           persistedUserMessageId?: string,
         ) => {
-          const finalContent = (content || streamedMessage || "").trim();
+          const finalContent = content || streamedMessage || "";
           const nextAssistantMessageId =
             persistedMessageId && persistedMessageId.trim().length > 0
               ? persistedMessageId

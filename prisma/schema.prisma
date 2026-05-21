@@ -225,7 +225,7 @@ model ChatRunAnalytics {
   tokensOutput  Int?
   estimatedCost Float?
 
-  runId   String?
+  runId   String? @unique
   traceId String?
   status  String?
 
@@ -233,7 +233,6 @@ model ChatRunAnalytics {
 
   @@index([chatId])
   @@index([createdAt])
-  @@index([runId])
 }
 
 model Document {

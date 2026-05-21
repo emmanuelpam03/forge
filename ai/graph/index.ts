@@ -11,13 +11,13 @@ import { CHAT_GRAPH_EDGE_LIST, CHAT_GRAPH_NODES } from "@/ai/graph/edges";
 import {
   generateResponseNode,
   loadContextNode,
+  loadContextEnrichmentNode,
   saveMessagesNode,
   classifyIntentNode,
   planTaskNode,
   toolRouterNode,
   toolRouterNodeImpl,
   synthesizeEvidenceNode,
-  reflectionNode,
   generateTitleNode,
   extractMemoryNode,
   setGraphStreamEventEmitter,
@@ -51,12 +51,25 @@ async function runGraphPreResponse(
     classifyIntentNode(state),
   ]);
 
+  const liveContextEnrichmentPromise = contextResult.selectedContext
+    ? loadContextEnrichmentNode(
+        state,
+        contextResult.selectedContext,
+        contextResult.preferences,
+        state.memorySummary,
+      )
+    : Promise.resolve(null);
+
   Object.assign(state, contextResult);
   Object.assign(state, classificationResult);
   Object.assign(state, await planTaskNode(state));
   Object.assign(state, await toolRouterNodeImpl(state, onEvent));
   Object.assign(state, await synthesizeEvidenceNode(state));
-  Object.assign(state, await reflectionNode(state));
+
+  const liveContextEnrichment = await liveContextEnrichmentPromise;
+  if (liveContextEnrichment) {
+    Object.assign(state, liveContextEnrichment);
+  }
 
   // Clear the run-scoped emitter after all pre-response events are done.
   setGraphStreamEventEmitter(undefined);
@@ -79,7 +92,6 @@ const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.planTask, planTaskNode)
   .addNode(CHAT_GRAPH_NODES.toolRouter, toolRouterNode)
   .addNode(CHAT_GRAPH_NODES.synthesizeEvidence, synthesizeEvidenceNode)
-  .addNode(CHAT_GRAPH_NODES.reflectOnResponse, reflectionNode)
   .addNode(CHAT_GRAPH_NODES.generateResponse, generateResponseNode)
   .addNode(CHAT_GRAPH_NODES.saveMessages, saveMessagesNode)
   .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode)

@@ -58,15 +58,15 @@ function estimateTokens(text: string): number {
 async function loadRecentTurns(
   chatId: string,
   limit: number = RECENT_TURN_WINDOW,
-  cutoffMessageId?: string | null,
+  _cutoffMessageId?: string | null,
 ): Promise<ChatMessageSnapshot[]> {
   // If cutoffMessageId is provided, load its createdAt and limit results to messages
   // created at or before that timestamp.
   let whereClause: Prisma.MessageWhereInput = { chatId };
 
-  if (cutoffMessageId) {
+  if (_cutoffMessageId) {
     const cutoffMsg = await prisma.message.findUnique({
-      where: { id: cutoffMessageId },
+      where: { id: _cutoffMessageId },
       select: { createdAt: true },
     });
     if (cutoffMsg) {
@@ -359,12 +359,12 @@ function applyTokenBudget(
  */
 export async function loadContextFastPath(
   chatId: string,
-  cutoffMessageId?: string | null,
+  _cutoffMessageId?: string | null,
 ): Promise<SelectedContext> {
   const ctxTimer = startTimer("loadContextFastPath", { chatId });
   try {
     // Load only recent turns (2 messages) - minimal DB hit
-    const recentTurns = await loadRecentTurns(chatId, RECENT_TURN_WINDOW, cutoffMessageId);
+    const recentTurns = await loadRecentTurns(chatId, RECENT_TURN_WINDOW, _cutoffMessageId);
 
     return {
       recentTurns,
@@ -397,7 +397,7 @@ export async function loadContextFastPath(
  */
 export async function enrichContextInBackground(
   chatId: string,
-  cutoffMessageId?: string | null,
+  _cutoffMessageId?: string | null,
 ): Promise<Partial<SelectedContext> & { memorySummary: MemorySummarySnapshot | null }> {
   const enrichTimer = startTimer("enrichContextInBackground", { chatId });
   try {
@@ -414,11 +414,15 @@ export async function enrichContextInBackground(
       loadChatSummary(chatId),
     ]);
 
+    // Also load a fuller set of recent turns for enrichment purposes
+    const recentTurns = await loadRecentTurns(chatId, RECENT_TURN_WINDOW_FULL, _cutoffMessageId);
+
     const userMemoryText = userMemory
       ? `Version ${userMemory.version}: ${userMemory.summary}`
       : null;
 
     return {
+      recentTurns,
       chatSummary,
       projectContext,
       preferences,
@@ -440,7 +444,7 @@ export async function enrichContextInBackground(
  */
 export async function loadContextForChat(
   chatId: string,
-  cutoffMessageId?: string | null,
+  _cutoffMessageId?: string | null,
 ): Promise<SelectedContext> {
   const ctxTimer = startTimer("loadContextForChat", { chatId });
   let totalTokens = 0;
@@ -457,7 +461,7 @@ export async function loadContextForChat(
     chatSummary,
     projectMemory,
   ] = await Promise.all([
-    loadRecentTurns(chatId, RECENT_TURN_WINDOW_FULL, cutoffMessageId),
+  loadRecentTurns(chatId, RECENT_TURN_WINDOW_FULL, _cutoffMessageId),
     loadUserPreferences(),
     loadUserMemorySummary(),
     loadProjectContext(chatId),

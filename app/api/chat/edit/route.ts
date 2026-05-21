@@ -143,9 +143,7 @@ export async function POST(request: NextRequest) {
               },
             );
 
-            const finalMessage = (
-              result.assistantMessage || assistantMessage
-            ).trim();
+            const finalMessage = result.assistantMessage || assistantMessage;
 
             if (!finalMessage) {
               console.error(

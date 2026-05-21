@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { getRedisClient } from "@/lib/redis";
 import { dequeueJob, completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type EnrichContextJobData } from "@/lib/job-queue";
 import { error as logError, info } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
@@ -124,8 +125,19 @@ export async function persistSaveMessagesJobData(
     data: chatUpdateData,
   });
 
-  await prisma.chatRunAnalytics.create({
-    data: {
+  await prisma.chatRunAnalytics.upsert({
+    where: { runId: data.runId },
+    update: {
+      chatId: data.chatId,
+      modelUsed: data.modelUsed,
+      provider: "openrouter",
+      latencyMs: data.latencyMs,
+      tokensInput: data.inputTokens,
+      tokensOutput: data.outputTokens,
+      traceId: data.traceId,
+      status: "completed",
+    },
+    create: {
       chatId: data.chatId,
       modelUsed: data.modelUsed,
       provider: "openrouter",
@@ -262,10 +274,13 @@ async function startWorkerForQueue<T>(
   jobType: "saveMessages" | "generateTitle" | "enrichContext" | "extractMemory",
   processor: (job: Job<T>) => Promise<void>,
 ): Promise<void> {
-  while (true) {
+  while (!workersStopping) {
     try {
-      const job = await dequeueJob(jobType, 30);
+      const job = await dequeueJob(jobType, workersStopping ? 1 : 30);
       if (!job) {
+        if (workersStopping) {
+          break;
+        }
         // Queue empty, wait and retry
         await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
@@ -273,6 +288,9 @@ async function startWorkerForQueue<T>(
 
       await processor(job as unknown as Job<T>);
     } catch (err) {
+      if (workersStopping) {
+        break;
+      }
       logError("worker_error", { jobType, error: err });
       // Continue processing despite errors
       await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -286,22 +304,77 @@ async function startWorkerForQueue<T>(
  * Safe to call multiple times - uses a module-level guard to prevent duplicate initialization.
  */
 let workersInitialized = false;
+let workersStopping = false;
+let workerLoopPromises: Promise<void>[] = [];
 
-export function initializeBackgroundWorkers(): void {
-  if (workersInitialized) {
+export type BackgroundWorkerHandle = {
+  shutdown: (options?: { timeoutMs?: number }) => Promise<void>;
+};
+
+async function waitForWorkerLoops(timeoutMs: number): Promise<void> {
+  if (workerLoopPromises.length === 0) {
     return;
   }
+
+  await Promise.race([
+    Promise.allSettled(workerLoopPromises),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`worker shutdown timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
+
+async function shutdownBackgroundWorkers(options?: { timeoutMs?: number }): Promise<void> {
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+
+  if (workersStopping) {
+    return;
+  }
+
+  workersStopping = true;
+  info("background_workers_shutdown_requested", { timeoutMs });
+
+  try {
+    await waitForWorkerLoops(timeoutMs);
+    info("background_workers_shutdown_completed", { timeoutMs });
+  } catch (error) {
+    logError("background_workers_shutdown_failed", { error, timeoutMs });
+    throw error;
+  }
+}
+
+export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHandle> {
+  if (workersInitialized) {
+    return {
+      shutdown: shutdownBackgroundWorkers,
+    };
+  }
+
+  const redis = getRedisClient();
+  if (!redis) {
+    throw new Error("REDIS_URL is required to start background workers.");
+  }
+
+  await redis.ping();
+
   workersInitialized = true;
+  workersStopping = false;
 
   // Start workers for each job type (fire and forget)
-  void startWorkerForQueue("saveMessages", processSaveMessagesJob);
-  void startWorkerForQueue("generateTitle", processGenerateTitleJob);
-  void startWorkerForQueue("enrichContext", processEnrichContextJob);
-  void startWorkerForQueue("extractMemory", processExtractMemoryJob);
+  workerLoopPromises = [
+    startWorkerForQueue("saveMessages", processSaveMessagesJob),
+    startWorkerForQueue("generateTitle", processGenerateTitleJob),
+    startWorkerForQueue("enrichContext", processEnrichContextJob),
+    startWorkerForQueue("extractMemory", processExtractMemoryJob),
+  ];
 
   info("background_workers_initialized", {
     jobTypes: ["saveMessages", "generateTitle", "enrichContext", "extractMemory"],
   });
+
+  return {
+    shutdown: shutdownBackgroundWorkers,
+  };
 }
 
 // Export for testing

@@ -24,7 +24,9 @@ const chatRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   // Initialize background workers on first request (lazy initialization)
-  initializeBackgroundWorkers();
+  void initializeBackgroundWorkers().catch((error) => {
+    logError("background_workers_init_failed", { error });
+  });
 
   try {
     const body = await request.json();
@@ -120,9 +122,7 @@ export async function POST(request: NextRequest) {
             );
 
             // Route-level validation: ensure response is not empty
-            const finalMessage = (
-              result.assistantMessage || assistantMessage
-            ).trim();
+            const finalMessage = result.assistantMessage || assistantMessage;
             finalPersistedMessageId = result.assistantMessageId ?? undefined;
 
             if (!finalMessage) {

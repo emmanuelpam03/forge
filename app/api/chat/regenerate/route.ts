@@ -207,9 +207,7 @@ export async function POST(request: NextRequest) {
                 send(event);
               },
             );
-            const finalMessage = (
-              result.assistantMessage || assistantMessage
-            ).trim();
+            const finalMessage = result.assistantMessage || assistantMessage;
 
             if (!finalMessage) {
               await prisma.message

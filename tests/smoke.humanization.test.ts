@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { shouldUseHumanizationMode } from "../ai/prompts/humanization.prompt.ts";
-import { sanitizeAssistantOutput } from "../ai/graph/output-sanitizer.ts";
 
 test("smoke: humanization prompt included only on explicit requests", () => {
   const explicit =
@@ -25,18 +24,4 @@ test("smoke: humanization prompt included only on explicit requests", () => {
   assert.ok(humanizationMd.includes("ANTI-ROBOTIC RULES"));
 });
 
-test("smoke: sanitizer cleans up drafting artifacts when humanize is used", () => {
-  const raw = `\n*Check: Drafting notes\n\nThis is the actual answer.\n\nNo fragments\n`;
-  const cleaned = sanitizeAssistantOutput(raw);
-
-  assert.ok(!cleaned.includes("Check:"));
-  assert.ok(cleaned.includes("This is the actual answer."));
-});
-
-test("smoke: sanitizer unwraps single-asterisk emphasis and removes stray asterisks", () => {
-  const raw = "This looks biased: *Prejudice* and some stray * stars.";
-  const cleaned = sanitizeAssistantOutput(raw);
-
-  assert.ok(!cleaned.includes("*"));
-  assert.ok(cleaned.trim().length > 0);
-});
+// Sanitizer removed from runtime; no runtime sanitizer smoke tests.
