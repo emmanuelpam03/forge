@@ -758,14 +758,19 @@ export function ChatClient({
               const event = JSON.parse(line) as StreamEvent;
 
             if (event.type === "status") {
-              // Update transient status on the active assistant placeholder
-              setMessages((currentMessages) =>
-                currentMessages.map((m) =>
-                  m.id === activeAssistantMessageId
-                    ? { ...m, status: event.message }
-                    : m,
-                ),
-              );
+              // Suppress generic "Loading context..." for new chats with no history
+              if (event.message === "Loading context..." && !hasMessages) {
+                // ignore
+              } else {
+                // Update transient status on the active assistant placeholder
+                setMessages((currentMessages) =>
+                  currentMessages.map((m) =>
+                    m.id === activeAssistantMessageId
+                      ? { ...m, status: event.message }
+                      : m,
+                  ),
+                );
+              }
             }
 
             if (event.type === "title") {
@@ -1054,13 +1059,18 @@ export function ChatClient({
             const event = JSON.parse(line) as StreamEvent;
 
             if (event.type === "status") {
-              setMessages((currentMessages) =>
-                currentMessages.map((m) =>
-                  m.id === activeAssistantMessageId
-                    ? { ...m, status: event.message }
-                    : m,
-                ),
-              );
+              // Suppress generic "Loading context..." for new chats with no history
+              if (event.message === "Loading context..." && !hasMessages) {
+                // ignore
+              } else {
+                setMessages((currentMessages) =>
+                  currentMessages.map((m) =>
+                    m.id === activeAssistantMessageId
+                      ? { ...m, status: event.message }
+                      : m,
+                  ),
+                );
+              }
             }
 
             if (event.type === "title") {
@@ -1342,13 +1352,18 @@ export function ChatClient({
               const event = JSON.parse(line) as StreamEvent;
 
             if (event.type === "status") {
-              setMessages((currentMessages) =>
-                currentMessages.map((m) =>
-                  m.id === activeAssistantMessageId
-                    ? { ...m, status: event.message }
-                    : m,
-                ),
-              );
+              // Suppress generic "Loading context..." for new chats with no history
+              if (event.message === "Loading context..." && !hasMessages) {
+                // ignore
+              } else {
+                setMessages((currentMessages) =>
+                  currentMessages.map((m) =>
+                    m.id === activeAssistantMessageId
+                      ? { ...m, status: event.message }
+                      : m,
+                  ),
+                );
+              }
             }
 
             if (event.type === "title") {

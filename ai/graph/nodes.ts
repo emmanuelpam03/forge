@@ -7,12 +7,7 @@ import {
   type ModelOverride,
 } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router.ts";
-import { MEMORY_EXTRACTION_PROMPT } from "@/ai/prompts/memory";
-import {
-  loadContextFastPath,
-  enrichContextInBackground,
-  updateUserMemory,
-} from "@/ai/context/engine";
+import { loadContextFastPath } from "@/ai/context/engine";
 import { persistSaveMessagesJobData } from "@/lib/background-worker";
 import { queueJob, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
 import { createForgeTools } from "@/ai/tools";
@@ -408,22 +403,15 @@ function deriveFormattingProfile(
  * This is needed for multi-sequential tool chaining where intermediate results are prose.
  */
 export async function loadContextNode(state: ChatGraphState) {
-  emitStatus(undefined, "Loading context...");
-  // Use fast path: Load only recent turns for quick model start (~1-2ms)
+  // Load only same-chat recent turns. Do NOT emit a generic "Loading context..."
+  // message or trigger any background enrichment for new chats.
   const selectedContext = await loadContextFastPath(
     state.chatId,
     state.parentMessageId ?? null,
   );
 
-  // Queue background enrichment (loads project context, user memory, preferences)
-  // This runs asynchronously and doesn't block model response start
-  void queueJob("enrichContext", {
-    chatId: state.chatId,
-    runId: state.runId,
-  });
-
   state.selectedContext = selectedContext;
-  state.preferences = selectedContext.preferences;
+  state.preferences = selectedContext.preferences ?? [];
 
   return {
     selectedContext,
@@ -440,45 +428,10 @@ type LiveContextEnrichmentOutput = {
   _timings: NonNullable<ChatGraphState["_timings"]>;
 };
 
-export async function loadContextEnrichmentNode(
-  state: ChatGraphState,
-  preservedOriginalSelectedContext: NonNullable<ChatGraphState["selectedContext"]>,
-  basePreferences: ChatGraphState["preferences"],
-  baseMemorySummary: ChatGraphState["memorySummary"],
-): Promise<LiveContextEnrichmentOutput | null> {
-  const liveContextEnrichmentStartedAt = Date.now();
-
-  try {
-    const enrichment = await enrichContextInBackground(
-      state.chatId,
-      state.parentMessageId ?? null,
-    );
-
-    if (!preservedOriginalSelectedContext) {
-      return null;
-    }
-
-    return {
-      selectedContext: {
-        ...preservedOriginalSelectedContext,
-        ...enrichment,
-      },
-      preferences: enrichment.preferences ?? basePreferences,
-      memorySummary: enrichment.memorySummary ?? baseMemorySummary,
-      _timings: {
-        ...(state._timings ?? {}),
-        liveContextEnrichmentStartedAt,
-        liveContextEnrichmentCompletedAt: Date.now(),
-      },
-    };
-  } catch (error) {
-    logError("live_context_enrichment_failed", {
-      chatId: state.chatId,
-      runId: state.runId,
-      error,
-    });
-    return null;
-  }
+// Context enrichment node removed: background enrichment and cross-chat
+// memory/project context are disabled in the chat-history-only architecture.
+export async function loadContextEnrichmentNode() {
+  return null;
 }
 
 export async function generateResponseNode(state: ChatGraphState) {
@@ -1289,39 +1242,7 @@ export async function generateTitleNode(state: ChatGraphState) {
  * Input: userMessage + assistantMessage + intent
  * Output: extractedMemory field
  */
+// Memory extraction disabled under chat-history-only policy.
 export async function extractMemoryNode(state: ChatGraphState) {
-  try {
-    const model = createGeminiModel();
-    const prompt = MEMORY_EXTRACTION_PROMPT.replace(
-      /"{USER_MESSAGE}"/g,
-      state.userMessage,
-    )
-      .replace(/"{ASSISTANT_MESSAGE}"/g, state.assistantMessage)
-      .replace(/"{INTENT}"/g, state.intent || "");
-
-    const response = await model.invoke(
-      [new HumanMessage(prompt)],
-      buildLangSmithRunConfig(state, "memory-extraction"),
-    );
-    const extractedMemory = toTextContent(response.content)
-      .trim()
-      .replace(/^["']|["']$/g, "");
-
-    // Phase 6: Update user memory with extracted fact (deduplicated & ranked)
-    if (extractedMemory) {
-      await updateUserMemory(extractedMemory).catch((err) => {
-        warn("update_user_memory_failed", { error: err });
-        // Non-blocking - don't throw
-      });
-    }
-
-    return {
-      extractedMemory,
-    };
-  } catch (error) {
-    logError("memory_extraction_failed", { error });
-    return {
-      extractedMemory: "",
-    };
-  }
+  return { extractedMemory: "" };
 }

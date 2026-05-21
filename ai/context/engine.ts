@@ -102,74 +102,27 @@ async function loadRecentTurns(
  * Load global user preferences (for now, single-user mode).
  * In future, scope by userId.
  */
+// Preferences disabled for chat-history-only context. Keep stub in place.
 async function loadUserPreferences(): Promise<PreferenceSnapshot[]> {
-  const preferences = await prisma.preference.findMany({
-    orderBy: [{ category: "asc" }, { key: "asc" }],
-  });
-
-  return preferences.map((p) => ({
-    key: p.key,
-    value: p.value,
-    category: p.category,
-  }));
+  return [];
 }
 
 /**
  * Load the latest user memory summary.
  * In future, scope by userId.
  */
+// Memory summary disabled under chat-history-only policy.
 async function loadUserMemorySummary(): Promise<MemorySummarySnapshot | null> {
-  const summary = await prisma.memorySummary.findFirst({
-    orderBy: { updatedAt: "desc" },
-  });
-
-  if (!summary) return null;
-
-  return {
-    id: summary.id,
-    summary: summary.summary,
-    version: summary.version,
-    updatedAt: summary.updatedAt.toISOString(),
-  };
+  return null;
 }
 
 /**
  * Load project context snippets (if chat belongs to a project).
  * Uses simple lexical ranking for now.
  */
+// Project context disabled for chat-history-only policy.
 async function loadProjectContext(chatId: string): Promise<string | null> {
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    select: { projectId: true, title: true },
-  });
-
-  if (!chat?.projectId) {
-    return null;
-  }
-
-  // Load recent project messages (simple recency ranking)
-  const messages = await prisma.message.findMany({
-    where: {
-      chat: { projectId: chat.projectId },
-      role: { in: ["user", "assistant"] },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-    select: { content: true, role: true, createdAt: true },
-  });
-
-  if (messages.length === 0) {
-    return null;
-  }
-
-  // Take only the most recent messages
-  const recentProjectMessages = messages
-    .slice(0, 6)
-    .reverse()
-    .map((m) => `${m.role}: ${m.content}`)
-    .join("\n");
-
-  return recentProjectMessages || null;
+  return null;
 }
 
 /**
@@ -363,8 +316,28 @@ export async function loadContextFastPath(
 ): Promise<SelectedContext> {
   const ctxTimer = startTimer("loadContextFastPath", { chatId });
   try {
-    // Load only recent turns (2 messages) - minimal DB hit
-    const recentTurns = await loadRecentTurns(chatId, RECENT_TURN_WINDOW, _cutoffMessageId);
+    const recentTurns = await loadRecentTurns(
+      chatId,
+      RECENT_TURN_WINDOW,
+      _cutoffMessageId,
+    );
+
+    const recentContent = recentTurns
+      .map((msg) => `${msg.role}: ${msg.content}`)
+      .join("\n");
+
+    const sections: ContextSection[] = recentTurns.length
+      ? [
+          {
+            name: "Recent Conversation",
+            content: recentContent,
+            priority: 1,
+            estimatedTokens: estimateTokens(recentContent),
+          },
+        ]
+      : [];
+
+    const totalEstimatedTokens = sections.reduce((acc, s) => acc + s.estimatedTokens, 0);
 
     return {
       recentTurns,
@@ -373,17 +346,8 @@ export async function loadContextFastPath(
       preferences: [],
       userMemory: null,
       retrievedSnippets: null,
-      sections: recentTurns.length > 0 ? [
-        {
-          name: "Recent Conversation",
-          content: recentTurns.map((msg) => `${msg.role}: ${msg.content}`).join("\n"),
-          priority: 1,
-          estimatedTokens: estimateTokens(
-            recentTurns.map((msg) => `${msg.role}: ${msg.content}`).join("\n")
-          ),
-        },
-      ] : [],
-      totalEstimatedTokens: 0,
+      sections,
+      totalEstimatedTokens,
       budgetUsed: 0,
     };
   } finally {
@@ -391,165 +355,76 @@ export async function loadContextFastPath(
   }
 }
 
-/**
- * Background enrichment: Load full context asynchronously.
- * Called after model starts streaming. Results enrich state for future turns.
- */
+// Background enrichment disabled: return empty enrichment to avoid any
+// cross-chat/project/memory retrievals.
 export async function enrichContextInBackground(
-  chatId: string,
+  _chatId: string,
   _cutoffMessageId?: string | null,
 ): Promise<Partial<SelectedContext> & { memorySummary: MemorySummarySnapshot | null }> {
-  const enrichTimer = startTimer("enrichContextInBackground", { chatId });
-  try {
-    // Parallel load of context sources (skip recent turns - already loaded)
-    const [
-      preferences,
-      userMemory,
-      projectContext,
-      chatSummary,
-    ] = await Promise.all([
-      loadUserPreferences(),
-      loadUserMemorySummary(),
-      loadProjectContext(chatId),
-      loadChatSummary(chatId),
-    ]);
-
-    // Also load a fuller set of recent turns for enrichment purposes
-    const recentTurns = await loadRecentTurns(chatId, RECENT_TURN_WINDOW_FULL, _cutoffMessageId);
-
-    const userMemoryText = userMemory
-      ? `Version ${userMemory.version}: ${userMemory.summary}`
-      : null;
-
-    return {
-      recentTurns,
-      chatSummary,
-      projectContext,
-      preferences,
-      userMemory: userMemoryText,
-      memorySummary: userMemory,
-    };
-  } catch (err) {
-    logError("enrich_context_failed", { chatId, error: err });
-    return { memorySummary: null }; // Return empty enrichment on error; don't crash
-  } finally {
-    void endTimer(enrichTimer);
-  }
+  return { memorySummary: null } as Partial<SelectedContext> & {
+    memorySummary: MemorySummarySnapshot | null;
+  };
 }
 
-/**
- * Main context loading function.
- * Orchestrates all context loading and selection.
- * Phase 5: Project-aware loading.
- */
+// Full chat loader: same-chat recent turns only (more comprehensive window)
 export async function loadContextForChat(
   chatId: string,
   _cutoffMessageId?: string | null,
 ): Promise<SelectedContext> {
   const ctxTimer = startTimer("loadContextForChat", { chatId });
-  let totalTokens = 0;
   try {
-  // Load project info first to decide what to load next
-  const projectInfo = await loadProjectInfo(chatId);
+    const recentTurns = await loadRecentTurns(
+      chatId,
+      RECENT_TURN_WINDOW_FULL,
+      _cutoffMessageId,
+    );
 
-  // Parallel load of all context sources
-  const [
-    recentTurns,
-    preferences,
-    userMemory,
-    projectContext,
-    chatSummary,
-    projectMemory,
-  ] = await Promise.all([
-  loadRecentTurns(chatId, RECENT_TURN_WINDOW_FULL, _cutoffMessageId),
-    loadUserPreferences(),
-    loadUserMemorySummary(),
-    loadProjectContext(chatId),
-    loadChatSummary(chatId),
-    projectInfo.projectId
-      ? buildProjectMemory(projectInfo.projectId)
-      : Promise.resolve(null),
-  ]);
+    const recentContent = recentTurns
+      .map((msg) => `${msg.role}: ${msg.content}`)
+      .join("\n");
 
-  // Format user memory summary if available
-  const userMemoryText = userMemory
-    ? `Version ${userMemory.version}: ${userMemory.summary}`
-    : null;
+    const sections: ContextSection[] = recentTurns.length
+      ? [
+          {
+            name: "Recent Conversation",
+            content: recentContent,
+            priority: 1,
+            estimatedTokens: estimateTokens(recentContent),
+          },
+        ]
+      : [];
 
-  // Assemble all context sections in priority order (project-aware)
-  const allSections = assembleContextSections(
-    recentTurns,
-    chatSummary,
-    projectContext,
-    preferences,
-    userMemoryText,
-    projectMemory,
-  );
+    const totalEstimatedTokens = sections.reduce((acc, s) => acc + s.estimatedTokens, 0);
 
-  // Apply token budget
-  const selectedSections = applyTokenBudget(allSections);
-
-  // Calculate total tokens used
-  totalTokens = selectedSections.reduce((sum, s) => sum + s.estimatedTokens, 0);
-  const budgetPercentage = Math.round((totalTokens / TOKEN_BUDGET) * 100);
-
-  return {
-    recentTurns,
-    chatSummary: chatSummary || null,
-    projectContext: projectContext || null,
-    preferences,
-    userMemory: userMemoryText || null,
-    retrievedSnippets: null,
-    sections: selectedSections,
-    totalEstimatedTokens: totalTokens,
-    budgetUsed: budgetPercentage,
-  };
+    return {
+      recentTurns,
+      chatSummary: null,
+      projectContext: null,
+      preferences: [],
+      userMemory: null,
+      retrievedSnippets: null,
+      sections,
+      totalEstimatedTokens,
+      budgetUsed: 0,
+    };
+  } catch (err) {
+    logError("load_context_failed", { chatId, error: err });
+    return {
+      recentTurns: [],
+      chatSummary: null,
+      projectContext: null,
+      preferences: [],
+      userMemory: null,
+      retrievedSnippets: null,
+      sections: [],
+      totalEstimatedTokens: 0,
+      budgetUsed: 0,
+    };
   } finally {
-    void endTimer(ctxTimer, { budgetUsed: Math.round((totalTokens / TOKEN_BUDGET) * 100) });
+    void endTimer(ctxTimer);
   }
 }
-
-/**
- * Load chat summary for a specific chat.
- */
-async function loadChatSummary(chatId: string): Promise<string | null> {
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    select: { summary: true },
-  });
-
-  return chat?.summary ?? null;
-}
-
-/**
- * Maintain rolling chat summary.
- * Call after saving messages to update chat summary if needed.
- *
- * Strategy:
- * - Trigger summary generation when message count crosses thresholds (10, 20, 30, etc.)
- * - Summarize oldest messages beyond RECENT_TURN_WINDOW to preserve continuity
- * - Keep summary concise (<500 tokens) to preserve budget
- */
-export async function maintainChatSummary(chatId: string): Promise<void> {
-  // Count total messages in chat
-  const messageCount = await prisma.message.count({
-    where: { chatId },
-  });
-
-  // Only generate summary after 10+ messages
-  const SUMMARY_THRESHOLD = 10;
-  const SUMMARY_UPDATE_INTERVAL = 10; // Update every 10 messages
-
-  if (messageCount < SUMMARY_THRESHOLD) {
-    return; // Not enough messages yet
-  }
-
-  // Check if summary needs update (rough check: if message count is multiple of interval)
-  if (messageCount % SUMMARY_UPDATE_INTERVAL !== 0) {
-    return; // Not time to update yet
-  }
-
-  // Load all messages to understand conversation flow
+export async function generateChatSummary(chatId: string): Promise<void> {
   const allMessages = await prisma.message.findMany({
     where: { chatId },
     orderBy: { createdAt: "asc" },
@@ -565,7 +440,6 @@ export async function maintainChatSummary(chatId: string): Promise<void> {
   }
 
   // Build summary text from older messages
-  // This is a simple approach: extract key points from message sequence
   const summaryText = buildChatSummary(messagesForSummary);
 
   if (summaryText) {
@@ -574,6 +448,7 @@ export async function maintainChatSummary(chatId: string): Promise<void> {
       data: { summary: summaryText },
     });
   }
+
 }
 
 /**

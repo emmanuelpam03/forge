@@ -350,7 +350,7 @@ function buildRuntimeContext(state: ChatGraphState): string {
     return [evidencePriorityContext, selectedContext].filter(Boolean).join(" ");
   }
 
-  return [
+  const segments: Array<PromptSegment | null> = [
     evidencePriorityContext,
     formatSelectedOptions(state),
     formatIntent(state),
@@ -382,7 +382,8 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   logTeachingDepthTelemetry(state, controls.teachingDepth);
 
   const runtimeContext = buildRuntimeContext(state);
-  const memoryInjection = buildMemoryInjection(state);
+  // Memory injection disabled: context must mean only same-chat history.
+  const memoryInjection = "";
 
   const seniorEngineerEnabled =
     controls.persona === "senior-engineer" ||
@@ -493,27 +494,21 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       },
       enabled: effectiveTaskCategory !== "coding",
     },
-    {
-      id: "runtime-context",
-      layer: "runtime-context",
-      priority: 70,
-      content: runtimeContext,
-      directives: {
-        "context.runtime": "current-turn-signals",
-      },
-      enabled: runtimeContext.trim().length > 0,
-    },
-    {
-      id: "memory-injection",
-      layer: "memory-injection",
-      priority: 65,
-      content: memoryInjection,
-      directives: {
-        "context.memory": "historical-and-preference-context",
-      },
-      enabled: memoryInjection.trim().length > 0,
-    },
+    runtimeContext.trim().length > 0
+      ? {
+          id: "runtime-context",
+          layer: "runtime-context",
+          priority: 70,
+          content: runtimeContext,
+          directives: {
+            "context.runtime": "current-turn-signals",
+          },
+          enabled: true,
+        }
+      : null,
   ];
+
+  return segments.filter((s): s is PromptSegment => s !== null);
 }
 
 export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
