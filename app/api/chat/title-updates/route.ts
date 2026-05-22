@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   if (requestedChatIds.length > 0) {
     const existingChats = await prisma.chat.findMany({
-      where: { id: { in: requestedChatIds } },
+      where: { id: { in: requestedChatIds }, userId: session.user.id },
       select: { id: true },
     });
 
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const missingChatIds = requestedChatIds.filter((chatId) => !existingChatIds.has(chatId));
 
     if (missingChatIds.length > 0) {
-      return new Response("Forbidden", { status: 403 });
+      return new Response("Not Found", { status: 404 });
     }
   }
 
