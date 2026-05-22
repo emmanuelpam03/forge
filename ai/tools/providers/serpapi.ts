@@ -33,17 +33,27 @@ export async function serpapiImageSearch(query: string, count: number = 6): Prom
     const payload = await res.json();
     const items = payload.images_results || payload.image_results || [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imgs: ProviderImage[] = items.map((it: any, idx: number) => ({
-      id: it.id || it.position || it.source || it.original || String(idx),
-      url: it.original || it.source || it.link || it.thumbnail || it.url,
-      thumbnailUrl: it.thumbnail || it.thumbnail_link || it.tbn || it.thumb || it.original || it.url,
-      title: it.title || it.alt || undefined,
-      sourcePage: it.context || it.source || it.link || undefined,
-      width: it.width || undefined,
-      height: it.height || undefined,
-      provider: "serpapi",
-    }));
+    const imgs: ProviderImage[] = items.map((it: unknown, idx: number) => {
+      const obj = it as Record<string, unknown>;
+      const id = String(obj.id ?? obj.position ?? obj.source ?? obj.original ?? idx);
+      const url = (obj.original ?? obj.source ?? obj.link ?? obj.thumbnail ?? obj.url) as string | undefined;
+      const thumbnailUrl = (obj.thumbnail ?? obj.thumbnail_link ?? obj.tbn ?? obj.thumb ?? obj.original ?? obj.url) as string | undefined;
+      const title = (obj.title ?? obj.alt) as string | undefined;
+      const sourcePage = (obj.context ?? obj.source ?? obj.link) as string | undefined;
+      const width = typeof obj.width === "number" ? (obj.width as number) : undefined;
+      const height = typeof obj.height === "number" ? (obj.height as number) : undefined;
+
+      return {
+        id,
+        url,
+        thumbnailUrl,
+        title,
+        sourcePage,
+        width,
+        height,
+        provider: "serpapi",
+      };
+    });
 
     // cache for 1 hour
     try {

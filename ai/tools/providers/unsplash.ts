@@ -26,17 +26,22 @@ export async function unsplashSearch(query: string, count: number = 6): Promise<
     if (!res.ok) return [];
     const payload = await res.json();
     const results = payload.results || [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imgs: ProviderImage[] = results.map((r: any) => ({
-      id: r.id,
-      url: r.urls?.regular || r.urls?.full || r.urls?.raw,
-      thumbnailUrl: r.urls?.thumb || r.urls?.small || r.urls?.regular,
-      title: r.description || r.alt_description || undefined,
-      sourcePage: r.links?.html,
-      width: r.width,
-      height: r.height,
-      provider: "unsplash",
-    }));
+    const imgs: ProviderImage[] = results.map((r: unknown) => {
+      const obj = r as Record<string, unknown>;
+      const urls = obj.urls as Record<string, unknown> | undefined;
+      const links = obj.links as Record<string, unknown> | undefined;
+
+      return {
+        id: obj.id as string,
+        url: (urls?.regular ?? urls?.full ?? urls?.raw) as string | undefined,
+        thumbnailUrl: (urls?.thumb ?? urls?.small ?? urls?.regular) as string | undefined,
+        title: (obj.description ?? obj.alt_description) as string | undefined,
+        sourcePage: links?.html as string | undefined,
+        width: typeof obj.width === "number" ? (obj.width as number) : undefined,
+        height: typeof obj.height === "number" ? (obj.height as number) : undefined,
+        provider: "unsplash",
+      };
+    });
 
     try {
       await cacheSet(cacheKey, JSON.stringify(imgs), 3600);

@@ -274,9 +274,7 @@ export function MessageRenderer({
           {children}
         </a>
       ),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      code: (props: any) => {
-        const { className, children, inline, ...restProps } = props;
+      code: ({ className, children, inline, ...restProps }: { className?: string; children: React.ReactNode; inline?: boolean } & Record<string, unknown>) => {
         const languageMatch = /language-(\w+)/.exec(className ?? "");
         const language = languageMatch?.[1];
         const codeText = String(children).replace(/\n$/, "");

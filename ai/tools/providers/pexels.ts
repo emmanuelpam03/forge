@@ -31,21 +31,32 @@ export async function pexelsSearch(query: string, count: number = 6): Promise<Pr
     const payload = await res.json();
     const photos = payload.photos || [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imgs: ProviderImage[] = photos.map((p: any) => ({
-      id: String(p.id),
-      url: p.src?.large2x || p.src?.large || p.src?.original || undefined,
-      thumbnailUrl: p.src?.medium || p.src?.small || p.src?.tiny || undefined,
-      title: p.alt || p.photographer || undefined,
-      sourcePage: p.url || undefined,
-      width: p.width || undefined,
-      height: p.height || undefined,
-      provider: "pexels",
-      metadata: {
-        photographer: p.photographer,
-        photographer_url: p.photographer_url,
-      },
-    }));
+    const imgs: ProviderImage[] = photos.map((p: unknown) => {
+      const obj = p as Record<string, unknown>;
+      const src = obj.src as Record<string, unknown> | undefined;
+      const id = obj.id !== undefined ? String(obj.id) : "";
+      const url = (src?.large2x ?? src?.large ?? src?.original) as string | undefined;
+      const thumbnailUrl = (src?.medium ?? src?.small ?? src?.tiny) as string | undefined;
+      const title = (obj.alt ?? obj.photographer) as string | undefined;
+      const sourcePage = obj.url as string | undefined;
+      const width = typeof obj.width === "number" ? (obj.width as number) : undefined;
+      const height = typeof obj.height === "number" ? (obj.height as number) : undefined;
+
+      return {
+        id: id,
+        url,
+        thumbnailUrl,
+        title,
+        sourcePage,
+        width,
+        height,
+        provider: "pexels",
+        metadata: {
+          photographer: obj.photographer as string | undefined,
+          photographer_url: obj.photographer_url as string | undefined,
+        },
+      };
+    });
 
     try {
       // Cache the full fetched array (up to perPage) so future requests

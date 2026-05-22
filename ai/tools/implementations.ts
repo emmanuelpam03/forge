@@ -616,10 +616,19 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
       format: "json",
     }).toString();
 
-    let geocodePayload: any = {};
+    type GeocodeResult = {
+      name?: string;
+      country?: string;
+      admin1?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+    type GeocodePayload = { results?: GeocodeResult[] };
+
+    let geocodePayload: GeocodePayload = {};
     let geocodeResponse = await fetchWithTimeout(geocodeUrl.toString()).catch(() => null);
     if (geocodeResponse && geocodeResponse.ok) {
-      geocodePayload = await geocodeResponse.json().catch(() => ({}));
+      geocodePayload = (await geocodeResponse.json().catch(() => ({}))) as GeocodePayload;
     }
 
     let place = geocodePayload.results?.[0];
