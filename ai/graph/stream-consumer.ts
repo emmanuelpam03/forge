@@ -36,6 +36,28 @@ export function extractTextFromModelChunk(chunk: unknown): string {
   return "";
 }
 
+const INTERNAL_TRACE_PATTERNS = [
+  /<｜DSML｜[^>]*>/g,
+  /<\/?｜DSML｜tool_calls>/g,
+  /<｜DSML｜invoke[^>]*>/g,
+  /^\s*id="t\d+"\s*$/gim,
+  /^\s*invoke name=.*$/gim,
+  /^\s*tool_calls\s*$/gim,
+];
+
+export function sanitizeVisibleAssistantText(text: string): string {
+  if (!text) {
+    return "";
+  }
+
+  let sanitized = text;
+  for (const pattern of INTERNAL_TRACE_PATTERNS) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+
+  return sanitized;
+}
+
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   return (
     !!value &&
@@ -55,7 +77,9 @@ export async function consumeModelStream(
   }
 
   for await (const token of tokenStream) {
-    const chunkText = extractTextFromModelChunk(token);
+    const chunkText = sanitizeVisibleAssistantText(
+      extractTextFromModelChunk(token),
+    );
     if (!chunkText) {
       continue;
     }

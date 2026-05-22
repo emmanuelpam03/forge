@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   consumeModelStream,
   extractTextFromModelChunk,
+  sanitizeVisibleAssistantText,
 } from "../ai/graph/stream-consumer.ts";
 
 function readWorkspaceFile(relativePath: string): string {
@@ -60,11 +61,21 @@ test("consumeModelStream rejects non-async iterables", async () => {
   );
 });
 
+test("sanitizeVisibleAssistantText strips internal tool traces", () => {
+  const leaked = `Here is the answer\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="imageSearch">\nid="t1"`;
+
+  const sanitized = sanitizeVisibleAssistantText(leaked);
+
+  assert.equal(sanitized.includes("DSML"), false);
+  assert.equal(sanitized.includes("imageSearch"), false);
+  assert.match(sanitized, /Here is the answer/);
+});
+
 test("generateResponseNode uses LangChain stream consumption", () => {
   const source = readWorkspaceFile("ai/graph/nodes.ts");
 
   assert.match(source, /consumeModelStream\(/);
-  assert.match(source, /extractTextFromModelChunk/);
+  assert.match(source, /sanitizeVisibleAssistantText/);
   assert.doesNotMatch(source, /for await \(const token of tokenStream\)/);
   assert.doesNotMatch(source, /chunk\.choices\[0\]\.delta\.content/);
 });

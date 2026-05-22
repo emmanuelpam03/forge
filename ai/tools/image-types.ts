@@ -29,6 +29,7 @@ export type RetrievedImage = {
   thumbnailUrl: string;
   title?: string;
   sourcePage?: string;
+  source?: string;
   width?: number;
   height?: number;
   provider?: string;
@@ -42,11 +43,14 @@ export type RetrievedImage = {
 };
 
 export type ImageSearchResult = {
+  type: "image_group";
   success: boolean;
   images: RetrievedImage[];
   queryUsed: string;
+  queryVariantsUsed?: string[];
   totalFound: number;
   retrievalTimeMs: number;
+  semanticConfidence?: number;
 };
 
 export type ProviderImage = {

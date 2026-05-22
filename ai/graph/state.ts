@@ -118,6 +118,26 @@ export type ChatGraphState = {
   intent: string;
   toolsUsed: string[];
   toolContext: string;
+  imageBlock?:
+    | {
+        images: Array<{
+          id: string;
+          url: string;
+          thumbnailUrl?: string;
+          title?: string;
+          sourcePage?: string;
+          source?: string;
+          width?: number;
+          height?: number;
+          provider?: string;
+          relevanceScore?: number;
+          safetyScore?: number;
+          metadata?: Record<string, unknown>;
+        }>;
+        totalFound?: number;
+        retrievalTimeMs?: number;
+      }
+    | undefined;
   extractedMemory: string;
   generatedTitle: string;
   toolPlan: ToolPlan | null;

@@ -5,7 +5,12 @@ import fetchWithTimeout from "@/lib/fetchWithTimeout";
 import type { ImageSearchInput, ImageSearchResult, ProviderImage } from "./image-types";
 import { serpapiImageSearch } from "./providers/serpapi";
 import { pexelsSearch } from "./providers/pexels";
-import { rankImages } from "@/ai/services/image-ranking";
+import {
+  computeSemanticConfidence,
+  filterRelevantImages,
+  groundImageSearchQuery,
+  rankImages,
+} from "@/ai/services/image-ranking";
 import { assessSafety } from "@/ai/services/image-safety";
 
 export type ToolResult = {
@@ -762,12 +767,15 @@ export async function imageSearchToolAsync(
 
   const count = Math.min(Math.max(input.count ?? 6, 1), 20);
   const start = Date.now();
+  const grounding = groundImageSearchQuery({ ...input, query });
+  const queryVariants = [grounding.query, ...grounding.fallbackQueries].filter(
+    (variant, index, all) => variant && all.indexOf(variant) === index,
+  );
 
-  try {
-    // Query available providers in parallel (SerpAPI, Pexels)
+  async function searchVariant(queryVariant: string) {
     const providerPromises = [
-      serpapiImageSearch(query, count),
-      pexelsSearch(query, count),
+      serpapiImageSearch(queryVariant, count),
+      pexelsSearch(queryVariant, count),
     ];
 
     const settled = await Promise.allSettled(providerPromises);
@@ -775,24 +783,62 @@ export async function imageSearchToolAsync(
       .flatMap((s) => (s.status === "fulfilled" ? s.value : []))
       .slice(0, Math.min(count * 3, 50));
 
-    // Ranking pipeline: dedupe and score
-    let images = rankImages(providerImages, input);
-
-    // Safety checks (heuristic). Remove images failing safeSearch when requested.
-    const safetyMap = assessSafety(images);
-    images = images
+    const ranked = rankImages(providerImages, { ...input, query: queryVariant });
+    const safetyMap = assessSafety(ranked);
+    const safeRanked = ranked
       .map((im) => ({ ...im, safetyScore: safetyMap[im.id] ?? 0 }))
       .filter((im) => {
         if (input.safeSearch === false) return true;
         return (im.safetyScore ?? 0) >= 0.5;
       });
 
+    const filtered = filterRelevantImages(safeRanked, {
+      ...input,
+      query: queryVariant,
+    });
+
+    return {
+      queryVariant,
+      images: filtered.slice(0, count),
+      semanticConfidence: computeSemanticConfidence(filtered, {
+        ...input,
+        query: queryVariant,
+      }),
+    };
+  }
+
+  try {
+    let images: Awaited<ReturnType<typeof searchVariant>>["images"] = [];
+    let semanticConfidence = 0;
+    let queryUsed = grounding.query;
+    const queryVariantsUsed: string[] = [];
+
+    for (const queryVariant of queryVariants) {
+      queryVariantsUsed.push(queryVariant);
+      const result = await searchVariant(queryVariant);
+      if (
+        result.images.length > images.length ||
+        result.semanticConfidence > semanticConfidence
+      ) {
+        images = result.images;
+        semanticConfidence = result.semanticConfidence;
+        queryUsed = queryVariant;
+      }
+
+      if (result.images.length >= Math.max(2, Math.ceil(count * 0.5)) && result.semanticConfidence >= 0.7) {
+        break;
+      }
+    }
+
     const result: ImageSearchResult = {
+      type: "image_group",
       success: true,
       images,
-      queryUsed: query,
+      queryUsed,
+      queryVariantsUsed,
       totalFound: images.length,
       retrievalTimeMs: Date.now() - start,
+      semanticConfidence,
     };
     // If no images were found, surface a helpful error so the assistant can
     // explain why images aren't available (e.g., missing API keys or no results).
@@ -808,7 +854,7 @@ export async function imageSearchToolAsync(
     return {
       success: true,
       result: JSON.stringify(result),
-      metadata: { provider: "multi", count: images.length },
+      metadata: { provider: "multi", count: images.length, queryUsed },
     };
   } catch (err) {
     return { success: false, result: "", error: `Image search failed: ${err instanceof Error ? err.message : String(err)}` };

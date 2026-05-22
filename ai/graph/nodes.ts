@@ -16,6 +16,7 @@ import { info, warn, error as logError, debug } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import {
   consumeModelStream,
+  sanitizeVisibleAssistantText,
   toTextContent,
 } from "@/ai/graph/stream-consumer";
 import {
@@ -32,6 +33,13 @@ import { shouldPreserveLongFormDraft } from "@/ai/graph/response-shaping";
 import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { RetrievedImage } from "@/ai/tools/image-types";
+import { groundImageSearchQuery } from "@/ai/services/image-ranking";
+
+type ChatImageBlock = {
+  images: RetrievedImage[];
+  totalFound?: number;
+  retrievalTimeMs?: number;
+};
 
 function emitImageSearchEvent(
   toolName: string,
@@ -55,6 +63,7 @@ function emitImageSearchEvent(
         thumbnailUrl: im.thumbnailUrl,
         title: im.title,
         sourcePage: im.sourcePage,
+        source: im.sourcePage || im.provider,
         width: im.width,
         height: im.height,
         provider: im.provider,
@@ -364,7 +373,28 @@ function buildToolArgs(
   }
 
   if (toolName === "imageSearch") {
-    return { query: message };
+    const grounded = groundImageSearchQuery({ query: message });
+    return {
+      query: grounded.query,
+      intent:
+        grounded.category === "culture"
+          ? "inspiration"
+          : grounded.category === "nature"
+            ? "nature"
+            : grounded.category === "architecture" || grounded.category === "landmarks"
+              ? "architecture"
+              : grounded.category === "people"
+                ? "person"
+                : grounded.category === "cities"
+                  ? "inspiration"
+                  : "educational",
+      count: 6,
+      safeSearch: true,
+      aspectRatio: "landscape",
+      placementHint: "gallery",
+      freshness: "recent",
+      avoidDuplicates: true,
+    };
   }
 
   return {};
@@ -445,7 +475,10 @@ export async function generateResponseNode(state: ChatGraphState) {
         ttftMs: firstTokenAt - startedAt,
       });
 
-      graphStreamEventEmitter?.({ type: "token", content: assistantMessage });
+      const visibleMessage = sanitizeVisibleAssistantText(assistantMessage);
+      if (visibleMessage) {
+        graphStreamEventEmitter?.({ type: "token", content: visibleMessage });
+      }
 
       info("stream_closed_reflection", {
         chatId: state.chatId,
@@ -502,9 +535,13 @@ export async function generateResponseNode(state: ChatGraphState) {
           });
         }
 
-        // Append raw chunk exactly as received and forward unchanged
-        assistantMessage += chunkText;
-        graphStreamEventEmitter?.({ type: "token", content: chunkText });
+        const visibleChunk = sanitizeVisibleAssistantText(chunkText);
+        if (!visibleChunk) {
+          return;
+        }
+
+        assistantMessage += visibleChunk;
+        graphStreamEventEmitter?.({ type: "token", content: visibleChunk });
       });
 
       const endedAt = Date.now();
@@ -521,7 +558,12 @@ export async function generateResponseNode(state: ChatGraphState) {
       });
     }
 
-  // Validate response content extraction
+  // Never expose raw tool outputs directly to the user. If the model failed
+  // to produce content, return a safe, assistant-composed fallback message
+  // that invites the user to retry or request a summary.
+  assistantMessage = sanitizeVisibleAssistantText(assistantMessage);
+
+  // Validate response content extraction after sanitization.
   if (!assistantMessage) {
     logError("null_model_content", {
       message: `[CRITICAL] Model returned null/undefined content.`,
@@ -531,9 +573,6 @@ export async function generateResponseNode(state: ChatGraphState) {
     });
   }
 
-  // Never expose raw tool outputs directly to the user. If the model failed
-  // to produce content, return a safe, assistant-composed fallback message
-  // that invites the user to retry or request a summary.
   if (!assistantMessage) {
     logError("null_model_content", {
       message: `[CRITICAL] Model returned null/undefined content.`,
@@ -608,6 +647,7 @@ export function testResolveToolPlan(
 export async function saveMessagesNode(state: ChatGraphState) {
   const saveTimer = startTimer("saveMessagesNode", { chatId: state.chatId, runId: state.runId });
   try {
+    const imageBlock = (state as ChatGraphState & { imageBlock?: ChatImageBlock }).imageBlock;
     // Determine if user message should be created (avoid duplication in edit flows)
     const lastPrev = state.previousMessages?.[state.previousMessages.length - 1];
     const shouldCreateUser = !(
@@ -638,7 +678,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
       runId: state.runId,
       traceId: state.traceId || null,
       generatedTitle: state.generatedTitle,
-      media: state.imageBlock ?? undefined,
+      media: imageBlock ?? undefined,
     };
 
     const queuedJobId = await queueJob("saveMessages", jobData);
@@ -668,7 +708,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
       userMessageId: preAllocatedUserMessageId,
       // propagate any images discovered during tool execution so
       // persistence can include them.
-      imageBlock: state.imageBlock ?? undefined,
+      imageBlock: imageBlock ?? undefined,
     };
   } finally {
     void endTimer(saveTimer);
@@ -800,7 +840,7 @@ export async function toolRouterNodeImpl(
     }> = [];
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
-    let intermediateImageBlock: ChatGraphState["imageBlock"] = undefined;
+    let intermediateImageBlock: ChatImageBlock | undefined = undefined;
 
     if (state.forceTool) {
       const forcedName = state.forceTool;
@@ -867,6 +907,7 @@ export async function toolRouterNodeImpl(
                     thumbnailUrl: im.thumbnailUrl,
                     title: im.title,
                     sourcePage: im.sourcePage,
+                    source: im.sourcePage || im.provider,
                     width: im.width,
                     height: im.height,
                     provider: im.provider,

@@ -12,6 +12,7 @@ export type StreamEvent =
         thumbnailUrl: string;
         title?: string;
         sourcePage?: string;
+        source?: string;
         width?: number;
         height?: number;
         provider?: string;
