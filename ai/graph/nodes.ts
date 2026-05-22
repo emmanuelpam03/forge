@@ -648,6 +648,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
   const saveTimer = startTimer("saveMessagesNode", { chatId: state.chatId, runId: state.runId });
   try {
     const imageBlock = state.imageBlock;
+    const attachments = state.attachments ?? [];
     // Determine if user message should be created (avoid duplication in edit flows)
     const lastPrev = state.previousMessages?.[state.previousMessages.length - 1];
     const shouldCreateUser = !(
@@ -678,7 +679,13 @@ export async function saveMessagesNode(state: ChatGraphState) {
       runId: state.runId,
       traceId: state.traceId || null,
       generatedTitle: state.generatedTitle,
-      media: imageBlock ?? undefined,
+      media:
+        imageBlock || attachments.length > 0
+          ? {
+              ...(imageBlock ? { imageBlock } : {}),
+              ...(attachments.length > 0 ? { attachments } : {}),
+            }
+          : undefined,
     };
 
     const queuedJobId = await queueJob("saveMessages", jobData);

@@ -32,6 +32,7 @@ import { info } from "@/lib/logger";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 import { SELECTED_OPTION_LABELS } from "@/ai/selected-options";
+import { formatAttachmentContext as formatUploadedAttachmentContext } from "@/lib/attachment-processing";
 
 function formatSelectedOptions(state: ChatGraphState): string {
   const selectedOptions = state.selectedOptions ?? [];
@@ -323,13 +324,20 @@ function formatToolPlan(state: ChatGraphState): string {
 
 function buildRuntimeContext(state: ChatGraphState): string {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
+  const attachmentContext = formatUploadedAttachmentContext(
+    state.attachments,
+    state.userMessage,
+  );
 
   if (state.selectedContext) {
     const selectedContext = formatSelectedContext(state.selectedContext);
-    return [evidencePriorityContext, selectedContext].filter(Boolean).join(" ");
+    return [evidencePriorityContext, attachmentContext, selectedContext]
+      .filter(Boolean)
+      .join(" ");
   }
   const runtimeLines = [
     evidencePriorityContext,
+    attachmentContext,
     formatSelectedOptions(state),
     formatIntent(state),
     formatToolContext(state),

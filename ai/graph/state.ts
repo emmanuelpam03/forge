@@ -1,10 +1,11 @@
 import { Annotation } from "@langchain/langgraph";
 import type { MessageRole } from "@/app/generated/prisma/enums";
 import type { SelectedContext } from "@/ai/context/engine";
-import type { QueryIntentClassification } from "@/ai/graph/classification.ts";
+import type { QueryIntentClassification } from "@/ai/graph/classification";
 import type { ReflectionReport } from "@/ai/graph/reflection.prompt";
-import type { StructuredIntentClassification } from "@/ai/graph/classification.ts";
+import type { StructuredIntentClassification } from "@/ai/graph/classification";
 import type { SelectedOptionId } from "@/ai/selected-options";
+import type { UploadedAttachment } from "@/lib/attachment-types";
 import type {
   AudienceLevel,
   FormattingProfile,
@@ -19,7 +20,6 @@ export type ClassificationIntent =
   | "reasoning"
   | "code"
   | "creative";
-
 export type ClassificationConfidence = "high" | "medium" | "low";
 
 export type ClassifiedIntent = {
@@ -105,6 +105,7 @@ export type ChatGraphState = {
   preferences: PreferenceSnapshot[];
   memorySummary: MemorySummarySnapshot | null;
   selectedContext?: SelectedContext;
+  attachments?: UploadedAttachment[];
   _timings?: ChatPipelineTimings;
   contextBudgetTokens?: number;
   retrievedSnippets?: string[];
@@ -206,6 +207,10 @@ export const chatGraphState = Annotation.Root({
     reducer: lastValue,
   }),
   selectedContext: Annotation<SelectedContext | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  attachments: Annotation<UploadedAttachment[] | undefined>({
     default: () => undefined,
     reducer: lastValue,
   }),
@@ -389,6 +394,7 @@ export type ChatGraphInput = Pick<
   | "skipUserCreate"
   | "promptBehavior"
   | "selectedOptions"
+  | "attachments"
 > & {
   model?: string;
   provider?: string;
@@ -406,6 +412,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   preferences: [],
   memorySummary: null,
   selectedContext: undefined,
+  attachments: input.attachments ?? undefined,
   _timings: undefined,
   contextBudgetTokens: undefined,
   retrievedSnippets: undefined,

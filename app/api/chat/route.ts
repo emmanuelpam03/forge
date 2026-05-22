@@ -7,6 +7,39 @@ import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 import { toResponse, ApiError } from "@/lib/error-response";
 
+const attachmentSchema = z.object({
+  id: z.string().min(1),
+  chatId: z.string().min(1),
+  name: z.string().min(1),
+  originalName: z.string().min(1),
+  mimeType: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  checksum: z.string().min(1),
+  kind: z.enum([
+    "image",
+    "pdf",
+    "document",
+    "code",
+    "spreadsheet",
+    "text",
+    "json",
+    "audio",
+    "video",
+    "other",
+  ]),
+  status: z.enum(["uploading", "processing", "ready", "failed"]),
+  storageUrl: z.string().min(1),
+  storagePath: z.string().min(1),
+  uploadedAt: z.string().min(1),
+  extractedText: z.string().optional(),
+  summary: z.string().optional(),
+  pageCount: z.number().int().optional(),
+  width: z.number().int().optional(),
+  height: z.number().int().optional(),
+  language: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const runtime = "nodejs";
 
 const chatRequestSchema = z.object({
@@ -20,6 +53,7 @@ const chatRequestSchema = z.object({
     })
     .optional(),
   selectedOptions: z.array(selectedOptionIdSchema).optional(),
+  attachments: z.array(attachmentSchema).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -101,6 +135,7 @@ export async function POST(request: NextRequest) {
                 model: parsedBody.data.model,
                 provider: parsedBody.data.provider,
                 selectedOptions: parsedBody.data.selectedOptions ?? [],
+                attachments: parsedBody.data.attachments ?? [],
                 promptBehavior: parsedBody.data.promptBehavior
                   ? {
                       ...DEFAULT_PROMPT_BEHAVIOR_CONTROLS,

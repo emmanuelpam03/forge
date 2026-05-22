@@ -13,10 +13,13 @@ import {
   Square,
   Mic,
   Plus,
+  Upload,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
 import ImageCarousel from "@/components/chat/images/ImageCarousel";
 import ImageGrid from "@/components/chat/images/ImageGrid";
+import { AttachmentChip } from "@/components/chat/AttachmentChip";
+import { AttachmentPreviewDialog } from "@/components/chat/AttachmentPreviewDialog";
 import { useFeedback } from "@/components/feedback-provider";
 import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
 import { ModesMenu } from "@/components/ModesMenu";
@@ -24,6 +27,10 @@ import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 import { type StreamEvent } from "@/ai/graph/stream";
 import { type RetrievedImage } from "@/ai/tools/image-types";
 import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
+import {
+  inferAttachmentKind,
+  type UploadedAttachment,
+} from "@/lib/attachment-types";
 
 const GENERIC_CHAT_TITLE_PATTERNS = [/^new chat$/i, /^untitled/i, /^chat$/i];
 
@@ -69,6 +76,9 @@ type ChatMessage = {
   reasoning?: string;
   reasoningExpanded?: boolean;
   error?: string;
+  attachmentBlock?: {
+    attachments: UploadedAttachment[];
+  };
   imageBlock?: {
     images: RetrievedImage[];
     totalFound?: number;
@@ -364,6 +374,9 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
@@ -377,8 +390,10 @@ export function ChatClient({
     useSeniorEngineeringMode(chatId);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
 
@@ -571,6 +586,123 @@ export function ChatClient({
       ),
     );
   }, []);
+
+  const clearComposerAttachments = useCallback(() => {
+    setAttachments([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const uploadAttachment = useCallback(
+    async (file: File) => {
+      const tempAttachmentId = `temp-${crypto.randomUUID()}`;
+      const tempAttachment: UploadedAttachment = {
+        id: tempAttachmentId,
+        chatId,
+        name: file.name,
+        originalName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        checksum: "pending",
+        kind: inferAttachmentKind({ name: file.name, mimeType: file.type }),
+        status: "uploading",
+        storageUrl: "",
+        storagePath: "",
+        uploadedAt: new Date().toISOString(),
+      };
+
+      setAttachments((current) => [...current, tempAttachment]);
+
+      try {
+        const formData = new FormData();
+        formData.append("chatId", chatId);
+        formData.append("file", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | { attachments?: UploadedAttachment[]; error?: string }
+          | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.error ?? `Failed to upload ${file.name}`);
+        }
+
+        const uploadedAttachment = payload?.attachments?.[0];
+        if (!uploadedAttachment) {
+          throw new Error(`Upload succeeded but no attachment metadata was returned for ${file.name}.`);
+        }
+
+        setAttachments((current) =>
+          current.map((attachment) =>
+            attachment.id === tempAttachmentId ? uploadedAttachment : attachment,
+          ),
+        );
+
+        showFeedback({
+          type: "success",
+          title: "File uploaded",
+          description: uploadedAttachment.name,
+        });
+      } catch (uploadError) {
+        const description =
+          uploadError instanceof Error
+            ? uploadError.message
+            : `Failed to upload ${file.name}`;
+
+        setAttachments((current) =>
+          current.filter((attachment) => attachment.id !== tempAttachmentId),
+        );
+
+        showFeedback({
+          type: "error",
+          title: "Upload failed",
+          description,
+        });
+      }
+    },
+    [chatId, showFeedback],
+  );
+
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const fileArray = Array.from(files);
+      if (fileArray.length === 0) {
+        return;
+      }
+
+      for (const file of fileArray) {
+        await uploadAttachment(file);
+      }
+    },
+    [uploadAttachment],
+  );
+
+  const openAttachmentPicker = useCallback(() => {
+    const input = fileInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+
+    input.click();
+  }, []);
+
+  const removeAttachment = useCallback((attachmentId: string) => {
+    setAttachments((current) =>
+      current.filter((attachment) => attachment.id !== attachmentId),
+    );
+  }, []);
+
+  const hasAttachments = attachments.length > 0;
 
   const finalizeStreamState = useCallback(
     (messageId: string, source: string) => {
@@ -1175,6 +1307,15 @@ export function ChatClient({
         return;
       }
 
+      if (attachments.some((attachment) => attachment.status !== "ready")) {
+        showFeedback({
+          type: "error",
+          title: "Wait for uploads to finish",
+          description: "All attachments must finish uploading before you send.",
+        });
+        return;
+      }
+
       const userMessageId = `local-user-${crypto.randomUUID()}`;
       const assistantPlaceholderId = `local-assistant-${crypto.randomUUID()}`;
 
@@ -1226,6 +1367,7 @@ export function ChatClient({
             model: requestModel.id,
             provider: requestModel.provider,
             selectedOptions: selectedOptionIds,
+            attachments,
             promptBehavior: isForceSeniorEngineeringMode
               ? { persona: "senior-engineer" }
               : undefined,
@@ -1315,6 +1457,7 @@ export function ChatClient({
                   : currentMessage,
             ),
           );
+          clearComposerAttachments();
           finalizeStreamState(nextAssistantMessageId, "send");
         };
 
@@ -1440,6 +1583,8 @@ export function ChatClient({
     [
       appendAnswerChunk,
       appendReasoningChunk,
+      attachments,
+      clearComposerAttachments,
       resetStreamBuffers,
       chatId,
       draft,
@@ -1556,6 +1701,23 @@ export function ChatClient({
                     )}
                   </div>
                 ) : null}
+
+                {message.attachmentBlock?.attachments?.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {message.attachmentBlock.attachments.map((attachment) => (
+                      <AttachmentChip
+                        key={attachment.id}
+                        attachment={attachment}
+                        compact
+                        onPreview={
+                          attachment.status === "ready"
+                            ? () => setPreviewAttachment(attachment)
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </React.Fragment>
             ))
           )}
@@ -1563,9 +1725,35 @@ export function ChatClient({
         </div>
       </div>
 
+      <AttachmentPreviewDialog
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
+
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-208 px-6 pointer-events-auto">
-          <div className="relative rounded-full border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
+          <div
+            ref={composerRef}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (event.dataTransfer.types.includes("Files")) {
+                setIsDraggingFiles(true);
+              }
+            }}
+            onDragLeave={() => setIsDraggingFiles(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setIsDraggingFiles(false);
+              void uploadFiles(event.dataTransfer.files);
+            }}
+            onPaste={(event) => {
+              const pastedFiles = Array.from(event.clipboardData.files);
+              if (pastedFiles.length > 0) {
+                void uploadFiles(pastedFiles);
+              }
+            }}
+            className={`relative rounded-3xl border bg-card/90 px-4 py-3 shadow-lg backdrop-blur transition ${isDraggingFiles ? "border-primary ring-2 ring-primary/30" : "border-border"}`}
+          >
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
               <div className="relative col-start-1 row-start-1 self-center">
                 <button
@@ -1623,6 +1811,7 @@ export function ChatClient({
                   onClose={() => setIsModesMenuOpen(false)}
                   chatId={chatId}
                   triggerRef={modesMenuTriggerRef}
+                  onUploadClick={openAttachmentPicker}
                   className="absolute bottom-full left-0 mb-3 z-50 w-[20rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
                 />
               </div>
@@ -1634,6 +1823,23 @@ export function ChatClient({
                       key={option.id}
                       option={option}
                       onRemove={() => removeOption(option.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {hasAttachments ? (
+                <div className="col-start-2 row-start-2 flex flex-wrap gap-2">
+                  {attachments.map((attachment) => (
+                    <AttachmentChip
+                      key={attachment.id}
+                      attachment={attachment}
+                      onRemove={() => removeAttachment(attachment.id)}
+                      onPreview={
+                        attachment.status === "ready"
+                          ? () => setPreviewAttachment(attachment)
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -1656,10 +1862,29 @@ export function ChatClient({
               />
 
               <div className="col-start-3 row-start-1 flex items-center gap-2 self-center">
+                <button
+                  type="button"
+                  onClick={openAttachmentPicker}
+                  className="rounded-full p-2 text-muted-foreground transition hover:text-foreground"
+                  aria-label="Upload file"
+                  title="Upload file"
+                >
+                  <Upload size={18} />
+                </button>
+
                 <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
                   <Mic size={18} />
                 </button>
 
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    void uploadFiles(event.target.files ?? []);
+                  }}
+                />
 
 
 

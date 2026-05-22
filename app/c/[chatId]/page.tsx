@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getChatById } from "@/lib/actions/chats";
 import { getBranchesForParent } from "@/lib/actions/messages";
+import { inferAttachmentKind, type UploadedAttachment } from "@/lib/attachment-types";
 import { ChatClient } from "./ChatClient";
 
 export default async function ChatPage({
@@ -91,7 +92,115 @@ export default async function ChatPage({
     reasoning?: string;
     reasoningExpanded?: boolean;
     error?: string;
+    attachmentBlock?: {
+      attachments: UploadedAttachment[];
+    };
+    imageBlock?: {
+      id?: string;
+      url?: string;
+      thumbnailUrl?: string;
+      title?: string;
+    };
   };
+
+  function parseAttachment(input: unknown): UploadedAttachment | null {
+    if (!input || typeof input !== "object") {
+      return null;
+    }
+
+    const attachment = input as Record<string, unknown>;
+    const name = typeof attachment.name === "string" ? attachment.name : undefined;
+    const originalName =
+      typeof attachment.originalName === "string"
+        ? attachment.originalName
+        : name;
+    const mimeType =
+      typeof attachment.mimeType === "string"
+        ? attachment.mimeType
+        : "application/octet-stream";
+    const storageUrl =
+      typeof attachment.storageUrl === "string" ? attachment.storageUrl : "";
+    const storagePath =
+      typeof attachment.storagePath === "string" ? attachment.storagePath : "";
+
+    if (!name || !originalName || !storageUrl || !storagePath) {
+      return null;
+    }
+
+    return {
+      id:
+        typeof attachment.id === "string" && attachment.id
+          ? attachment.id
+          : storagePath,
+      chatId: typeof attachment.chatId === "string" ? attachment.chatId : chatId,
+      name,
+      originalName,
+      mimeType,
+      sizeBytes:
+        typeof attachment.sizeBytes === "number" ? attachment.sizeBytes : 0,
+      checksum:
+        typeof attachment.checksum === "string" ? attachment.checksum : "",
+      kind:
+        typeof attachment.kind === "string"
+          ? (attachment.kind as UploadedAttachment["kind"])
+          : inferAttachmentKind({ name, mimeType }),
+      status:
+        attachment.status === "uploading" ||
+        attachment.status === "processing" ||
+        attachment.status === "ready" ||
+        attachment.status === "failed"
+          ? attachment.status
+          : "ready",
+      storageUrl,
+      storagePath,
+      uploadedAt:
+        typeof attachment.uploadedAt === "string"
+          ? attachment.uploadedAt
+          : new Date().toISOString(),
+      extractedText:
+        typeof attachment.extractedText === "string"
+          ? attachment.extractedText
+          : undefined,
+      summary:
+        typeof attachment.summary === "string"
+          ? attachment.summary
+          : undefined,
+      pageCount:
+        typeof attachment.pageCount === "number"
+          ? attachment.pageCount
+          : undefined,
+      width:
+        typeof attachment.width === "number" ? attachment.width : undefined,
+      height:
+        typeof attachment.height === "number" ? attachment.height : undefined,
+      language:
+        typeof attachment.language === "string"
+          ? attachment.language
+          : undefined,
+      error:
+        typeof attachment.error === "string" ? attachment.error : undefined,
+    };
+  }
+
+  function extractAttachmentBlock(media: unknown) {
+    if (!media || typeof media !== "object") {
+      return undefined;
+    }
+
+    const maybeMedia = media as Record<string, unknown>;
+    const rawAttachments = Array.isArray(maybeMedia.attachments)
+      ? maybeMedia.attachments
+      : [];
+    const attachments = rawAttachments
+      .map((attachment) => parseAttachment(attachment))
+      .filter((attachment): attachment is UploadedAttachment => attachment !== null);
+
+    if (attachments.length === 0) {
+      return undefined;
+    }
+
+    return { attachments };
+  }
 
   const initialMessages: ChatMessage[] = [];
   for (const message of chat.messages) {
@@ -100,6 +209,7 @@ export default async function ChatPage({
         id: message.id,
         role: message.role,
         content: message.content,
+        attachmentBlock: extractAttachmentBlock(message.media),
       });
       continue;
     }
@@ -118,6 +228,7 @@ export default async function ChatPage({
         branchId: message.branchId,
         // include persisted media if present
         imageBlock: extractImageBlock(message.media),
+        attachmentBlock: extractAttachmentBlock(message.media),
       });
       continue;
     }
@@ -142,6 +253,7 @@ export default async function ChatPage({
         createdAt: branch.createdAt.toISOString(),
       })),
       imageBlock: extractImageBlock(message.media),
+      attachmentBlock: extractAttachmentBlock(message.media),
     });
   }
 
