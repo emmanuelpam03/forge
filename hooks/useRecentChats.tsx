@@ -66,7 +66,7 @@ export default function useRecentChats(initialChats: ChatItemData[]) {
     };
 
     const handleError = () => {
-      console.warn("Title updates stream disconnected, will auto-reconnect");
+      // suppressed noisy reconnect message
     };
 
     source.addEventListener("message", handleMessage as EventListener);
