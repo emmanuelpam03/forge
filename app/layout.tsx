@@ -21,8 +21,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://yourdomain.com";
-
 export const metadata: Metadata = {
   title: {
     default: "Forge",
@@ -41,18 +39,18 @@ export const metadata: Metadata = {
   authors: [{ name: "Forge Team" }],
   creator: "Forge",
   publisher: "Forge",
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL("https://yourdomain.com"),
   openGraph: {
     title: "Forge",
     description:
       "Forge is an AI workspace for chats, projects, research, strategy, and productivity.",
-    url: SITE_URL,
+    url: "https://yourdomain.com",
     siteName: "Forge",
     locale: "en_US",
     type: "website",
     images: [
       {
-        url: `${SITE_URL}/og-image.png`,
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "Forge",
@@ -64,7 +62,7 @@ export const metadata: Metadata = {
     title: "Forge",
     description:
       "Forge is an AI workspace for chats, projects, research, strategy, and productivity.",
-    images: [`${SITE_URL}/og-image.png`],
+    images: ["/og-image.png"],
   },
 };
 

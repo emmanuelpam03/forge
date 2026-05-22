@@ -17,8 +17,6 @@ import {
 } from "lucide-react";
 import SettingsShell from "../../components/SettingsShell";
 import SettingsGlobalSeniorToggle from "../../components/SettingsGlobalSeniorToggle";
-import { useEffect, useState } from "react";
-import { getGlobalDefaultModel, setGlobalDefaultModel } from "@/hooks/useGlobalSettings";
 
 const SETTINGS_SECTIONS = [
   {
@@ -81,46 +79,6 @@ const KEYBOARD_SHORTCUTS = [
 ];
 
 export default function SettingsPage() {
-  const MODEL_OPTIONS = [
-    { id: "deepseek/deepseek-v4-flash", label: "DeepSeek v4 Flash" },
-    { id: "default/gpt-4o", label: "GPT-4o (default)" },
-  ];
-
-  const [selectedModel, setSelectedModel] = useState<string | null>(() => {
-    try {
-      return getGlobalDefaultModel();
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/settings/model");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (mounted && data?.modelId) setSelectedModel(data.modelId);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  const saveModelPreference = async () => {
-    if (!selectedModel) return;
-    try {
-      // Persist locally
-      setGlobalDefaultModel(selectedModel);
-      // Persist server-side (if authenticated)
-      await fetch("/api/settings/model", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ modelId: selectedModel }) });
-      // Optionally show feedback; Settings page has no feedback provider here so we skip it
-    } catch {
-      // ignore
-    }
-  };
   return (
     <SettingsShell>
       <div className="flex w-full flex-col gap-6">
@@ -306,25 +264,6 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <SettingsGlobalSeniorToggle />
-              </div>
-            </div>
-            {/* Global Model Preference */}
-            <div className="rounded-2xl border border-border bg-muted p-4 mt-3">
-              <div className="flex items-center justify-between gap-3">
-                <div style={{ flex: 1 }}>
-                  <p className="text-[14px] font-medium text-foreground">Default Model</p>
-                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">Choose the model you'd like Forge to use by default.</p>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <select value={selectedModel ?? ""} onChange={(e) => setSelectedModel(e.target.value)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm">
-                      <option value="">(use local default)</option>
-                      {MODEL_OPTIONS.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.label}</option>
-                      ))}
-                    </select>
-                    <button onClick={saveModelPreference} className="rounded-full bg-primary px-3 py-2 text-sm font-medium text-white">Save</button>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
