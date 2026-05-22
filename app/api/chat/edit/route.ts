@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
+import { error as logError } from "@/lib/logger";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 
 export const runtime = "nodejs";
@@ -146,14 +147,11 @@ export async function POST(request: NextRequest) {
             const finalMessage = result.assistantMessage || assistantMessage;
 
             if (!finalMessage) {
-              console.error(
-                JSON.stringify({
-                  error: "empty-response-after-edit-stream",
-                  chat_id: hashIdentifierForLogging(result.chatId),
-                  run_id: hashIdentifierForLogging(result.runId),
-                  intent: result.intent,
-                }),
-              );
+              logError("empty_response_after_edit_stream", {
+                chatId: hashIdentifierForLogging(result.chatId),
+                runId: hashIdentifierForLogging(result.runId),
+                intent: result.intent,
+              });
 
               send({
                 type: "status",
@@ -167,14 +165,14 @@ export async function POST(request: NextRequest) {
               response: finalMessage,
             });
           } catch (err) {
-            console.error("Edit stream failed:", err);
+            logError("edit_stream_failed", { error: err });
             send({ type: "status", message: "Failed to generate a response." });
             send({ type: "done" });
           }
 
           controller.close();
         })().catch((error) => {
-          console.error("Edit stream failed:", error);
+          logError("edit_stream_failed", { error });
           controller.close();
         });
       },
@@ -188,7 +186,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat edit route failed:", error);
+    logError("chat_edit_route_failed", { error });
     return new Response(JSON.stringify({ error: "Failed to edit message." }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

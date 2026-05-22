@@ -2,6 +2,10 @@ import { hashIdentifierForLogging } from "./logging.ts";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+/**
+ * Build a structured log entry. This ensures common fields are present and
+ * identifier-like fields (ending with `id`) are hashed for privacy.
+ */
 function buildEntry(level: LogLevel, message: string, context?: Record<string, unknown>) {
   const entry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
@@ -19,6 +23,16 @@ function buildEntry(level: LogLevel, message: string, context?: Record<string, u
         entry[k] = v;
       }
     }
+  }
+
+  // Inject canonical `service` metadata unless provided by caller. This helps
+  // downstream log consumers to filter/route logs by service name.
+  if (!entry.service) {
+    // Prefer an explicit env var, fall back to package name if available.
+    // This value can be overridden by callers via the `context` argument.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore access optional npm variable
+    entry.service = process.env.SERVICE_NAME || (process.env.npm_package_name as string) || "forge";
   }
 
   return entry;
@@ -92,6 +106,16 @@ function output(entry: Record<string, unknown>, level: LogLevel) {
 
 export function log(level: LogLevel, message: string, context?: Record<string, unknown>) {
   const entry = buildEntry(level, message, context);
+  output(entry, level);
+}
+
+/**
+ * Log a named event with standardized metadata.
+ * - `eventName` should follow `snake_case` like `chat_started`.
+ * - `metadata` may include `route`, `path`, `chatId`, `runId`, etc.
+ */
+export function event(level: LogLevel, eventName: string, metadata?: Record<string, unknown>) {
+  const entry = buildEntry(level, eventName, metadata);
   output(entry, level);
 }
 

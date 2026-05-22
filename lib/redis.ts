@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import { error as logError } from "./logger";
 
 let client: Redis | null = null;
 
@@ -10,7 +11,7 @@ export function getRedisClient() {
     client = new Redis(url);
     return client;
   } catch (err) {
-    console.error('[Redis] Failed to create client:', err);
+    logError("redis_client_create_failed", { error: err });
     return null;
   }
 }

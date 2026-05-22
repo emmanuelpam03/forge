@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { error as logError } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
       },
     );
   } catch (err) {
-    console.error(err);
+    logError("dev_create_chat_failed", { error: err });
     return new Response(JSON.stringify({ error: "failed" }), { status: 500 });
   }
 }

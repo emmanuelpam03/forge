@@ -275,31 +275,31 @@ export function MessageRenderer({
           {children}
         </a>
       ),
-      code: ({ className, children, inline, ...restProps }: { className?: string; children: React.ReactNode; inline?: boolean } & Record<string, unknown>) => {
-        const languageMatch = /language-(\w+)/.exec(className ?? "");
-        const language = languageMatch?.[1];
-        const codeText = String(children).replace(/\n$/, "");
-        const isBlockCode = !Boolean(inline);
+      code: ({ children, ...restProps }: { children: React.ReactNode } & Record<string, unknown>) => (
+        <code
+          {...restProps}
+          className="rounded-md px-1.5 py-0.5 font-mono text-[0.875em]"
+          style={{
+            background: "var(--message-code-bg)",
+            border: "1px solid var(--message-code-border)",
+            color: "var(--message-code-text)",
+          }}
+        >
+          {children}
+        </code>
+      ),
+      pre: ({ children }) => {
+        const child = Children.only(children) as React.ReactElement<{
+          className?: string;
+          children?: React.ReactNode;
+        }>;
 
-        if (!isBlockCode) {
-          return (
-            <code
-              {...restProps}
-              className="rounded-md px-1.5 py-0.5 font-mono text-[0.875em]"
-              style={{
-                background: "var(--message-code-bg)",
-                border: "1px solid var(--message-code-border)",
-                color: "var(--message-code-text)",
-              }}
-            >
-              {children}
-            </code>
-          );
-        }
+        const languageMatch = /language-(\w+)/.exec(child.props.className ?? "");
+        const language = languageMatch?.[1];
+        const codeText = String(child.props.children ?? "").replace(/\n$/, "");
 
         return <CodeBlock language={language} code={codeText} />;
       },
-      pre: ({ children }) => <>{children}</>,
       hr: () => (
         <hr className="my-5" style={{ borderColor: "var(--border)" }} />
       ),

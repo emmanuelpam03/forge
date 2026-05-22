@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
+import { info as logInfo, warn as logWarn, error as logError } from "@/lib/logger";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 
 export const runtime = "nodejs";
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
       start(controller) {
         let controllerClosed = false;
 
-        const safeClose = () => {
+          const safeClose = () => {
           if (controllerClosed) {
             return;
           }
@@ -98,9 +99,9 @@ export async function POST(request: NextRequest) {
           controllerClosed = true;
           try {
             controller.close();
-            console.info("Regenerate stream: controller closed");
+            logInfo("regenerate_stream_controller_closed", { messageId: assistantPlaceholder.id });
           } catch (err) {
-            console.warn("Regenerate stream: controller.close() failed:", err);
+            logWarn("regenerate_stream_controller_close_failed", { error: err });
           }
         };
 
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
             return true;
           } catch (error) {
             controllerClosed = true;
-            console.warn("Regenerate SSE send skipped after close:", error);
+            logWarn("regenerate_sse_send_skipped_after_close", { error });
             try {
               controller.close();
             } catch {}
@@ -197,10 +198,7 @@ export async function POST(request: NextRequest) {
                       }),
                     )
                     .catch((error) => {
-                      console.error(
-                        "Failed to persist regenerate progress:",
-                        error,
-                      );
+                      logError("failed_to_persist_regenerate_progress", { error });
                     });
                 }
 
@@ -216,14 +214,11 @@ export async function POST(request: NextRequest) {
                 })
                 .catch(() => null);
 
-              console.error(
-                JSON.stringify({
-                  error: "empty-response-after-regen-stream",
-                  chat_id: hashIdentifierForLogging(result.chatId),
-                  run_id: hashIdentifierForLogging(result.runId),
-                  intent: result.intent,
-                }),
-              );
+              logError("empty_response_after_regen_stream", {
+                chatId: hashIdentifierForLogging(result.chatId),
+                runId: hashIdentifierForLogging(result.runId),
+                intent: result.intent,
+              });
 
               send({
                 type: "status",
@@ -231,7 +226,7 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            console.info("Regenerate stream: emitting done", {
+            logInfo("regenerate_stream_emitting_done", {
               messageId: assistantPlaceholder.id,
               length: finalMessage.length,
             });
@@ -246,22 +241,20 @@ export async function POST(request: NextRequest) {
 
             // Post-processing continues in background without blocking stream close
             persistProgress.catch((error) => {
-              console.error("Failed to persist regenerate progress:", error);
+              logError("failed_to_persist_regenerate_progress", { error });
             });
             sendBranchList().catch((error) => {
-              console.error("Failed to send branch list:", error);
+              logError("failed_to_send_branch_list", { error });
             });
           } catch (err) {
-            console.error("Regenerate stream failed:", err);
+            logError("regenerate_stream_failed", { error: err });
             await prisma.message
               .delete({
                 where: { id: assistantPlaceholder.id },
               })
               .catch(() => null);
             send({ type: "status", message: "Failed to generate a response." });
-            console.info("Regenerate stream: emitting error done", {
-              messageId: assistantPlaceholder.id,
-            });
+            logInfo("regenerate_stream_emitting_error_done", { messageId: assistantPlaceholder.id });
             send({
               type: "done",
               messageId: assistantPlaceholder.id,
@@ -270,7 +263,7 @@ export async function POST(request: NextRequest) {
             safeClose();
           }
         })().catch((error) => {
-          console.error("Regenerate stream failed:", error);
+          logError("regenerate_stream_failed", { error });
           safeClose();
         });
       },
@@ -284,7 +277,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Chat regenerate route failed:", error);
+    logError("chat_regenerate_route_failed", { error });
     const detail =
       error instanceof Error
         ? { message: error.message, stack: error.stack }
