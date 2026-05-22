@@ -533,7 +533,7 @@ export function SidebarClient({
       source.removeEventListener("error", handleError as EventListener);
       source.close();
     };
-  }, [recentChats.map((c) => c.id).join(",")]);
+  }, [recentChats]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 260);

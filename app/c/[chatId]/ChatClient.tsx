@@ -520,12 +520,18 @@ export function ChatClient({
     }
 
     let active = true;
+    let shouldRetry = true;
 
     const syncTitleFromServer = async () => {
       try {
         const response = await fetch(`/api/chat/${chatId}`, {
           cache: "no-store",
         });
+
+        if (response.status === 401 || response.status === 403) {
+          shouldRetry = false;
+          return;
+        }
 
         if (!response.ok) {
           return;
@@ -553,10 +559,18 @@ export function ChatClient({
     };
 
     void syncTitleFromServer();
-    const intervalId = window.setInterval(syncTitleFromServer, 2500);
+    const intervalId = window.setInterval(() => {
+      if (!shouldRetry) {
+        window.clearInterval(intervalId);
+        return;
+      }
+
+      void syncTitleFromServer();
+    }, 2500);
 
     return () => {
       active = false;
+      shouldRetry = false;
       window.clearInterval(intervalId);
     };
   }, [chatId, chatTitle]);

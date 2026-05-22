@@ -18,7 +18,12 @@ export default function CodeBlock({ code, language }: Props) {
   const { theme } = useTheme();
 
   const [copied, setCopied] = useState(false);
-  const [mounted] = useState(() => typeof window !== "undefined");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     if (!copied) return;
