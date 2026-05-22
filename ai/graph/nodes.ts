@@ -1311,7 +1311,7 @@ export async function generateTitleNode(state: ChatGraphState) {
   // Queue title generation as background job (don't block response stream)
   // Title will be generated and persisted asynchronously
   // For first turn, we could emit title later; for subsequent turns it's optional
-  const recentConversation = state.previousMessages
+  const recentConversation = (state.previousMessages ?? [])
     .slice(-4)
     .map((message) => `${message.role.toUpperCase()}: ${message.content.trim()}`)
     .filter((line) => line.trim().length > 0)

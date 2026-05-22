@@ -25,6 +25,17 @@ import { type StreamEvent } from "@/ai/graph/stream";
 import { type RetrievedImage } from "@/ai/tools/image-types";
 import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 
+const GENERIC_CHAT_TITLE_PATTERNS = [/^new chat$/i, /^untitled/i, /^chat$/i];
+
+function isGenericChatTitle(title: string): boolean {
+  const normalized = title.trim();
+  if (!normalized) {
+    return true;
+  }
+
+  return GENERIC_CHAT_TITLE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
 type BranchOption = {
   id: string;
   content: string;
@@ -488,13 +499,67 @@ export function ChatClient({
       }
     };
 
+    const handleError = () => {
+      console.warn("Title updates stream disconnected, will auto-reconnect");
+      // EventSource automatically reconnects, but you may want to show user feedback
+    };
+
     source.addEventListener("message", handleMessage as EventListener);
+    source.addEventListener("error", handleError as EventListener);
 
     return () => {
       source.removeEventListener("message", handleMessage as EventListener);
+      source.removeEventListener("error", handleError as EventListener);
       source.close();
     };
   }, [chatId]);
+
+  useEffect(() => {
+    if (!isGenericChatTitle(chatTitle)) {
+      return;
+    }
+
+    let active = true;
+
+    const syncTitleFromServer = async () => {
+      try {
+        const response = await fetch(`/api/chat/${chatId}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          title?: string;
+        };
+
+        if (!active || typeof payload.title !== "string" || !payload.title) {
+          return;
+        }
+
+        if (payload.title !== chatTitle) {
+          setChatTitle(payload.title);
+          window.dispatchEvent(
+            new CustomEvent("chat:title-updated", {
+              detail: { chatId, title: payload.title },
+            }),
+          );
+        }
+      } catch {
+        // Ignore transient fetch failures and retry on the next tick.
+      }
+    };
+
+    void syncTitleFromServer();
+    const intervalId = window.setInterval(syncTitleFromServer, 2500);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [chatId, chatTitle]);
 
   useEffect(() => {
     const textarea = textareaRef.current;

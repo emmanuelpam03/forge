@@ -9,6 +9,16 @@ export async function GET(request: Request) {
     return new Response("Redis unavailable", { status: 503 });
   }
 
+  // Parse optional chatIds query param to limit which chat updates are forwarded
+  const url = new URL(request.url);
+  const chatIdsParam = url.searchParams.get("chatIds") ?? "";
+  const allowedChatIds = new Set(
+    chatIdsParam
+      .split(",")
+      .map((s) => decodeURIComponent(s || "").trim())
+      .filter(Boolean),
+  );
+
   const subscriber = redis.duplicate();
 
   const encoder = new TextEncoder();
@@ -56,11 +66,32 @@ export async function GET(request: Request) {
 
       void subscriber.subscribe(CHAT_TITLE_UPDATES_CHANNEL, (message) => {
         try {
-          send(JSON.parse(message));
+          const msgStr = String(message);
+          const parsed = JSON.parse(msgStr) as { chatId?: string; title?: string };
+
+          // If the client requested a specific set of chatIds, only forward matching events
+          if (allowedChatIds.size > 0 && parsed.chatId && !allowedChatIds.has(parsed.chatId)) {
+            return; // skip non-matching chat updates
+          }
+
+          send(parsed);
         } catch {
-          send({ chatId: "", title: "" });
+          // Preserve original fallback behavior for malformed payloads
+          // Only forward the fallback if the client is not filtering by chatIds
+          if (allowedChatIds.size === 0) {
+            send({ chatId: "", title: "" });
+          }
         }
-      }).catch(() => {
+      }).catch((err) => {
+        // Log the subscription error with channel context, then close the stream
+        try {
+          console.error("Failed to subscribe to chat title updates", {
+            channel: CHAT_TITLE_UPDATES_CHANNEL,
+            error: err,
+          });
+        } catch (logErr) {
+          // ignore logging failures
+        }
         void close(controller);
       });
 

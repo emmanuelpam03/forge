@@ -16,12 +16,11 @@ type Props = {
 
 export default function CodeBlock({ code, language }: Props) {
   const { theme } = useTheme();
+
   const [copied, setCopied] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [mounted] = useState(() => typeof window !== "undefined");
 
   useEffect(() => {
-    setMounted(true);
-
     if (!copied) return;
     const id = window.setTimeout(() => setCopied(false), 2000);
     return () => window.clearTimeout(id);

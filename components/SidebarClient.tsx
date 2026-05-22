@@ -486,7 +486,10 @@ export function SidebarClient({
   }, []);
 
   useEffect(() => {
-    const source = new EventSource("/api/chat/title-updates");
+    const chatIdsKey = recentChats.map((c) => c.id).join(",");
+    const baseUrl = "/api/chat/title-updates";
+    const url = chatIdsKey ? `${baseUrl}?chatIds=${encodeURIComponent(chatIdsKey)}` : baseUrl;
+    const source = new EventSource(url);
 
     const handleMessage = (event: MessageEvent<string>) => {
       try {
@@ -517,13 +520,20 @@ export function SidebarClient({
       }
     };
 
+    const handleError = () => {
+      console.warn("Title updates stream disconnected, will auto-reconnect");
+      // EventSource automatically reconnects, but consider user feedback
+    };
+
     source.addEventListener("message", handleMessage as EventListener);
+    source.addEventListener("error", handleError as EventListener);
 
     return () => {
       source.removeEventListener("message", handleMessage as EventListener);
+      source.removeEventListener("error", handleError as EventListener);
       source.close();
     };
-  }, []);
+  }, [recentChats.map((c) => c.id).join(",")]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 260);

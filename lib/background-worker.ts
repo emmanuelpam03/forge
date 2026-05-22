@@ -179,13 +179,18 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
     }
 
     const model = createGeminiModel();
-    const conversationContext = [
-      data.recentConversation?.trim(),
-      `User: ${data.userMessage.trim()}`,
-      `Assistant: ${data.assistantMessage.trim()}`,
-    ]
-      .filter((part): part is string => typeof part === "string" && part.length > 0)
-      .join("\n");
+    const parts: string[] = [];
+    if (typeof data.recentConversation === "string" && data.recentConversation.trim().length > 0) {
+      parts.push(data.recentConversation.trim());
+    }
+    if (typeof data.userMessage === "string" && data.userMessage.trim().length > 0) {
+      parts.push(`User: ${data.userMessage.trim()}`);
+    }
+    if (typeof data.assistantMessage === "string" && data.assistantMessage.trim().length > 0) {
+      parts.push(`Assistant: ${data.assistantMessage.trim()}`);
+    }
+
+    const conversationContext = parts.join("\n");
 
     let prompt = TITLE_GENERATION_PROMPT.replace("{CONVERSATION_CONTEXT}", conversationContext);
 
