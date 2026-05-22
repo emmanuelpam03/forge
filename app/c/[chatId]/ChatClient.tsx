@@ -36,6 +36,18 @@ function isGenericChatTitle(title: string): boolean {
   return GENERIC_CHAT_TITLE_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
+function formatCapitalizedTitle(input: string): string {
+  return input
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      const [first = "", ...rest] = word;
+      return `${first.toUpperCase()}${rest.join("").toLowerCase()}`;
+    })
+    .join(" ");
+}
+
 type BranchOption = {
   id: string;
   content: string;
@@ -422,55 +434,9 @@ export function ChatClient({
     [updateAssistantMessage],
   );
 
-  const applyImagesToMessage = useCallback(
-    (
-      messageId: string,
-      images: RetrievedImage[],
-      totalFound?: number,
-      retrievalTimeMs?: number,
-    ) => {
-      setMessages((currentMessages) =>
-        currentMessages.map((m) =>
-          m.id === messageId
-            ? {
-                ...m,
-                imageBlock: {
-                  images,
-                  ...(typeof totalFound === "number" ? { totalFound } : {}),
-                  ...(typeof retrievalTimeMs === "number" ? { retrievalTimeMs } : {}),
-                },
-              }
-            : m,
-        ),
-      );
-    },
-    [],
-  );
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isSending]);
-
-  useEffect(() => {
-    const handleTitleUpdated = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        chatId?: string;
-        title?: string;
-      }>).detail;
-
-      if (detail?.chatId !== chatId || !detail.title) {
-        return;
-      }
-
-      setChatTitle(detail.title);
-    };
-
-    window.addEventListener("chat:title-updated", handleTitleUpdated as EventListener);
-
-    return () => {
-      window.removeEventListener("chat:title-updated", handleTitleUpdated as EventListener);
-    };
-  }, [chatId]);
 
   useEffect(() => {
     const nextTitle = chatTitle.trim() ? `${chatTitle} | Forge` : "Forge";
@@ -478,102 +444,6 @@ export function ChatClient({
       document.title = nextTitle;
     }
   }, [chatTitle]);
-
-  useEffect(() => {
-    const source = new EventSource("/api/chat/title-updates");
-
-    const handleMessage = (event: MessageEvent<string>) => {
-      try {
-        const detail = JSON.parse(event.data) as {
-          chatId?: string;
-          title?: string;
-        };
-
-        if (detail.chatId !== chatId || !detail.title) {
-          return;
-        }
-
-        setChatTitle(detail.title);
-      } catch {
-        // Ignore malformed payloads and keep the stream alive.
-      }
-    };
-
-    const handleError = () => {
-      console.warn("Title updates stream disconnected, will auto-reconnect");
-      // EventSource automatically reconnects, but you may want to show user feedback
-    };
-
-    source.addEventListener("message", handleMessage as EventListener);
-    source.addEventListener("error", handleError as EventListener);
-
-    return () => {
-      source.removeEventListener("message", handleMessage as EventListener);
-      source.removeEventListener("error", handleError as EventListener);
-      source.close();
-    };
-  }, [chatId]);
-
-  useEffect(() => {
-    if (!isGenericChatTitle(chatTitle)) {
-      return;
-    }
-
-    let active = true;
-    let shouldRetry = true;
-
-    const syncTitleFromServer = async () => {
-      try {
-        const response = await fetch(`/api/chat/${chatId}`, {
-          cache: "no-store",
-        });
-
-        if (response.status === 401 || response.status === 403) {
-          shouldRetry = false;
-          return;
-        }
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = (await response.json()) as {
-          title?: string;
-        };
-
-        if (!active || typeof payload.title !== "string" || !payload.title) {
-          return;
-        }
-
-        if (payload.title !== chatTitle) {
-          setChatTitle(payload.title);
-          window.dispatchEvent(
-            new CustomEvent("chat:title-updated", {
-              detail: { chatId, title: payload.title },
-            }),
-          );
-        }
-      } catch {
-        // Ignore transient fetch failures and retry on the next tick.
-      }
-    };
-
-    void syncTitleFromServer();
-    const intervalId = window.setInterval(() => {
-      if (!shouldRetry) {
-        window.clearInterval(intervalId);
-        return;
-      }
-
-      void syncTitleFromServer();
-    }, 2500);
-
-    return () => {
-      active = false;
-      shouldRetry = false;
-      window.clearInterval(intervalId);
-    };
-  }, [chatId, chatTitle]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -909,18 +779,6 @@ export function ChatClient({
               }
             }
 
-            if (event.type === "title") {
-              const newTitle = event.title;
-              setChatTitle(newTitle);
-              try {
-                window.dispatchEvent(
-                  new CustomEvent("chat:title-updated", {
-                    detail: { chatId, title: newTitle },
-                  }),
-                );
-              } catch {}
-            }
-
             if (event.type === "reasoning") {
               applyReasoning(event.content);
             }
@@ -1209,18 +1067,6 @@ export function ChatClient({
               }
             }
 
-            if (event.type === "title") {
-              const newTitle = event.title;
-              setChatTitle(newTitle);
-              try {
-                window.dispatchEvent(
-                  new CustomEvent("chat:title-updated", {
-                    detail: { chatId, title: newTitle },
-                  }),
-                );
-              } catch {}
-            }
-
             if (event.type === "placeholder") {
               applyPlaceholder(event);
             }
@@ -1335,6 +1181,13 @@ export function ChatClient({
       setIsSending(true);
       setError(null);
       setLastUserMessage(message);
+
+      if (isGenericChatTitle(chatTitle)) {
+        const nextTitle = formatCapitalizedTitle(message);
+        if (nextTitle) {
+          setChatTitle(nextTitle);
+        }
+      }
 
       if (!messageToSend) {
         setDraft("");
@@ -1502,30 +1355,6 @@ export function ChatClient({
               }
             }
 
-            if (event.type === "title") {
-              const newTitle = event.title;
-              setChatTitle(newTitle);
-              try {
-                window.dispatchEvent(
-                  new CustomEvent("chat:title-updated", {
-                    detail: { chatId, title: newTitle },
-                  }),
-                );
-              } catch {}
-            }
-
-              if (event.type === "images") {
-                applyImagesToMessage(
-                  activeAssistantMessageId,
-                  event.images ?? [],
-                  // event.totalFound and event.retrievalTimeMs are optional in
-                  // some stream variants; guard their presence when assigning
-                  // to the message imageBlock.
-                  typeof event.totalFound === "number" ? event.totalFound : undefined,
-                  typeof event.retrievalTimeMs === "number" ? event.retrievalTimeMs : undefined,
-                );
-              }
-
               if (event.type === "reasoning") {
                 applyReasoning(event.content);
               }
@@ -1621,8 +1450,8 @@ export function ChatClient({
       isForceSeniorEngineeringMode,
       showFeedback,
       finalizeStreamState,
-      applyImagesToMessage,
       hasMessages,
+      chatTitle,
     ],
   );
 
