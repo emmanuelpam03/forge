@@ -214,6 +214,7 @@ function MessageBubble({
                   <MessageRenderer
                     content={message.content}
                     isStreaming={isStreamingAssistant}
+                    images={message.imageBlock?.images ?? null}
                   />
                 ) : (
                   <p className="whitespace-pre-wrap leading-7 tracking-[-0.01em]">

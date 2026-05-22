@@ -87,6 +87,8 @@ export interface SaveMessagesJobData {
   runId: string;
   traceId: string | null;
   generatedTitle?: string;
+  // Optional media payload (e.g., image block) serialized as JSON-serializable object
+  media?: unknown | null;
 }
 
 export interface GenerateTitleJobData {

@@ -86,6 +86,7 @@ export type MessageCountAggregateOutputType = {
   latencyMs: number
   runId: number
   traceId: number
+  media: number
   createdAt: number
   _all: number
 }
@@ -151,6 +152,7 @@ export type MessageCountAggregateInputType = {
   latencyMs?: true
   runId?: true
   traceId?: true
+  media?: true
   createdAt?: true
   _all?: true
 }
@@ -255,6 +257,7 @@ export type MessageGroupByOutputType = {
   latencyMs: number | null
   runId: string | null
   traceId: string | null
+  media: runtime.JsonValue | null
   createdAt: Date
   _count: MessageCountAggregateOutputType | null
   _avg: MessageAvgAggregateOutputType | null
@@ -295,6 +298,7 @@ export type MessageWhereInput = {
   latencyMs?: Prisma.IntNullableFilter<"Message"> | number | null
   runId?: Prisma.StringNullableFilter<"Message"> | string | null
   traceId?: Prisma.StringNullableFilter<"Message"> | string | null
+  media?: Prisma.JsonNullableFilter<"Message">
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
   parent?: Prisma.XOR<Prisma.MessageNullableScalarRelationFilter, Prisma.MessageWhereInput> | null
@@ -316,6 +320,7 @@ export type MessageOrderByWithRelationInput = {
   latencyMs?: Prisma.SortOrderInput | Prisma.SortOrder
   runId?: Prisma.SortOrderInput | Prisma.SortOrder
   traceId?: Prisma.SortOrderInput | Prisma.SortOrder
+  media?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   chat?: Prisma.ChatOrderByWithRelationInput
   parent?: Prisma.MessageOrderByWithRelationInput
@@ -340,6 +345,7 @@ export type MessageWhereUniqueInput = Prisma.AtLeast<{
   latencyMs?: Prisma.IntNullableFilter<"Message"> | number | null
   runId?: Prisma.StringNullableFilter<"Message"> | string | null
   traceId?: Prisma.StringNullableFilter<"Message"> | string | null
+  media?: Prisma.JsonNullableFilter<"Message">
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
   chat?: Prisma.XOR<Prisma.ChatScalarRelationFilter, Prisma.ChatWhereInput>
   parent?: Prisma.XOR<Prisma.MessageNullableScalarRelationFilter, Prisma.MessageWhereInput> | null
@@ -361,6 +367,7 @@ export type MessageOrderByWithAggregationInput = {
   latencyMs?: Prisma.SortOrderInput | Prisma.SortOrder
   runId?: Prisma.SortOrderInput | Prisma.SortOrder
   traceId?: Prisma.SortOrderInput | Prisma.SortOrder
+  media?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.MessageCountOrderByAggregateInput
   _avg?: Prisma.MessageAvgOrderByAggregateInput
@@ -386,6 +393,7 @@ export type MessageScalarWhereWithAggregatesInput = {
   latencyMs?: Prisma.IntNullableWithAggregatesFilter<"Message"> | number | null
   runId?: Prisma.StringNullableWithAggregatesFilter<"Message"> | string | null
   traceId?: Prisma.StringNullableWithAggregatesFilter<"Message"> | string | null
+  media?: Prisma.JsonNullableWithAggregatesFilter<"Message">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Message"> | Date | string
 }
 
@@ -401,6 +409,7 @@ export type MessageCreateInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
@@ -422,6 +431,7 @@ export type MessageUncheckedCreateInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
   sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
@@ -439,6 +449,7 @@ export type MessageUpdateInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
@@ -460,6 +471,7 @@ export type MessageUncheckedUpdateInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
   sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
@@ -479,6 +491,7 @@ export type MessageCreateManyInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
 
@@ -494,6 +507,7 @@ export type MessageUpdateManyMutationInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -511,6 +525,7 @@ export type MessageUncheckedUpdateManyInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -543,6 +558,7 @@ export type MessageCountOrderByAggregateInput = {
   latencyMs?: Prisma.SortOrder
   runId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
+  media?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -732,6 +748,7 @@ export type MessageCreateWithoutChatInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
   children?: Prisma.MessageCreateNestedManyWithoutParentInput
@@ -751,6 +768,7 @@ export type MessageUncheckedCreateWithoutChatInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
   sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
@@ -799,6 +817,7 @@ export type MessageScalarWhereInput = {
   latencyMs?: Prisma.IntNullableFilter<"Message"> | number | null
   runId?: Prisma.StringNullableFilter<"Message"> | string | null
   traceId?: Prisma.StringNullableFilter<"Message"> | string | null
+  media?: Prisma.JsonNullableFilter<"Message">
   createdAt?: Prisma.DateTimeFilter<"Message"> | Date | string
 }
 
@@ -814,6 +833,7 @@ export type MessageCreateWithoutChildrenInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
@@ -834,6 +854,7 @@ export type MessageUncheckedCreateWithoutChildrenInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
 }
@@ -855,6 +876,7 @@ export type MessageCreateWithoutParentInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   children?: Prisma.MessageCreateNestedManyWithoutParentInput
@@ -874,6 +896,7 @@ export type MessageUncheckedCreateWithoutParentInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
   sourceTasks?: Prisma.TaskUncheckedCreateNestedManyWithoutSourceMessageInput
@@ -912,6 +935,7 @@ export type MessageUpdateWithoutChildrenInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
@@ -932,6 +956,7 @@ export type MessageUncheckedUpdateWithoutChildrenInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
 }
@@ -964,6 +989,7 @@ export type MessageCreateWithoutSourceTasksInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   chat: Prisma.ChatCreateNestedOneWithoutMessagesInput
   parent?: Prisma.MessageCreateNestedOneWithoutChildrenInput
@@ -984,6 +1010,7 @@ export type MessageUncheckedCreateWithoutSourceTasksInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   children?: Prisma.MessageUncheckedCreateNestedManyWithoutParentInput
 }
@@ -1016,6 +1043,7 @@ export type MessageUpdateWithoutSourceTasksInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
@@ -1036,6 +1064,7 @@ export type MessageUncheckedUpdateWithoutSourceTasksInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
 }
@@ -1053,6 +1082,7 @@ export type MessageCreateManyChatInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
 
@@ -1068,6 +1098,7 @@ export type MessageUpdateWithoutChatInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   parent?: Prisma.MessageUpdateOneWithoutChildrenNestedInput
   children?: Prisma.MessageUpdateManyWithoutParentNestedInput
@@ -1087,6 +1118,7 @@ export type MessageUncheckedUpdateWithoutChatInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
   sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
@@ -1105,6 +1137,7 @@ export type MessageUncheckedUpdateManyWithoutChatInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1121,6 +1154,7 @@ export type MessageCreateManyParentInput = {
   latencyMs?: number | null
   runId?: string | null
   traceId?: string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
 
@@ -1136,6 +1170,7 @@ export type MessageUpdateWithoutParentInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   chat?: Prisma.ChatUpdateOneRequiredWithoutMessagesNestedInput
   children?: Prisma.MessageUpdateManyWithoutParentNestedInput
@@ -1155,6 +1190,7 @@ export type MessageUncheckedUpdateWithoutParentInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MessageUncheckedUpdateManyWithoutParentNestedInput
   sourceTasks?: Prisma.TaskUncheckedUpdateManyWithoutSourceMessageNestedInput
@@ -1173,6 +1209,7 @@ export type MessageUncheckedUpdateManyWithoutParentInput = {
   latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   runId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  media?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -1230,6 +1267,7 @@ export type MessageSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   latencyMs?: boolean
   runId?: boolean
   traceId?: boolean
+  media?: boolean
   createdAt?: boolean
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
   parent?: boolean | Prisma.Message$parentArgs<ExtArgs>
@@ -1252,6 +1290,7 @@ export type MessageSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   latencyMs?: boolean
   runId?: boolean
   traceId?: boolean
+  media?: boolean
   createdAt?: boolean
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
   parent?: boolean | Prisma.Message$parentArgs<ExtArgs>
@@ -1271,6 +1310,7 @@ export type MessageSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   latencyMs?: boolean
   runId?: boolean
   traceId?: boolean
+  media?: boolean
   createdAt?: boolean
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
   parent?: boolean | Prisma.Message$parentArgs<ExtArgs>
@@ -1290,10 +1330,11 @@ export type MessageSelectScalar = {
   latencyMs?: boolean
   runId?: boolean
   traceId?: boolean
+  media?: boolean
   createdAt?: boolean
 }
 
-export type MessageOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "chatId" | "role" | "content" | "parentId" | "branchId" | "modelUsed" | "provider" | "tokensInput" | "tokensOutput" | "latencyMs" | "runId" | "traceId" | "createdAt", ExtArgs["result"]["message"]>
+export type MessageOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "chatId" | "role" | "content" | "parentId" | "branchId" | "modelUsed" | "provider" | "tokensInput" | "tokensOutput" | "latencyMs" | "runId" | "traceId" | "media" | "createdAt", ExtArgs["result"]["message"]>
 export type MessageInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   chat?: boolean | Prisma.ChatDefaultArgs<ExtArgs>
   parent?: boolean | Prisma.Message$parentArgs<ExtArgs>
@@ -1332,6 +1373,7 @@ export type $MessagePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     latencyMs: number | null
     runId: string | null
     traceId: string | null
+    media: runtime.JsonValue | null
     createdAt: Date
   }, ExtArgs["result"]["message"]>
   composites: {}
@@ -1773,6 +1815,7 @@ export interface MessageFieldRefs {
   readonly latencyMs: Prisma.FieldRef<"Message", 'Int'>
   readonly runId: Prisma.FieldRef<"Message", 'String'>
   readonly traceId: Prisma.FieldRef<"Message", 'String'>
+  readonly media: Prisma.FieldRef<"Message", 'Json'>
   readonly createdAt: Prisma.FieldRef<"Message", 'DateTime'>
 }
     

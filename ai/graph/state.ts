@@ -237,6 +237,29 @@ export const chatGraphState = Annotation.Root({
     default: () => "",
     reducer: lastValue,
   }),
+  imageBlock: Annotation<
+    | {
+        images: Array<{
+          id: string;
+          url: string;
+          thumbnailUrl?: string;
+          title?: string;
+          sourcePage?: string;
+          width?: number;
+          height?: number;
+          provider?: string;
+          relevanceScore?: number;
+          safetyScore?: number;
+          metadata?: Record<string, unknown>;
+        }>; 
+        totalFound?: number;
+        retrievalTimeMs?: number;
+      }
+    | undefined
+  >({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
   extractedMemory: Annotation<string>({
     default: () => "",
     reducer: lastValue,

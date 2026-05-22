@@ -116,6 +116,8 @@ export default async function ChatPage({
         content: message.content,
         parentId: message.parentId,
         branchId: message.branchId,
+        // include persisted media if present
+        imageBlock: (message.media as any) ?? undefined,
       });
       continue;
     }
@@ -139,6 +141,7 @@ export default async function ChatPage({
         branchId: branch.branchId,
         createdAt: branch.createdAt.toISOString(),
       })),
+      imageBlock: (message.media as any) ?? undefined,
     });
   }
 

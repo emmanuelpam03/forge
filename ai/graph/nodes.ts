@@ -638,6 +638,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
       runId: state.runId,
       traceId: state.traceId || null,
       generatedTitle: state.generatedTitle,
+      media: state.imageBlock ?? undefined,
     };
 
     const queuedJobId = await queueJob("saveMessages", jobData);
@@ -665,6 +666,9 @@ export async function saveMessagesNode(state: ChatGraphState) {
       traceId: state.traceId,
       assistantMessageId: state.assistantMessageId,
       userMessageId: preAllocatedUserMessageId,
+      // propagate any images discovered during tool execution so
+      // persistence can include them.
+      imageBlock: state.imageBlock ?? undefined,
     };
   } finally {
     void endTimer(saveTimer);
@@ -796,6 +800,7 @@ export async function toolRouterNodeImpl(
     }> = [];
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
+    let intermediateImageBlock: ChatGraphState["imageBlock"] = undefined;
 
     if (state.forceTool) {
       const forcedName = state.forceTool;
@@ -847,8 +852,41 @@ export async function toolRouterNodeImpl(
                 ? rawResult
                 : JSON.stringify(rawResult, null, 2);
 
-            // Emit images event if this is an imageSearch tool
-            emitImageSearchEvent(toolName, rawResult, state, onEvent);
+            // For imageSearch, emit structured images event and avoid
+            // including the raw JSON/text in evidenceBundles so internal
+            // orchestration isn't exposed to the assistant prompts.
+            if (toolName === "imageSearch") {
+              // Parse structured image result and persist to state imageBlock
+              try {
+                const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
+                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as any[];
+                intermediateImageBlock = {
+                  images: images.map((im) => ({
+                    id: im.id,
+                    url: im.url,
+                    thumbnailUrl: im.thumbnailUrl,
+                    title: im.title,
+                    sourcePage: im.sourcePage,
+                    width: im.width,
+                    height: im.height,
+                    provider: im.provider,
+                    relevanceScore: im.relevanceScore,
+                    safetyScore: im.safetyScore,
+                    metadata: im.metadata || {},
+                  })),
+                  totalFound: (parsed?.totalFound as number) ?? images.length,
+                  retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+                };
+              } catch {
+                // ignore parse errors; still emit images event
+              }
+              emitImageSearchEvent(toolName, rawResult, state, onEvent);
+              return {
+                tool: toolName,
+                content: "",
+                timestamp: new Date().toISOString(),
+              };
+            }
 
             return {
               tool: toolName,
@@ -873,6 +911,7 @@ export async function toolRouterNodeImpl(
         toolsUsed: Array.from(toolsUsed),
         evidenceBundles,
         toolContext: intermediateContext,
+        imageBlock: intermediateImageBlock,
       };
     }
 
@@ -892,8 +931,21 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
-          // Emit images event if this is an imageSearch tool
-          emitImageSearchEvent(toolName, rawResult, state, onEvent);
+          // If this is an imageSearch tool, emit a structured images event
+          // for the UI and avoid storing its raw textual output in the
+          // evidenceBundles or as toolContext. This keeps orchestration
+          // internal and prevents tool JSON from leaking into prompts.
+          if (toolName === "imageSearch") {
+            emitImageSearchEvent(toolName, rawResult, state, onEvent);
+            toolsUsed.add(toolName);
+            evidenceBundles.push({
+              tool: toolName,
+              content: "",
+              timestamp: new Date().toISOString(),
+            });
+            // do not set intermediateContext to the raw image JSON
+            continue;
+          }
 
           toolsUsed.add(toolName);
           evidenceBundles.push({

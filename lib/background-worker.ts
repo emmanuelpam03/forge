@@ -92,6 +92,7 @@ export async function persistSaveMessagesJobData(
     latencyMs: data.latencyMs,
     runId: data.runId,
     traceId: data.traceId,
+    media: data.media ?? undefined,
   };
 
   let persistedAssistantMessageId = data.assistantMessageId ?? null;

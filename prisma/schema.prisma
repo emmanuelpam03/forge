@@ -139,6 +139,9 @@ model Message {
   // LangSmith trace linking
   runId   String?
   traceId String?
+  
+  // Optional structured media (images, attachments) stored as JSON
+  media Json?
 
   createdAt DateTime @default(now())
 

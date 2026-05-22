@@ -181,6 +181,7 @@ export const MessageScalarFieldEnum = {
   latencyMs: 'latencyMs',
   runId: 'runId',
   traceId: 'traceId',
+  media: 'media',
   createdAt: 'createdAt'
 } as const
 

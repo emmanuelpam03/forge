@@ -275,7 +275,11 @@ function formatToolContext(state: ChatGraphState): string {
   let context = "";
 
   if (state.evidenceBundles.length > 0) {
+    // Exclude imageSearch bundles from the textual tool context so that
+    // image results remain a structured, UI-rendered asset and do not
+    // cause raw tool output (JSON/XML) to appear in prompts.
     context = state.evidenceBundles
+      .filter((bundle) => bundle.tool !== "imageSearch")
       .map((bundle) => `${bundle.tool} evidence: ${bundle.content}`)
       .join(" ");
   } else if (state.toolContext) {
