@@ -156,6 +156,11 @@ export async function enrichContextInBackground(
   _chatId: string,
   _cutoffMessageId?: string | null,
 ): Promise<Partial<SelectedContext> & { memorySummary: MemorySummarySnapshot | null }> {
+  // Parameters are intentionally unused in chat-history-only mode.
+  // Reference them to satisfy unused-variable checks in TS/linters.
+  void _chatId;
+  void _cutoffMessageId;
+
   return { memorySummary: null } as Partial<SelectedContext> & {
     memorySummary: MemorySummarySnapshot | null;
   };
