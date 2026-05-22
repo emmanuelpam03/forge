@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { splitStreamingMarkdown } from "./markdown-stream";
 
 type MessageRendererProps = {
   content: string;
@@ -16,6 +17,11 @@ export function MessageRenderer({
   isStreaming,
   images,
 }: MessageRendererProps) {
+  const { markdown, trailingText } = useMemo(
+    () => splitStreamingMarkdown(content || "", isStreaming),
+    [content, isStreaming],
+  );
+
   const components = useMemo<Components>(
     () => ({
       h1: ({ children }) => (
@@ -94,7 +100,7 @@ export function MessageRenderer({
         </h6>
       ),
       p: ({ children }) => (
-        <div
+        <p
           className="mb-4 last:mb-0"
           style={{
             lineHeight: "1.85",
@@ -103,7 +109,7 @@ export function MessageRenderer({
           }}
         >
           {children}
-        </div>
+        </p>
       ),
       ul: ({ children }) => (
         <ul
@@ -235,7 +241,7 @@ export function MessageRenderer({
         const { className, children, inline, ...restProps } = props;
         const languageMatch = /language-(\w+)/.exec(className ?? "");
         const language = languageMatch?.[1];
-        const codeText = String(children);
+        const codeText = String(children).replace(/\n$/, "");
         const isBlockCode = !Boolean(inline);
 
         if (!isBlockCode) {
@@ -256,6 +262,7 @@ export function MessageRenderer({
 
         return <CodeBlock language={language} code={codeText} />;
       },
+      pre: ({ children }) => <>{children}</>,
       hr: () => (
         <hr className="my-5" style={{ borderColor: "var(--border)" }} />
       ),
@@ -279,8 +286,21 @@ export function MessageRenderer({
   return (
     <div className="prose prose-invert max-w-none prose-p:my-0 prose-ul:my-0 prose-ol:my-0 prose-hr:my-0 prose-pre:my-0 prose-code:before:content-none prose-code:after:content-none">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {content || ""}
+        {markdown}
       </ReactMarkdown>
+
+      {trailingText ? (
+        <p
+          className="mb-4 whitespace-pre-wrap last:mb-0"
+          style={{
+            lineHeight: "1.85",
+            color: "var(--message-text)",
+            fontSize: "1rem",
+          }}
+        >
+          {trailingText}
+        </p>
+      ) : null}
 
       {images && images.length > 0 ? (
         <div className="my-4">
