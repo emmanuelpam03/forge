@@ -278,49 +278,47 @@ export function MessageRenderer({
 
   return (
     <div className="prose prose-invert max-w-none prose-p:my-0 prose-ul:my-0 prose-ol:my-0 prose-hr:my-0 prose-pre:my-0 prose-code:before:content-none prose-code:after:content-none">
-      {/* Render content paragraphs and optionally inject images after the first paragraph */}
-      <div>
-        {(() => {
-          const paragraphs = (content || "").split(/\n\n/);
-          return (
-            <>
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-                {paragraphs.slice(0, 1).join("\n\n")}
-              </ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {content || ""}
+      </ReactMarkdown>
 
-              {images && images.length > 0 ? (
-                <div className="my-4">
-                  {images.length >= 4 ? (
-                    // grid for larger sets
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {images.map((im) => (
-                        <div key={im.id} className="relative rounded-md overflow-hidden bg-gray-100 h-40">
-                          {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
-                          <img src={im.thumbnailUrl || im.url} alt={im.title || "image"} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex space-x-3 overflow-x-auto py-2">
-                      {images.map((im) => (
-                        <div key={im.id} className="relative flex-none w-56 h-36 rounded-md overflow-hidden bg-muted">
-                          <img src={im.thumbnailUrl || im.url} alt={im.title || "image"} title={im.title} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
+      {images && images.length > 0 ? (
+        <div className="my-4">
+          {images.length >= 4 ? (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {images.map((im) => (
+                <div
+                  key={im.id}
+                  className="relative h-40 overflow-hidden rounded-md bg-gray-100"
+                >
+                  <img
+                    src={im.thumbnailUrl || im.url}
+                    alt={im.title || "image"}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-              ) : null}
-
-              {paragraphs.slice(1).map((p, idx) => (
-                <ReactMarkdown key={idx} remarkPlugins={[remarkGfm]} components={components}>
-                  {p}
-                </ReactMarkdown>
               ))}
-            </>
-          );
-        })()}
-      </div>
+            </div>
+          ) : (
+            <div className="flex space-x-3 overflow-x-auto py-2">
+              {images.map((im) => (
+                <div
+                  key={im.id}
+                  className="relative h-36 w-56 flex-none overflow-hidden rounded-md bg-muted"
+                >
+                  <img
+                    src={im.thumbnailUrl || im.url}
+                    alt={im.title || "image"}
+                    title={im.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {isStreaming ? (
         <span
           className="ml-0.5 inline-block animate-pulse"
