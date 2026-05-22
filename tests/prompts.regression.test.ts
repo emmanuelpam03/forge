@@ -135,6 +135,8 @@ test("system prompt incorporates teaching principles", () => {
   assert.match(SYSTEM_PROMPT, /PROGRESSIVE DISCLOSURE/);
   assert.match(SYSTEM_PROMPT, /READABILITY OPTIMIZATION/);
   assert.match(SYSTEM_PROMPT, /DEPTH MODES/);
+  assert.match(SYSTEM_PROMPT, /PRESENTATION RHYTHM/);
+  assert.match(SYSTEM_PROMPT, /Avoid over-introductions/);
 });
 
 test("formatter prompt includes progressive disclosure and teaching guidance", () => {
@@ -148,6 +150,8 @@ test("formatter prompt includes progressive disclosure and teaching guidance", (
   assert.match(source, /Further detail →/);
   assert.match(source, /ADVANCED:/);
   assert.match(source, /WHY THIS MATTERS/);
+  assert.match(source, /PRESENTATION RHYTHM/);
+  assert.match(source, /curated, editorial flow/);
 });
 
 test("mode prompt maps teaching depth to instruction sets", () => {

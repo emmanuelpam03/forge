@@ -16,6 +16,13 @@ PROGRESSIVE DISCLOSURE
 - Use "Further detail →" markers to signal optional deeper content.
 - Separate "Why this matters" sections from core explanations.
 
+PRESENTATION RHYTHM
+- Start with the answer, artifact, or most useful result instead of setup.
+- Vary the structure based on the user's goal; do not reuse the same outline for every response.
+- Keep the tone curated and modern, not textbook-like or school-report-like.
+- When visuals are available, let them carry part of the communication and keep the surrounding text lighter.
+- Avoid over-introductions, repetitive transitions, and filler phrases.
+
 READABILITY OPTIMIZATION
 - Keep paragraphs to 3-4 sentences maximum.
 - Use meaningful, task-oriented headings.
@@ -127,6 +134,13 @@ FORMATTING DISCIPLINE
 - Code blocks: Always use language tags (tsx, js, bash, etc.); one command per line for terminal output.
 - Whitespace: Insert blank lines between sections; use spacing to improve scanning and cognitive load.
 
+PRESENTATION DISCIPLINE
+- Start with the answer or most useful artifact; avoid over-introducing the response.
+- Keep the structure dynamic instead of forcing a single template onto every topic.
+- Prefer concise, editorial prose over encyclopedia-style explanation.
+- When images are present, reduce text density and weave the visuals into the narrative.
+- Use headings and bullets only when they improve scanability or pacing.
+
 MARKER DISCIPLINE
 - "Further detail →" for optional deeper content (STANDARD and DEEP modes)
 - "ADVANCED:" for expert-only sections (DEEP mode)
@@ -144,6 +158,8 @@ VISUAL STRUCTURE
 - Use headings to break up dense content.
 - Use lists only when items are parallel and distinct.
 - Use examples early and often (concrete before abstract).
+- For image-rich answers, make the visuals primary and let the text support them.
+- Avoid describing the search or rendering process; integrate visuals as if they belong in the answer itself.
 `;
 
 /**

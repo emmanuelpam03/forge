@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { Children, isValidElement, useMemo } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -11,6 +11,31 @@ type MessageRendererProps = {
   isStreaming?: boolean;
   images?: { id: string; url: string; thumbnailUrl?: string; title?: string }[] | null;
 };
+
+function containsBlockLevelChild(children: React.ReactNode) {
+  return Children.toArray(children).some((child) => {
+    if (!isValidElement(child) || typeof child.type !== "string") {
+      return false;
+    }
+
+    return [
+      "div",
+      "pre",
+      "blockquote",
+      "table",
+      "ul",
+      "ol",
+      "li",
+      "p",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+    ].includes(child.type);
+  });
+}
 
 export function MessageRenderer({
   content,
@@ -100,16 +125,29 @@ export function MessageRenderer({
         </h6>
       ),
       p: ({ children }) => (
-        <p
-          className="mb-4 last:mb-0"
-          style={{
-            lineHeight: "1.85",
-            color: "var(--message-text)",
-            fontSize: "1rem",
-          }}
-        >
-          {children}
-        </p>
+        containsBlockLevelChild(children) ? (
+          <div
+            className="mb-4 last:mb-0"
+            style={{
+              lineHeight: "1.85",
+              color: "var(--message-text)",
+              fontSize: "1rem",
+            }}
+          >
+            {children}
+          </div>
+        ) : (
+          <p
+            className="mb-4 last:mb-0"
+            style={{
+              lineHeight: "1.85",
+              color: "var(--message-text)",
+              fontSize: "1rem",
+            }}
+          >
+            {children}
+          </p>
+        )
       ),
       ul: ({ children }) => (
         <ul

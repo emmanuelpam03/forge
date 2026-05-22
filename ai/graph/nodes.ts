@@ -647,7 +647,7 @@ export function testResolveToolPlan(
 export async function saveMessagesNode(state: ChatGraphState) {
   const saveTimer = startTimer("saveMessagesNode", { chatId: state.chatId, runId: state.runId });
   try {
-    const imageBlock = (state as ChatGraphState & { imageBlock?: ChatImageBlock }).imageBlock;
+    const imageBlock = state.imageBlock;
     // Determine if user message should be created (avoid duplication in edit flows)
     const lastPrev = state.previousMessages?.[state.previousMessages.length - 1];
     const shouldCreateUser = !(
