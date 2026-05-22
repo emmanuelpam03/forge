@@ -485,55 +485,7 @@ export function SidebarClient({
     };
   }, []);
 
-  useEffect(() => {
-    const chatIdsKey = recentChats.map((c) => c.id).join(",");
-    const baseUrl = "/api/chat/title-updates";
-    const url = chatIdsKey ? `${baseUrl}?chatIds=${encodeURIComponent(chatIdsKey)}` : baseUrl;
-    const source = new EventSource(url);
-
-    const handleMessage = (event: MessageEvent<string>) => {
-      try {
-        const detail = JSON.parse(event.data) as {
-          chatId?: string;
-          title?: string;
-        };
-
-        if (!detail.chatId || !detail.title) {
-          return;
-        }
-
-        const title = detail.title;
-
-        setRecentChats((prev) =>
-          prev.map((chat) =>
-            chat.id === detail.chatId ? { ...chat, title } : chat,
-          ),
-        );
-
-        window.dispatchEvent(
-          new CustomEvent("chat:title-updated", {
-            detail: { chatId: detail.chatId, title },
-          }),
-        );
-      } catch {
-        // Ignore malformed payloads and keep the stream alive.
-      }
-    };
-
-    const handleError = () => {
-      console.warn("Title updates stream disconnected, will auto-reconnect");
-      // EventSource automatically reconnects, but consider user feedback
-    };
-
-    source.addEventListener("message", handleMessage as EventListener);
-    source.addEventListener("error", handleError as EventListener);
-
-    return () => {
-      source.removeEventListener("message", handleMessage as EventListener);
-      source.removeEventListener("error", handleError as EventListener);
-      source.close();
-    };
-  }, [recentChats]);
+  // Title-updates EventSource removed by request — rely on window events only
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsBooting(false), 260);
