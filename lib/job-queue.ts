@@ -128,7 +128,7 @@ export async function queueJob<T>(
     return jobId;
   } catch (err) {
     logError("queue_job_failed", { jobId, type, error: err });
-    return jobId;
+    throw err;
   }
 }
 

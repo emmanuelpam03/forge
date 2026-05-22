@@ -16,7 +16,6 @@ import { info, warn, error as logError, debug } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import {
   consumeModelStream,
-  extractTextFromModelChunk,
   toTextContent,
 } from "@/ai/graph/stream-consumer";
 import {
@@ -220,9 +219,9 @@ function resolveToolPlanForQueryIntent(
   }
 
   if (selected.includes("research")) {
-    // Research should check both local project context and the web.
-    selectedTools.push("projectContextLookup");
-    selectedTools.push("webSearch");
+    // Research mode: prefer local summarization of the user's input
+    // (do not automatically query project context or the web under
+    // chat-history-only policy).
     selectedTools.push("summarizeText");
   }
 
@@ -239,8 +238,8 @@ function resolveToolPlanForQueryIntent(
   }
 
   if (selected.includes("coding")) {
-    // Coding benefits from project context lookup to find relevant code/docs.
-    selectedTools.push("projectContextLookup");
+    // Coding mode: do not automatically fetch project context under
+    // chat-history-only policy. Keep tools conservative.
   }
 
   // Heuristic: If the message looks like it would benefit from visual context, add imageSearch.
