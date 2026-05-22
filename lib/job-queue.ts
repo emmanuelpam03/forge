@@ -95,6 +95,7 @@ export interface GenerateTitleJobData {
   chatId: string;
   userMessage: string;
   assistantMessage: string;
+  recentConversation?: string;
   projectContext?: string | null;
   chatSummary?: string | null;
   memorySummary?: unknown | null;

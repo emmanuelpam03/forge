@@ -100,7 +100,7 @@ export default function HomePage() {
     try {
       setError("");
       setIsCreatingChat(true);
-      const { createChat, updateChat } = await import("@/lib/actions/chats");
+      const { createChat } = await import("@/lib/actions/chats");
       const createResult = await createChat();
 
       if (!createResult.success || !createResult.chat) {
@@ -108,13 +108,11 @@ export default function HomePage() {
       }
 
       const chatId = createResult.chat.id;
-      const title =
-        message.length > 60 ? `${message.slice(0, 60)}...` : message;
 
       // Confirm real chat: replace temp with real
       window.dispatchEvent(
         new CustomEvent("chat:confirmed", {
-          detail: { tempId, id: chatId, title },
+          detail: { tempId, id: chatId, title: "New Chat" },
         })
       );
 
@@ -142,10 +140,6 @@ export default function HomePage() {
           `/c/${chatId}?initialMessage=${encodeURIComponent(message)}`,
         );
       }, 0);
-
-      void updateChat(chatId, { title }).catch((updateError) => {
-        console.error("Failed to update chat title:", updateError);
-      });
     } catch (caughtError) {
       const description =
         caughtError instanceof Error

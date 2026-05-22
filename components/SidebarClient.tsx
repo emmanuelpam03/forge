@@ -468,6 +468,9 @@ export function SidebarClient({
     }
     function handleTitleUpdated(e: CustomEvent) {
       const { chatId, title } = e.detail;
+      if (!chatId || typeof title !== "string") {
+        return;
+      }
       setRecentChats((prev) =>
         prev.map((c) => (c.id === chatId ? { ...c, title } : c)),
       );
@@ -479,6 +482,46 @@ export function SidebarClient({
       window.removeEventListener("chat:created", handleChatCreated as EventListener);
       window.removeEventListener("chat:confirmed", handleChatConfirmed as EventListener);
       window.removeEventListener("chat:title-updated", handleTitleUpdated as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const source = new EventSource("/api/chat/title-updates");
+
+    const handleMessage = (event: MessageEvent<string>) => {
+      try {
+        const detail = JSON.parse(event.data) as {
+          chatId?: string;
+          title?: string;
+        };
+
+        if (!detail.chatId || !detail.title) {
+          return;
+        }
+
+        const title = detail.title;
+
+        setRecentChats((prev) =>
+          prev.map((chat) =>
+            chat.id === detail.chatId ? { ...chat, title } : chat,
+          ),
+        );
+
+        window.dispatchEvent(
+          new CustomEvent("chat:title-updated", {
+            detail: { chatId: detail.chatId, title },
+          }),
+        );
+      } catch {
+        // Ignore malformed payloads and keep the stream alive.
+      }
+    };
+
+    source.addEventListener("message", handleMessage as EventListener);
+
+    return () => {
+      source.removeEventListener("message", handleMessage as EventListener);
+      source.close();
     };
   }, []);
 

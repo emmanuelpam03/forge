@@ -9,7 +9,14 @@ function readWorkspaceFile(relativePath: string): string {
 
 test("generateTitleNode includes conversation context when available", () => {
   const src = readWorkspaceFile("ai/graph/nodes.ts");
-  // Ensure we are appending 'Context:' to the title prompt when context exists
   assert.match(src, /Context:\\n/);
-  assert.match(src, /Use this context when creating a concise, descriptive title\./);
+  assert.match(src, /recentConversation/);
+  assert.match(src, /slice\(-4\)/);
+});
+
+test("title prompt asks for semantic summary titles", () => {
+  const src = readWorkspaceFile("ai/prompts/title.ts");
+  assert.match(src, /Generate a concise, human-like chat title/);
+  assert.match(src, /Prefer semantic topic names, not the user's exact wording\./);
+  assert.match(src, /Use 3 to 6 words\./);
 });

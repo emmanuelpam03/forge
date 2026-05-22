@@ -7,6 +7,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { createGeminiModel } from "@/ai/models";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { toTextContent } from "@/ai/graph/stream-consumer";
+import { isGenericChatTitle, publishChatTitleUpdate } from "@/lib/chat-title-events";
 // buildLangSmithRunConfig not needed in worker
 
 /**
@@ -161,11 +162,32 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
   const timer = startTimer("process_generate_title", { chatId: data.chatId });
 
   try {
+    const existingChat = await prisma.chat.findUnique({
+      where: { id: data.chatId },
+      select: { title: true },
+    });
+
+    if (existingChat && !isGenericChatTitle(existingChat.title)) {
+      info("job_generateTitle_skipped_existing_title", {
+        jobId: job.id,
+        chatId: data.chatId,
+        runId: data.runId,
+        title: existingChat.title,
+      });
+      await completeJob(job.id, "generateTitle");
+      return;
+    }
+
     const model = createGeminiModel();
-    let prompt = TITLE_GENERATION_PROMPT.replace(/"{USER_MESSAGE}"/g, data.userMessage).replace(
-      /"{ASSISTANT_MESSAGE}"/g,
-      data.assistantMessage,
-    );
+    const conversationContext = [
+      data.recentConversation?.trim(),
+      `User: ${data.userMessage.trim()}`,
+      `Assistant: ${data.assistantMessage.trim()}`,
+    ]
+      .filter((part): part is string => typeof part === "string" && part.length > 0)
+      .join("\n");
+
+    let prompt = TITLE_GENERATION_PROMPT.replace("{CONVERSATION_CONTEXT}", conversationContext);
 
     const contextParts: string[] = [];
     if (data.projectContext) {
@@ -191,7 +213,6 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
 
     const response = await model.invoke([new HumanMessage(prompt)], runConfig);
     const generatedTitle = toTextContent(response.content)
-      .toLowerCase()
       .trim()
       .replace(/^["']|["']$/g, "")
       .replace(/[—–-].*$/, "")
@@ -204,6 +225,11 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
       await prisma.chat.update({
         where: { id: data.chatId },
         data: { title: generatedTitle },
+      });
+
+      await publishChatTitleUpdate({
+        chatId: data.chatId,
+        title: generatedTitle,
       });
     }
 

@@ -1,20 +1,22 @@
 /**
  * Prompt for generating chat titles.
- * Extracts a short, descriptive title from user-assistant exchange.
+ * Extracts a short, descriptive title from recent conversation context.
  */
-export const TITLE_GENERATION_PROMPT = `Generate a short, neutral chat title based on this exchange:
+export const TITLE_GENERATION_PROMPT = `Generate a concise, human-like chat title that summarizes the conversation topic.
 
-User: "{USER_MESSAGE}"
-Assistant: "{ASSISTANT_MESSAGE}"
+Conversation:
+{CONVERSATION_CONTEXT}
 
 Rules:
 - Use 3 to 6 words.
-- Make it descriptive, not promotional.
-- Do not add slogans, subtitles, or taglines.
-- Do not use em dashes, colons, or quotation marks.
+- Prefer semantic topic names, not the user's exact wording.
+- Be concise, readable, and context-aware.
+- Do not include punctuation unless necessary.
+- Do not add filler words, prefixes, or suffixes.
 - Respond with ONLY the title.
 
 Examples:
-- "Politics in Nigeria"
-- "Quantum Entanglement"
-- "Photosynthesis Basics"`;
+- Modern Leadership Challenges
+- Understanding WebSockets
+- Ghana Culture and Landmarks
+- AI Forex Bot Architecture`;

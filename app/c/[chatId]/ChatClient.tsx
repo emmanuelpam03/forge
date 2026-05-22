@@ -441,6 +441,62 @@ export function ChatClient({
   }, [messages, isSending]);
 
   useEffect(() => {
+    const handleTitleUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        chatId?: string;
+        title?: string;
+      }>).detail;
+
+      if (detail?.chatId !== chatId || !detail.title) {
+        return;
+      }
+
+      setChatTitle(detail.title);
+    };
+
+    window.addEventListener("chat:title-updated", handleTitleUpdated as EventListener);
+
+    return () => {
+      window.removeEventListener("chat:title-updated", handleTitleUpdated as EventListener);
+    };
+  }, [chatId]);
+
+  useEffect(() => {
+    const nextTitle = chatTitle.trim() ? `${chatTitle} | Forge` : "Forge";
+    if (document.title !== nextTitle) {
+      document.title = nextTitle;
+    }
+  }, [chatTitle]);
+
+  useEffect(() => {
+    const source = new EventSource("/api/chat/title-updates");
+
+    const handleMessage = (event: MessageEvent<string>) => {
+      try {
+        const detail = JSON.parse(event.data) as {
+          chatId?: string;
+          title?: string;
+        };
+
+        if (detail.chatId !== chatId || !detail.title) {
+          return;
+        }
+
+        setChatTitle(detail.title);
+      } catch {
+        // Ignore malformed payloads and keep the stream alive.
+      }
+    };
+
+    source.addEventListener("message", handleMessage as EventListener);
+
+    return () => {
+      source.removeEventListener("message", handleMessage as EventListener);
+      source.close();
+    };
+  }, [chatId]);
+
+  useEffect(() => {
     const textarea = textareaRef.current;
 
     if (!textarea) {

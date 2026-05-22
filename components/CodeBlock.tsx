@@ -17,8 +17,11 @@ type Props = {
 export default function CodeBlock({ code, language }: Props) {
   const { theme } = useTheme();
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+
     if (!copied) return;
     const id = window.setTimeout(() => setCopied(false), 2000);
     return () => window.clearTimeout(id);
@@ -36,7 +39,7 @@ export default function CodeBlock({ code, language }: Props) {
   }
 
   const lang = language || "text";
-  const isDark = theme === "dark";
+  const isDark = mounted && theme === "dark";
   const syntaxStyle = isDark ? dracula : atomOneLight;
 
   return (

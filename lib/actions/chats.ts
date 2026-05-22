@@ -123,15 +123,9 @@ export async function createChatWithMessage(
   projectId?: string,
 ) {
   try {
-    // Create chat with title derived from first message
-    const title =
-      messageContent.length > 60
-        ? messageContent.substring(0, 60) + "..."
-        : messageContent;
-
     const chat = await prisma.chat.create({
       data: {
-        title,
+        title: "New Chat",
         projectId: projectId || null,
       },
     });

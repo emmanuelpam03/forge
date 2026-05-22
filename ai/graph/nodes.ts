@@ -1311,10 +1311,17 @@ export async function generateTitleNode(state: ChatGraphState) {
   // Queue title generation as background job (don't block response stream)
   // Title will be generated and persisted asynchronously
   // For first turn, we could emit title later; for subsequent turns it's optional
+  const recentConversation = state.previousMessages
+    .slice(-4)
+    .map((message) => `${message.role.toUpperCase()}: ${message.content.trim()}`)
+    .filter((line) => line.trim().length > 0)
+    .join("\n");
+
   const titleJobData: GenerateTitleJobData = {
     chatId: state.chatId,
     userMessage: state.userMessage,
     assistantMessage: state.assistantMessage,
+    recentConversation: recentConversation || undefined,
     projectContext: state.selectedContext?.projectContext,
     chatSummary: state.selectedContext?.chatSummary,
     memorySummary: state.memorySummary,
