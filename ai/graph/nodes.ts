@@ -899,7 +899,7 @@ export async function toolRouterNodeImpl(
               // Parse structured image result and persist to state imageBlock
               try {
                 const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
-                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as any[];
+                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
                 intermediateImageBlock = {
                   images: images.map((im) => ({
                     id: im.id,
