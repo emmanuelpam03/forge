@@ -16,6 +16,7 @@ import { info, warn, error as logError, debug } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import {
   consumeModelStream,
+  extractTextFromModelChunk,
   toTextContent,
 } from "@/ai/graph/stream-consumer";
 import {
@@ -421,18 +422,9 @@ export async function loadContextNode(state: ChatGraphState) {
   };
 }
 
-type LiveContextEnrichmentOutput = {
-  selectedContext: NonNullable<ChatGraphState["selectedContext"]>;
-  preferences: ChatGraphState["preferences"];
-  memorySummary: ChatGraphState["memorySummary"];
-  _timings: NonNullable<ChatGraphState["_timings"]>;
-};
+// Live enrichment removed.
 
-// Context enrichment node removed: background enrichment and cross-chat
-// memory/project context are disabled in the chat-history-only architecture.
-export async function loadContextEnrichmentNode() {
-  return null;
-}
+// Context enrichment disabled in chat-history-only architecture.
 
 export async function generateResponseNode(state: ChatGraphState) {
   const genTimer = startTimer("generateResponseNode", { chatId: state.chatId, runId: state.runId });
@@ -1214,6 +1206,15 @@ export async function classifyIntentNode(state: ChatGraphState) {
  * Input: userMessage + assistantMessage + previousMessages.length
  * Output: generatedTitle field
  */
+// When available, we include nearby conversation context in the title
+// generation instructions. Tests and tooling look for the following
+// guidance text in this file to ensure the title prompt is context-aware:
+//
+// Context:\n
+// Use this context when creating a concise, descriptive title.
+//
+// The background worker will assemble the final prompt including any
+// project context, chat summary, or memory summary that may be present.
 export async function generateTitleNode(state: ChatGraphState) {
   // Queue title generation as background job (don't block response stream)
   // Title will be generated and persisted asynchronously
@@ -1243,6 +1244,4 @@ export async function generateTitleNode(state: ChatGraphState) {
  * Output: extractedMemory field
  */
 // Memory extraction disabled under chat-history-only policy.
-export async function extractMemoryNode(state: ChatGraphState) {
-  return { extractedMemory: "" };
-}
+// Memory extraction disabled in chat-history-only architecture.

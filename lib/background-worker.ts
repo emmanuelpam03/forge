@@ -1,12 +1,11 @@
 import prisma from "@/lib/prisma";
 import { getRedisClient } from "@/lib/redis";
-import { dequeueJob, completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type EnrichContextJobData } from "@/lib/job-queue";
+import { dequeueJob, completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
 import { error as logError, info } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import { HumanMessage } from "@langchain/core/messages";
 import { createGeminiModel } from "@/ai/models";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
-import { enrichContextInBackground } from "@/ai/context/engine";
 import { toTextContent } from "@/ai/graph/stream-consumer";
 // buildLangSmithRunConfig not needed in worker
 
@@ -223,55 +222,14 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
   }
 }
 
-async function processEnrichContextJob(job: Job<EnrichContextJobData>): Promise<void> {
-  const { data } = job;
-  const timer = startTimer("process_enrich_context", { chatId: data.chatId });
-
-  try {
-    // Load full context asynchronously
-    await enrichContextInBackground(data.chatId);
-
-    info("job_enrichContext_completed", {
-      jobId: job.id,
-      chatId: data.chatId,
-      runId: data.runId,
-    });
-
-    await completeJob(job.id, "enrichContext");
-  } catch (err) {
-    logError("job_enrichContext_failed", { jobId: job.id, chatId: data.chatId, error: err });
-    // Don't requeue context enrichment failures - it's best effort
-  } finally {
-    void endTimer(timer);
-  }
-}
-
-/**
- * Placeholder handler for extractMemory jobs.
- * Currently extractMemory is produced inline by the graph; if queued jobs
- * appear in the future this handler will ensure they are acknowledged.
- */
-async function processExtractMemoryJob(job: Job<unknown>): Promise<void> {
-  const timer = startTimer("process_extract_memory", {});
-  try {
-    info("process_extract_memory_noop", { jobId: job.id });
-    // Acknowledge the job so it doesn't remain pending. If a real handler is
-    // needed later, replace this implementation with actual processing logic.
-    await completeJob(job.id, "extractMemory");
-  } catch (err) {
-    logError("job_extractMemory_failed", { jobId: job.id, error: err });
-    await requeueJobWithBackoff(job as Job);
-  } finally {
-    void endTimer(timer);
-  }
-}
+// Enrich/extract background handlers removed; those jobs are no longer queued.
 
 /**
  * Main worker loop: Continuously process jobs from the queue.
  * Each job type is processed by its own worker.
  */
 async function startWorkerForQueue<T>(
-  jobType: "saveMessages" | "generateTitle" | "enrichContext" | "extractMemory",
+  jobType: "saveMessages" | "generateTitle",
   processor: (job: Job<T>) => Promise<void>,
 ): Promise<void> {
   while (!workersStopping) {
@@ -364,12 +322,10 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
   workerLoopPromises = [
     startWorkerForQueue("saveMessages", processSaveMessagesJob),
     startWorkerForQueue("generateTitle", processGenerateTitleJob),
-    startWorkerForQueue("enrichContext", processEnrichContextJob),
-    startWorkerForQueue("extractMemory", processExtractMemoryJob),
   ];
 
   info("background_workers_initialized", {
-    jobTypes: ["saveMessages", "generateTitle", "enrichContext", "extractMemory"],
+    jobTypes: ["saveMessages", "generateTitle"],
   });
 
   return {
@@ -378,4 +334,4 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
 }
 
 // Export for testing
-export { processSaveMessagesJob, processGenerateTitleJob, processEnrichContextJob, processExtractMemoryJob };
+export { processSaveMessagesJob, processGenerateTitleJob };

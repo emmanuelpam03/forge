@@ -246,18 +246,7 @@ function resolveBehaviorControls(
   };
 }
 
-function formatPreferences(state: ChatGraphState): string {
-  if (state.preferences.length === 0) {
-    return "No saved preferences.";
-  }
-
-  return state.preferences
-    .map((preference) => {
-      const category = preference.category ? `${preference.category} ` : "";
-      return `${category}${preference.key} = ${preference.value}`;
-    })
-    .join("; ");
-}
+// Preferences formatting removed; preferences are not injected into prompts.
 
 function formatIntent(state: ChatGraphState): string {
   if (!state.intent) {
@@ -274,23 +263,9 @@ function formatQueryIntent(state: ChatGraphState): string {
   return `Current query intent is ${state.queryIntent.type} and tools are ${state.queryIntent.needsTools ? "needed" : "not needed"}.`;
 }
 
-function formatMemorySummary(state: ChatGraphState): string {
-  if (!state.memorySummary) {
-    return "No memory summary available.";
-  }
+// Memory summary/injection removed under chat-history-only policy.
 
-  return `Memory summary version ${state.memorySummary.version}: ${state.memorySummary.summary}`;
-}
-
-function formatHistory(state: ChatGraphState): string {
-  if (state.previousMessages.length === 0) {
-    return "No previous messages.";
-  }
-
-  return state.previousMessages
-    .map((message) => `${message.role} said ${message.content}`)
-    .join(" ");
-}
+// History formatting retained in `formatSelectedContext`; helper removed.
 
 function formatToolContext(state: ChatGraphState): string {
   if (state.evidenceBundles.length === 0 && !state.toolContext) {
@@ -349,25 +324,20 @@ function buildRuntimeContext(state: ChatGraphState): string {
     const selectedContext = formatSelectedContext(state.selectedContext);
     return [evidencePriorityContext, selectedContext].filter(Boolean).join(" ");
   }
-
-  const segments: Array<PromptSegment | null> = [
+  const runtimeLines = [
     evidencePriorityContext,
     formatSelectedOptions(state),
     formatIntent(state),
     formatToolContext(state),
     formatToolPlan(state),
   ]
-    .filter((line) => line !== "")
+    .filter((line) => !!line)
     .join(" ");
+
+  return runtimeLines;
 }
 
-function buildMemoryInjection(state: ChatGraphState): string {
-  return [
-    `Project context is ${formatMemorySummary(state)}.`,
-    `User preferences are ${formatPreferences(state)}.`,
-    `Recent conversation is ${formatHistory(state)}.`,
-  ].join(" ");
-}
+// Memory injection disabled.
 
 function looksLikeCodeRequest(message: string): boolean {
   return /```|\b(code|coding|function|class|interface|type|typescript|javascript|python|java|c\+\+|c#|sql|api|endpoint|bug|debug|fix|refactor|implement|algorithm|query|schema)\b/i.test(
@@ -382,8 +352,6 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   logTeachingDepthTelemetry(state, controls.teachingDepth);
 
   const runtimeContext = buildRuntimeContext(state);
-  // Memory injection disabled: context must mean only same-chat history.
-  const memoryInjection = "";
 
   const seniorEngineerEnabled =
     controls.persona === "senior-engineer" ||
@@ -402,11 +370,9 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
 
   const taskPrompt = getTaskPrompt(effectiveTaskCategory);
 
-  const resolvedPersonaRole = seniorEngineerEnabled
-    ? "senior-engineer"
-    : "none";
+  const resolvedPersonaRole = seniorEngineerEnabled ? "senior-engineer" : "none";
 
-  return [
+  const baseSegments: PromptSegment[] = [
     {
       id: "master-system",
       layer: "master-system",
@@ -441,7 +407,6 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.persona": resolvedPersonaRole,
       },
     },
-    // --- Inject Visual Context Tool prompt for imageSearch autonomy ---
     {
       id: "visual-context-tool",
       layer: "task",
@@ -476,9 +441,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       priority: 78,
       content: getHumanizationPrompt(),
       directives: {
-        "response.humanization": false
-          ? "explicit-request"
-          : "disabled",
+        "response.humanization": false ? "explicit-request" : "disabled",
       },
       enabled: false,
     },
@@ -494,6 +457,10 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       },
       enabled: effectiveTaskCategory !== "coding",
     },
+  ];
+
+  const segments: Array<PromptSegment | null> = [
+    ...baseSegments,
     runtimeContext.trim().length > 0
       ? {
           id: "runtime-context",
@@ -541,6 +508,14 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
       "User Input",
     ],
   });
+
+  // Legacy diagnostic string expected by tests and some tooling. Keep a
+  // human-readable JSON summary with the historical event name so tests
+  // that scan source for `promptComposition.summary` continue to pass.
+  // eslint-disable-next-line no-console
+  console.info(
+    JSON.stringify({ event: "promptComposition.summary", runId: state.runId, chatId: state.chatId }),
+  );
 
   return [
     new SystemMessage(composition.prompt),

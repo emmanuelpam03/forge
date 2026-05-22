@@ -11,7 +11,6 @@ import { CHAT_GRAPH_EDGE_LIST, CHAT_GRAPH_NODES } from "@/ai/graph/edges";
 import {
   generateResponseNode,
   loadContextNode,
-  loadContextEnrichmentNode,
   saveMessagesNode,
   classifyIntentNode,
   planTaskNode,
@@ -19,7 +18,6 @@ import {
   toolRouterNodeImpl,
   synthesizeEvidenceNode,
   generateTitleNode,
-  extractMemoryNode,
   setGraphStreamEventEmitter,
 } from "@/ai/graph/nodes";
 import type { StreamEvent } from "./stream";
@@ -51,14 +49,8 @@ async function runGraphPreResponse(
     classifyIntentNode(state),
   ]);
 
-  const liveContextEnrichmentPromise = contextResult.selectedContext
-    ? loadContextEnrichmentNode(
-        state,
-        contextResult.selectedContext,
-        contextResult.preferences,
-        state.memorySummary,
-      )
-    : Promise.resolve(null);
+  // Background/live enrichment disabled in chat-history-only mode
+  const liveContextEnrichmentPromise = Promise.resolve(null);
 
   Object.assign(state, contextResult);
   Object.assign(state, classificationResult);
@@ -94,8 +86,7 @@ const graphBuilder = new StateGraph(chatGraphState)
   .addNode(CHAT_GRAPH_NODES.synthesizeEvidence, synthesizeEvidenceNode)
   .addNode(CHAT_GRAPH_NODES.generateResponse, generateResponseNode)
   .addNode(CHAT_GRAPH_NODES.saveMessages, saveMessagesNode)
-  .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode)
-  .addNode(CHAT_GRAPH_NODES.extractMemory, extractMemoryNode);
+  .addNode(CHAT_GRAPH_NODES.generateTitle, generateTitleNode);
 
 for (const [source, target] of CHAT_GRAPH_EDGE_LIST) {
   graphBuilder.addEdge(
@@ -268,15 +259,7 @@ export async function runChatGraphStream(
     logError("generate_title_failed", { chatId: input.chatId, error });
   }
 
-  // Run memory extraction in background to avoid delaying the response.
-  void (async () => {
-    try {
-      const memoryResult = await extractMemoryNode(state);
-      Object.assign(state, memoryResult);
-    } catch (error) {
-      logError("extract_memory_failed", { chatId: input.chatId, error });
-    }
-  })();
+  // Memory extraction disabled in chat-history-only mode.
 
   return state;
 }

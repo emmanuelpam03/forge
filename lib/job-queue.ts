@@ -3,15 +3,7 @@ import "server-only";
 import { getRedisClient } from "./redis";
 import { error as logError, info, debug } from "./logger";
 
-/**
- * Simple Redis-backed background job queue.
- * Provides fire-and-forget async job execution with exponential backoff.
- *
- * Uses Redis lists (LPUSH/BRPOP) for simplicity and availability.
- * Jobs are persisted until processed successfully.
- */
-
-export type JobType = "saveMessages" | "generateTitle" | "enrichContext" | "extractMemory";
+export type JobType = "saveMessages" | "generateTitle";
 
 export interface Job<T = unknown> {
   id: string;
@@ -35,10 +27,6 @@ function getProcessingMetricName(type: JobType): string | null {
       return "process_save_messages";
     case "generateTitle":
       return "process_generate_title";
-    case "enrichContext":
-      return "process_enrich_context";
-    case "extractMemory":
-      return "process_extract_memory";
     default:
       return null;
   }
@@ -107,20 +95,10 @@ export interface GenerateTitleJobData {
   assistantMessage: string;
   projectContext?: string | null;
   chatSummary?: string | null;
-  // Memory summary can be structured; accept unknown to avoid tight coupling
   memorySummary?: unknown | null;
   runId: string;
 }
 
-export interface EnrichContextJobData {
-  chatId: string;
-  runId: string;
-}
-
-/**
- * Queue a background job for async processing.
- * Returns immediately with job ID; processing happens asynchronously.
- */
 export async function queueJob<T>(
   type: JobType,
   data: T,
@@ -128,7 +106,6 @@ export async function queueJob<T>(
 ): Promise<string> {
   const redis = getRedisClient();
   if (!redis) {
-    // Fallback: If Redis is unavailable, log error but don't crash
     logError("redis_unavailable_cannot_queue_job", { type });
     return "no-redis";
   }
@@ -145,33 +122,22 @@ export async function queueJob<T>(
 
   try {
     const queueKey = `queue:${type}`;
-    // Add job to queue as JSON
     await redis.lpush(queueKey, JSON.stringify(job));
-
-    // Set queue expiration to prevent memory leak if processor crashes
-    // Queue is kept for 7 days
     await redis.expire(queueKey, 7 * 24 * 60 * 60);
-
     debug("job_queued", { jobId, type });
     return jobId;
   } catch (err) {
     logError("queue_job_failed", { jobId, type, error: err });
-    return jobId; // Return ID anyway; job is lost but request shouldn't fail
+    return jobId;
   }
 }
 
-/**
- * Dequeue a single job for processing.
- * Blocks up to timeoutSeconds waiting for a job to appear.
- */
 export async function dequeueJob(
   type: JobType,
   timeoutSeconds: number = 30,
 ): Promise<Job | null> {
   const redis = getRedisClient();
-  if (!redis) {
-    return null;
-  }
+  if (!redis) return null;
 
   try {
     const queueKey = `queue:${type}`;
@@ -185,27 +151,19 @@ export async function dequeueJob(
         Date.now().toString(),
       )) as string | null;
 
-      if (!jobJson) {
-        return null;
-      }
-
+      if (!jobJson) return null;
       return JSON.parse(jobJson) as Job;
     };
 
     const nextDelayedAt = async (): Promise<number | null> => {
       const next = (await redis.zrange(delayedKey, 0, 0, "WITHSCORES")) as string[];
-      if (!next || next.length < 2) {
-        return null;
-      }
-
+      if (!next || next.length < 2) return null;
       const scheduledAt = Number(next[1]);
       return Number.isFinite(scheduledAt) ? scheduledAt : null;
     };
 
     const dueDelayedJob = await claimDueDelayedJob();
-    if (dueDelayedJob) {
-      return dueDelayedJob;
-    }
+    if (dueDelayedJob) return dueDelayedJob;
 
     const nextScheduledAt = await nextDelayedAt();
     const waitSeconds =
@@ -213,18 +171,12 @@ export async function dequeueJob(
         ? Math.max(1, Math.min(timeoutSeconds, Math.ceil((nextScheduledAt - Date.now()) / 1000)))
         : timeoutSeconds;
 
-    // BRPOP blocks until a job is available or timeout expires
     const result = await redis.brpop(queueKey, waitSeconds);
-
-    if (!result || result.length < 2) {
-      return await claimDueDelayedJob();
-    }
+    if (!result || result.length < 2) return await claimDueDelayedJob();
 
     const raw = result[1] as string;
     const parsedJob = JSON.parse(raw) as Job & { scheduledAt?: number };
 
-    // Legacy support: if a scheduled job is still sitting in the immediate queue,
-    // move it into the delayed sorted set and let the next dequeue attempt pick it up.
     if (parsedJob.scheduledAt && Date.now() < parsedJob.scheduledAt) {
       try {
         await redis.zadd(delayedKey, parsedJob.scheduledAt, raw);
@@ -233,8 +185,6 @@ export async function dequeueJob(
       } catch (err) {
         logError("requeue_scheduled_job_failed", { error: err, jobId: parsedJob.id });
       }
-
-      // Indicate no ready job was returned (caller may wait or retry)
       return null;
     }
 
@@ -245,35 +195,22 @@ export async function dequeueJob(
   }
 }
 
-/**
- * Mark a job as successful and remove from queue.
- */
 export async function completeJob(jobId: string, type: JobType): Promise<void> {
   const redis = getRedisClient();
   if (!redis) return;
 
   try {
-    // Record completion in completed set for metrics/debugging
     const completedKey = `completed:${type}`;
     await redis.lpush(completedKey, jobId);
-    // Keep last 100 completed jobs
     await redis.ltrim(completedKey, 0, 99);
-    // Set TTL to expire old entries
     await redis.expire(completedKey, 24 * 60 * 60);
-
     debug("job_completed", { jobId, type });
   } catch (err) {
     logError("complete_job_failed", { jobId, type, error: err });
   }
 }
 
-/**
- * Requeue a failed job with exponential backoff.
- * If max retries exceeded, move to dead-letter queue.
- */
-export async function requeueJobWithBackoff(
-  job: Job,
-): Promise<void> {
+export async function requeueJobWithBackoff(job: Job): Promise<void> {
   const redis = getRedisClient();
   if (!redis) return;
 
@@ -282,51 +219,31 @@ export async function requeueJobWithBackoff(
     await redis.incr(`retries:${job.type}`);
 
     if (job.retries >= job.maxRetries) {
-      // Move to dead-letter queue
       const dlqKey = `dlq:${job.type}`;
       await redis.lpush(dlqKey, JSON.stringify(job));
       await redis.expire(dlqKey, 7 * 24 * 60 * 60);
-
-      logError("job_max_retries_exceeded", {
-        jobId: job.id,
-        type: job.type,
-        retries: job.retries,
-      });
+      logError("job_max_retries_exceeded", { jobId: job.id, type: job.type, retries: job.retries });
       return;
     }
 
-    // Exponential backoff: 2^retries seconds
     const backoffSeconds = Math.pow(2, job.retries);
-
-    // Re-queue into a delayed sorted set so workers don't keep popping the same
-    // job before its scheduled time.
     const delayedKey = `delayed:${job.type}`;
     const delayedJob = { ...job, scheduledAt: Date.now() + backoffSeconds * 1000 };
     await redis.zadd(delayedKey, delayedJob.scheduledAt, JSON.stringify(delayedJob));
     await redis.expire(delayedKey, 7 * 24 * 60 * 60);
 
-    info("job_requeued_with_backoff", {
-      jobId: job.id,
-      type: job.type,
-      retries: job.retries,
-      backoffSeconds,
-    });
+    info("job_requeued_with_backoff", { jobId: job.id, type: job.type, retries: job.retries, backoffSeconds });
   } catch (err) {
     logError("requeue_job_failed", { jobId: job.id, type: job.type, error: err });
   }
 }
 
-/**
- * Get queue metrics for monitoring.
- */
 export async function getQueueMetrics(): Promise<Record<string, unknown>> {
   const redis = getRedisClient();
-  if (!redis) {
-    return { available: false };
-  }
+  if (!redis) return { available: false };
 
   try {
-    const types: JobType[] = ["saveMessages", "generateTitle", "enrichContext", "extractMemory"];
+    const types: JobType[] = ["saveMessages", "generateTitle"];
     const metrics: Record<string, unknown> = { available: true };
 
     for (const type of types) {
@@ -357,9 +274,6 @@ export async function getQueueMetrics(): Promise<Record<string, unknown>> {
   }
 }
 
-/**
- * Purge a queue entirely (dev/testing only).
- */
 export async function purgeQueue(type: JobType): Promise<void> {
   const redis = getRedisClient();
   if (!redis) return;
