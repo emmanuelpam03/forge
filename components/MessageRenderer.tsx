@@ -3,6 +3,7 @@
 import { Children, isValidElement, useMemo } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
+import Image from "next/image";
 import remarkGfm from "remark-gfm";
 import { splitStreamingMarkdown } from "./markdown-stream";
 
@@ -347,12 +348,16 @@ export function MessageRenderer({
                   key={im.id}
                   className="relative h-40 overflow-hidden rounded-md bg-gray-100"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={im.thumbnailUrl || im.url}
-                    alt={im.title || "image"}
-                    className="h-full w-full object-cover"
-                  />
+                  {im.thumbnailUrl || im.url ? (
+                    <Image
+                      src={im.thumbnailUrl || im.url}
+                      alt={im.title || "image"}
+                      className="h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 640px) 100vw, 33vw"
+                      unoptimized
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -363,13 +368,17 @@ export function MessageRenderer({
                   key={im.id}
                   className="relative h-36 w-56 flex-none overflow-hidden rounded-md bg-muted"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={im.thumbnailUrl || im.url}
-                    alt={im.title || "image"}
-                    title={im.title}
-                    className="h-full w-full object-cover"
-                  />
+                  {im.thumbnailUrl || im.url ? (
+                    <Image
+                      src={im.thumbnailUrl || im.url}
+                      alt={im.title || "image"}
+                      title={im.title}
+                      className="h-full w-full object-cover"
+                      fill
+                      sizes="200px"
+                      unoptimized
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>
