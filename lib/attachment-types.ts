@@ -101,7 +101,6 @@ const CODE_EXTENSIONS = new Set([
   ".php",
   ".html",
   ".css",
-  ".json",
   ".yaml",
   ".yml",
   ".xml",

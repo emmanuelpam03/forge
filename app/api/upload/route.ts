@@ -29,8 +29,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!chat) {
-      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+      return NextResponse.json({ error: "Chat not found or access denied." }, { status: 404 });
     }
+
+    const MAX_FILES_PER_UPLOAD = 10;
 
     const fileEntries = formData
       .getAll("file")
@@ -38,6 +40,13 @@ export async function POST(request: NextRequest) {
 
     if (fileEntries.length === 0) {
       return NextResponse.json({ error: "No files provided." }, { status: 400 });
+    }
+
+    if (fileEntries.length > MAX_FILES_PER_UPLOAD) {
+      return NextResponse.json(
+        { error: `Maximum ${MAX_FILES_PER_UPLOAD} files allowed per upload.` },
+        { status: 400 }
+      );
     }
 
     const attachments = [];

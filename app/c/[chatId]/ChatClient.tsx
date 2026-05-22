@@ -391,6 +391,7 @@ export function ChatClient({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInputId = "chat-upload-input";
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
@@ -1740,7 +1741,15 @@ export function ChatClient({
                 setIsDraggingFiles(true);
               }
             }}
-            onDragLeave={() => setIsDraggingFiles(false)}
+            onDragLeave={(event) => {
+              const relatedTarget = event.relatedTarget ?? event.nativeEvent.relatedTarget;
+
+              if (relatedTarget && event.currentTarget.contains(relatedTarget as Node)) {
+                return;
+              }
+
+              setIsDraggingFiles(false);
+            }}
             onDrop={(event) => {
               event.preventDefault();
               setIsDraggingFiles(false);
@@ -1811,7 +1820,7 @@ export function ChatClient({
                   onClose={() => setIsModesMenuOpen(false)}
                   chatId={chatId}
                   triggerRef={modesMenuTriggerRef}
-                  onUploadClick={openAttachmentPicker}
+                  uploadInputId={uploadInputId}
                   className="absolute bottom-full left-0 mb-3 z-50 w-[20rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
                 />
               </div>
@@ -1877,12 +1886,14 @@ export function ChatClient({
                 </button>
 
                 <input
+                  id={uploadInputId}
                   ref={fileInputRef}
                   type="file"
                   multiple
                   className="sr-only"
                   onChange={(event) => {
                     void uploadFiles(event.target.files ?? []);
+                    setIsModesMenuOpen(false);
                   }}
                 />
 

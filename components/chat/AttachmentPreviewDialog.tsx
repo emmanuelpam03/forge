@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Download, ExternalLink, X } from "lucide-react";
 import CodeBlock from "@/components/CodeBlock";
 import { MarkdownMessage } from "@/components/MarkdownMessage";
@@ -13,19 +13,69 @@ type AttachmentPreviewDialogProps = {
 };
 
 export function AttachmentPreviewDialog({ attachment, onClose }: AttachmentPreviewDialogProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     if (!attachment) {
       return;
     }
 
+    const previouslyFocusedElement = document.activeElement as HTMLElement | null;
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const dialogElement = dialogRef.current;
+      if (!dialogElement) {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        dialogElement.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        closeButtonRef.current?.focus();
+        return;
+      }
+
+      const firstFocusableElement = focusableElements[0];
+      const lastFocusableElement = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (!activeElement || !dialogElement.contains(activeElement) || activeElement === firstFocusableElement) {
+          event.preventDefault();
+          lastFocusableElement.focus();
+        }
+      } else if (!activeElement || !dialogElement.contains(activeElement) || activeElement === lastFocusableElement) {
+        event.preventDefault();
+        firstFocusableElement.focus();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+
+    requestAnimationFrame(() => {
+      closeButtonRef.current?.focus();
+    });
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previouslyFocusedElement?.focus();
+    };
   }, [attachment, onClose]);
 
   if (!attachment) {
@@ -36,13 +86,19 @@ export function AttachmentPreviewDialog({ attachment, onClose }: AttachmentPrevi
   const language = attachment.language ?? getAttachmentLanguage(attachment.name);
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-200 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0d1117] text-white shadow-2xl shadow-black/40">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0d1117] text-white shadow-2xl shadow-black/40"
+      >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{attachment.name}</p>
+            <p id={titleId} className="truncate text-sm font-medium">{attachment.name}</p>
             <p className="text-xs text-white/60">
               {formatAttachmentSize(attachment.sizeBytes)} · {attachment.mimeType}
             </p>
@@ -67,6 +123,7 @@ export function AttachmentPreviewDialog({ attachment, onClose }: AttachmentPrevi
               Open
             </a>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               className="rounded-full p-2 text-white/70 transition hover:bg-white/10 hover:text-white"

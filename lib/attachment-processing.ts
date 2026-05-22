@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { imageSize } from "image-size";
 import mammoth from "mammoth";
 import Papa from "papaparse";
@@ -37,6 +37,17 @@ type ParsedAttachment = {
   language?: string;
 };
 
+function validatePathSegment(value: string, label: string): string {
+  const normalized = value.trim();
+  const safePattern = /^[A-Za-z0-9_-]+$/;
+
+  if (!normalized || normalized !== basename(normalized) || normalized.includes("..") || normalized.includes("/") || normalized.includes("\\") || !safePattern.test(normalized)) {
+    throw new Error(`Invalid ${label}.`);
+  }
+
+  return normalized;
+}
+
 export function validateAttachmentCandidate(input: {
   fileName: string;
   mimeType: string;
@@ -67,33 +78,43 @@ export async function persistAttachmentFile(
   input: AttachmentInput,
   attachmentId: string,
 ): Promise<{ storagePath: string; storageUrl: string; checksum: string }> {
+  const safeChatId = validatePathSegment(input.chatId, "chatId");
+  const safeAttachmentId = validatePathSegment(attachmentId, "attachmentId");
   const safeName = sanitizeAttachmentName(input.fileName);
   const extension = getAttachmentExtension(safeName) || extname(input.fileName).toLowerCase();
-  const fileName = `${attachmentId}${extension || ""}`;
-  const storageDir = join(process.cwd(), "public", "uploads", input.chatId, attachmentId);
+  const fileName = `${safeAttachmentId}${extension || ""}`;
+  const storageDir = join(process.cwd(), "public", "uploads", safeChatId, safeAttachmentId);
   const storagePath = join(storageDir, fileName);
 
   await mkdir(storageDir, { recursive: true });
   await writeFile(storagePath, input.buffer);
 
   const checksum = createHash("sha256").update(input.buffer).digest("hex");
-  const storageUrl = `/uploads/${input.chatId}/${attachmentId}/${fileName}`;
+  const storageUrl = `/uploads/${safeChatId}/${safeAttachmentId}/${fileName}`;
 
   return { storagePath, storageUrl, checksum };
 }
 
 async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
-  const parserModule = await import("pdf-parse");
-  const parser = (parserModule as { default?: (input: Buffer) => Promise<{ text?: string; numpages?: number }> }).default ??
-    (parserModule as unknown as (input: Buffer) => Promise<{ text?: string; numpages?: number }>);
-  const result = await parser(buffer);
+  try {
+    const parserModule = await import("pdf-parse");
+    const parser = (parserModule as { default?: (input: Buffer) => Promise<{ text?: string; numpages?: number }> }).default ??
+      (parserModule as unknown as (input: Buffer) => Promise<{ text?: string; numpages?: number }>);
+    const result = await parser(buffer);
 
-  const text = (result.text ?? "").trim();
-  return {
-    text,
-    summary: summarizeAttachmentText(text || "PDF uploaded. No extractable text found.", 320),
-    pageCount: result.numpages ?? undefined,
-  };
+    const text = (result.text ?? "").trim();
+    return {
+      text,
+      summary: summarizeAttachmentText(text || "PDF uploaded. No extractable text found.", 320),
+      pageCount: result.numpages ?? undefined,
+    };
+  } catch {
+    return {
+      text: "",
+      summary: "PDF uploaded. Failed to extract text.",
+      pageCount: undefined,
+    };
+  }
 }
 
 async function parseDocx(buffer: Buffer): Promise<ParsedAttachment> {
@@ -107,11 +128,11 @@ async function parseDocx(buffer: Buffer): Promise<ParsedAttachment> {
 
 function parseCsv(buffer: Buffer): ParsedAttachment {
   const csvText = buffer.toString("utf8");
-  const parsed = Papa.parse<string[]>(csvText, { skipEmptyLines: true });
+  const parsed = Papa.parse(csvText, { skipEmptyLines: true }) as { data: unknown[] };
   const rows = Array.isArray(parsed.data) ? parsed.data : [];
   const text = rows
     .slice(0, 25)
-    .map((row) => (Array.isArray(row) ? row.join(", ") : String(row)))
+    .map((row: unknown) => (Array.isArray(row) ? row.join(", ") : String(row)))
     .join("\n");
 
   return {

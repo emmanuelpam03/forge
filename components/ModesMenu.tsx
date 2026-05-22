@@ -15,7 +15,7 @@ interface ModesMenuProps {
   chatId: string | null;
   className?: string;
   triggerRef?: RefObject<HTMLElement | null>;
-  onUploadClick?: () => void;
+  uploadInputId?: string;
 }
 
 export function ModesMenu({
@@ -24,7 +24,7 @@ export function ModesMenu({
   chatId,
   className,
   triggerRef,
-  onUploadClick,
+  uploadInputId,
 }: ModesMenuProps) {
   const { showFeedback } = useFeedback();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -80,19 +80,16 @@ export function ModesMenu({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            onUploadClick?.();
-          }}
-          className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-muted-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground"
+        <label
+          htmlFor={uploadInputId}
+          className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-left text-muted-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground"
           title="Upload photos and files"
         >
           <div className="flex items-center gap-3">
             <Upload size={16} className="shrink-0" />
             <p className="text-[13px] font-medium">Upload photos and files</p>
           </div>
-        </button>
+        </label>
 
         <div className="h-px bg-border/60" />
 

@@ -120,6 +120,22 @@ export default async function ChatPage({
         : "application/octet-stream";
     const storageUrl =
       typeof attachment.storageUrl === "string" ? attachment.storageUrl : "";
+const VALID_ATTACHMENT_KINDS = new Set<UploadedAttachment["kind"]>([
+  "image",
+  "pdf",
+  "document",
+  "code",
+  "spreadsheet",
+  "text",
+  "json",
+  "audio",
+  "video",
+  "other",
+]);
+
+function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kind"] {
+  return typeof value === "string" && VALID_ATTACHMENT_KINDS.has(value as UploadedAttachment["kind"]);
+}
     const storagePath =
       typeof attachment.storagePath === "string" ? attachment.storagePath : "";
 
@@ -141,8 +157,8 @@ export default async function ChatPage({
       checksum:
         typeof attachment.checksum === "string" ? attachment.checksum : "",
       kind:
-        typeof attachment.kind === "string"
-          ? (attachment.kind as UploadedAttachment["kind"])
+        isValidAttachmentKind(attachment.kind)
+          ? attachment.kind
           : inferAttachmentKind({ name, mimeType }),
       status:
         attachment.status === "uploading" ||
@@ -150,7 +166,7 @@ export default async function ChatPage({
         attachment.status === "ready" ||
         attachment.status === "failed"
           ? attachment.status
-          : "ready",
+          : "failed",
       storageUrl,
       storagePath,
       uploadedAt:
