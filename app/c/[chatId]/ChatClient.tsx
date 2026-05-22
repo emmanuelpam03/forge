@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { getGlobalDefaultModel } from "@/hooks/useGlobalSettings";
 import {
   ArrowUp,
   ChevronLeft,
@@ -366,7 +367,17 @@ export function ChatClient({
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState(DEFAULT_MODEL_ID);
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => {
+    try {
+      // Persist model selection per-chat so users keep their choice
+      const stored = localStorage.getItem(`forge:chat:${String(chatId)}:selected-model`);
+      if (stored) return stored;
+      const globalDefault = getGlobalDefaultModel();
+      return globalDefault ?? DEFAULT_MODEL_ID;
+    } catch {
+      return DEFAULT_MODEL_ID;
+    }
+  });
   const {
     selectedOptions: selectedOptionIds,
     getSelectedOptionObjects,
@@ -382,8 +393,20 @@ export function ChatClient({
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
 
-  const selectedModel = DEFAULT_MODEL_OPTION;
+  const selectedModel = useMemo(
+    () => MODEL_OPTIONS.find((m) => m.id === selectedModelId) ?? DEFAULT_MODEL_OPTION,
+    [selectedModelId],
+  );
+
   const requestModel = selectedModel;
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`forge:chat:${String(chatId)}:selected-model`, selectedModelId);
+    } catch {
+      // ignore
+    }
+  }, [chatId, selectedModelId]);
 
   const hasMessages = messages.length > 0;
 
