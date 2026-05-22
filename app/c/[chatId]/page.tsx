@@ -117,7 +117,7 @@ export default async function ChatPage({
         parentId: message.parentId,
         branchId: message.branchId,
         // include persisted media if present
-        imageBlock: (message.media as any) ?? undefined,
+        imageBlock: extractImageBlock(message.media),
       });
       continue;
     }
@@ -141,8 +141,19 @@ export default async function ChatPage({
         branchId: branch.branchId,
         createdAt: branch.createdAt.toISOString(),
       })),
-      imageBlock: (message.media as any) ?? undefined,
+      imageBlock: extractImageBlock(message.media),
     });
+  }
+
+  function extractImageBlock(media: unknown) {
+    if (!media || typeof media !== "object") return undefined;
+    const m = media as Record<string, unknown>;
+    const id = typeof m.id === "string" ? m.id : undefined;
+    const url = typeof m.url === "string" ? m.url : undefined;
+    const thumbnailUrl = typeof m.thumbnailUrl === "string" ? m.thumbnailUrl : undefined;
+    const title = typeof m.title === "string" ? m.title : undefined;
+    if (!id && !url && !thumbnailUrl && !title) return undefined;
+    return { id, url, thumbnailUrl, title };
   }
 
   return (

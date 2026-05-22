@@ -516,7 +516,7 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
   // Legacy diagnostic string expected by tests and some tooling. Keep a
   // human-readable JSON summary with the historical event name so tests
   // that scan source for `promptComposition.summary` continue to pass.
-  // eslint-disable-next-line no-console
+   
   console.info(
     JSON.stringify({ event: "promptComposition.summary", runId: state.runId, chatId: state.chatId }),
   );

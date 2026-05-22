@@ -61,7 +61,7 @@ export async function serpapiImageSearch(query: string, count: number = 6): Prom
     } catch {}
 
     return imgs.slice(0, count);
-  } catch (_err) {
+  } catch {
     return [];
   }
 }

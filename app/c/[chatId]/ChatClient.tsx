@@ -1487,6 +1487,7 @@ export function ChatClient({
       showFeedback,
       finalizeStreamState,
       applyImagesToMessage,
+      hasMessages,
     ],
   );
 

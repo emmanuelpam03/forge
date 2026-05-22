@@ -626,7 +626,7 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
     type GeocodePayload = { results?: GeocodeResult[] };
 
     let geocodePayload: GeocodePayload = {};
-    let geocodeResponse = await fetchWithTimeout(geocodeUrl.toString()).catch(() => null);
+    const geocodeResponse = await fetchWithTimeout(geocodeUrl.toString()).catch(() => null);
     if (geocodeResponse && geocodeResponse.ok) {
       geocodePayload = (await geocodeResponse.json().catch(() => ({}))) as GeocodePayload;
     }
@@ -754,6 +754,7 @@ export async function weatherToolAsync(location: string): Promise<ToolResult> {
  */
 function isCurrentInfoQuery(_text: string): boolean {
   // Planner-driven routing should decide if a query requires fresh info.
+  void _text;
   return false;
 }
 
@@ -1226,5 +1227,7 @@ export async function executeToolByIntent(
     },
   };
 
+  void _intent;
+  void _userMessage;
   return { toolsRun: [], toolResults };
 }

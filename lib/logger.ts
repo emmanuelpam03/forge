@@ -65,26 +65,26 @@ function output(entry: Record<string, unknown>, level: LogLevel) {
   if (level === "error") {
     // In tests we emit logs synchronously so test harnesses can capture them.
     if (process.env.NODE_ENV === "test") {
-      // eslint-disable-next-line no-console
+       
       console.error(line);
     } else {
-      // eslint-disable-next-line no-console
+       
       asyncLog(() => console.error(line));
     }
   } else if (level === "warn") {
     if (process.env.NODE_ENV === "test") {
-      // eslint-disable-next-line no-console
+       
       console.warn(line);
     } else {
-      // eslint-disable-next-line no-console
+       
       asyncLog(() => console.warn(line));
     }
   } else {
     if (process.env.NODE_ENV === "test") {
-      // eslint-disable-next-line no-console
+       
       console.info(line);
     } else {
-      // eslint-disable-next-line no-console
+       
       asyncLog(() => console.info(line));
     }
   }

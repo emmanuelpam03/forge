@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+// Ensure logger writes synchronously in test runs
+process.env.NODE_ENV = process.env.NODE_ENV ?? "test";
+
 const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;

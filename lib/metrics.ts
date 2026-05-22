@@ -62,4 +62,6 @@ export async function recordMetric(name: string, value: number, tags?: Record<st
   } catch {}
 }
 
-export default { startTimer, endTimer, recordMetric };
+const Metrics = { startTimer, endTimer, recordMetric };
+
+export default Metrics;

@@ -16,29 +16,30 @@ export async function GET() {
     const limitedKeys: string[] = [];
     // Prefer scanIterator when available to iterate asynchronously
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const iterator = (client as any).scanIterator
-        ? (client as any).scanIterator({ MATCH: 'metrics:*', COUNT: 100 })
-        : null;
+      // Use a small local interface to avoid `any` while supporting multiple Redis clients
+      const rc = client as unknown as {
+        scanIterator?: (opts?: Record<string, unknown>) => AsyncIterable<string>;
+        scan?: (cursor: string, ...args: string[]) => Promise<[string, string[]]>;
+      };
 
-      if (iterator) {
+      if (rc.scanIterator && typeof rc.scanIterator === "function") {
+        const iterator = rc.scanIterator({ MATCH: "metrics:*", COUNT: 100 });
         for await (const k of iterator) {
           limitedKeys.push(k as string);
           if (limitedKeys.length >= 50) break;
         }
       } else {
         // Fallback: use manual SCAN loop
-        let cursor = '0';
+        let cursor = "0";
         do {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const res: [string, string[]] = await (client as any).scan(cursor, 'MATCH', 'metrics:*', 'COUNT', '100');
+          const res = await (rc.scan ? rc.scan(cursor, "MATCH", "metrics:*", "COUNT", "100") : Promise.resolve(["0", []]));
           cursor = res[0];
           const found = res[1] ?? [];
           for (const k of found) {
             limitedKeys.push(k);
             if (limitedKeys.length >= 50) break;
           }
-        } while (cursor !== '0' && limitedKeys.length < 50);
+        } while (cursor !== "0" && limitedKeys.length < 50);
       }
 
     } catch (scanErr) {

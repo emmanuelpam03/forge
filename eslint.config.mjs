@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Ignore generated artifacts (Prisma client, generated types)
     "app/generated/**",
     "app/generated/prisma/**",
+    // Ignore temporary probe file created by ESLint during exec
+    ".tmp-probe.mjs",
   ]),
 ]);
 

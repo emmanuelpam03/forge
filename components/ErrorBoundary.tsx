@@ -18,7 +18,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: unknown) {
     // Simple client-side logging; serverside tracing (LangSmith) is handled elsewhere
-    // eslint-disable-next-line no-console
+     
     console.error("Uncaught error in UI:", error, info);
   }
 

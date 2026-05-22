@@ -347,6 +347,7 @@ export function MessageRenderer({
                   key={im.id}
                   className="relative h-40 overflow-hidden rounded-md bg-gray-100"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={im.thumbnailUrl || im.url}
                     alt={im.title || "image"}
@@ -362,6 +363,7 @@ export function MessageRenderer({
                   key={im.id}
                   className="relative h-36 w-56 flex-none overflow-hidden rounded-md bg-muted"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={im.thumbnailUrl || im.url}
                     alt={im.title || "image"}
