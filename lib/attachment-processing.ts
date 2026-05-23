@@ -190,14 +190,34 @@ function parseText(buffer: Buffer, kind: string, name: string): ParsedAttachment
   };
 }
 
-function parseImage(buffer: Buffer, name: string): ParsedAttachment {
+async function parseImage(buffer: Buffer, name: string): Promise<ParsedAttachment> {
   try {
     const dimensions = imageSize(buffer);
-    return {
+    const base = {
       summary: `${name} (${dimensions.width ?? 0}x${dimensions.height ?? 0})`,
       width: dimensions.width ?? undefined,
       height: dimensions.height ?? undefined,
-    };
+    } as ParsedAttachment;
+
+    // Best-effort OCR: if tesseract.js is installed, try to extract text from images
+    // (useful for screenshots or images that contain text). This is optional and
+    // dynamically imported so the package isn't required in all environments.
+    try {
+      const maybeTesseract = await import("tesseract.js");
+      const tesseractModule = maybeTesseract as { recognize?: (input: Buffer | string, lang?: string) => Promise<{ data?: { text?: string } }> };
+      if (tesseractModule && typeof tesseractModule.recognize === "function") {
+        const ocrResult = await tesseractModule.recognize(buffer, "eng");
+        const text = (ocrResult?.data?.text ?? "").trim();
+        if (text) {
+          base.text = text;
+          base.summary = summarizeAttachmentText(text, 320);
+        }
+      }
+    } catch {
+      // Silent failure: OCR is optional
+    }
+
+    return base;
   } catch {
     return { summary: `${name} image uploaded.` };
   }
@@ -225,7 +245,7 @@ export async function parseAttachmentBuffer(input: AttachmentInput): Promise<Par
   }
 
   if (kind === "image") {
-    return parseImage(input.buffer, input.fileName);
+    return await parseImage(input.buffer, input.fileName);
   }
 
   if (kind === "code" || kind === "text" || kind === "json" || kind === "document") {
