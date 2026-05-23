@@ -119,6 +119,7 @@ function MessageBubble({
   onSwitchBranch,
   onToggleReasoning,
   onCopyMessage,
+  onPreviewAttachment,
   reasoning,
   showReasoning,
 }: {
@@ -133,6 +134,7 @@ function MessageBubble({
   onSwitchBranch?: (messageId: string, branch: BranchOption) => void;
   onToggleReasoning?: (messageId: string, expanded: boolean) => void;
   onCopyMessage?: (content: string) => void;
+  onPreviewAttachment?: (attachment: UploadedAttachment) => void;
   reasoning: string;
   showReasoning: boolean;
 }) {
@@ -252,7 +254,7 @@ function MessageBubble({
                         compact
                         onPreview={
                           attachment.status === "ready"
-                            ? () => setPreviewAttachment(attachment)
+                            ? () => onPreviewAttachment?.(attachment)
                             : undefined
                         }
                       />
@@ -1680,6 +1682,7 @@ export function ChatClient({
                   onCopyMessage={(content) => {
                     void copyMessage(content);
                   }}
+                  onPreviewAttachment={setPreviewAttachment}
                   reasoning={
                     message.role === "assistant" &&
                     (message.pending || message.streaming)

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { basename, extname } from "node:path";
 import { imageSize } from "image-size";
 import mammoth from "mammoth";
 import Papa from "papaparse";
@@ -17,9 +16,9 @@ import {
   getAttachmentExtension,
   getAttachmentLanguage,
   type UploadedAttachment,
-} from "@/lib/attachment-types";
-import prisma from "@/lib/prisma";
-import { uploadAttachmentToCloudinary } from "@/lib/cloudinary";
+} from "./attachment-types.ts";
+import prisma from "./prisma.ts";
+import { uploadAttachmentToCloudinary } from "./cloudinary.ts";
 
 export type AttachmentInput = {
   chatId: string;
@@ -37,17 +36,6 @@ type ParsedAttachment = {
   height?: number;
   language?: string;
 };
-
-function validatePathSegment(value: string, label: string): string {
-  const normalized = value.trim();
-  const safePattern = /^[A-Za-z0-9_-]+$/;
-
-  if (!normalized || normalized !== basename(normalized) || normalized.includes("..") || normalized.includes("/") || normalized.includes("\\") || !safePattern.test(normalized)) {
-    throw new Error(`Invalid ${label}.`);
-  }
-
-  return normalized;
-}
 
 export function validateAttachmentCandidate(input: {
   fileName: string;
@@ -108,9 +96,26 @@ async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
     const result = await parser(buffer);
 
     const text = (result.text ?? "").trim();
+    if (text) {
+      return {
+        text,
+        summary: summarizeAttachmentText(text || "PDF uploaded. No extractable text found.", 320),
+        pageCount: result.numpages ?? undefined,
+      };
+    }
+
+    const ocrText = await extractPdfOcrText(buffer);
+    if (ocrText) {
+      return {
+        text: ocrText,
+        summary: summarizeAttachmentText(ocrText, 320),
+        pageCount: result.numpages ?? undefined,
+      };
+    }
+
     return {
-      text,
-      summary: summarizeAttachmentText(text || "PDF uploaded. No extractable text found.", 320),
+      text: "",
+      summary: summarizeAttachmentText("PDF uploaded. No extractable text found.", 320),
       pageCount: result.numpages ?? undefined,
     };
   } catch {
@@ -119,6 +124,43 @@ async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
       summary: "PDF uploaded. Failed to extract text.",
       pageCount: undefined,
     };
+  }
+}
+
+async function extractPdfOcrText(buffer: Buffer): Promise<string> {
+  try {
+    const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const { createCanvas } = await import("@napi-rs/canvas");
+
+    const pdfjs = pdfjsModule as any;
+
+    const documentTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+    });
+
+    const pdfDocument = await documentTask.promise;
+    const maxPages = Math.min(pdfDocument.numPages, 2);
+    const recognizedText: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = createCanvas(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
+      const context = canvas.getContext("2d");
+
+      await page.render({ canvasContext: context as any, canvas: canvas as any, viewport } as any).promise;
+
+      const text = await extractImageText(canvas.toBuffer("image/png"));
+      if (text) {
+        recognizedText.push(text);
+      }
+    }
+
+    return recognizedText.join("\n\n").trim();
+  } catch {
+    return "";
   }
 }
 
@@ -195,7 +237,36 @@ function parseText(buffer: Buffer, kind: string, name: string): ParsedAttachment
   };
 }
 
-async function parseImage(buffer: Buffer, name: string): Promise<ParsedAttachment> {
+async function extractImageText(buffer: Buffer): Promise<string> {
+  try {
+    const { createWorker } = await import("tesseract.js");
+    const worker = await createWorker("eng");
+
+    try {
+      const result = await worker.recognize(buffer);
+      return (result.data.text ?? "").trim();
+    } finally {
+      await worker.terminate();
+    }
+  } catch {
+    return "";
+  }
+}
+
+export async function parseImageAttachment(
+  buffer: Buffer,
+  name: string,
+  extractor: (buffer: Buffer) => Promise<string> = extractImageText,
+): Promise<ParsedAttachment> {
+  const text = (await extractor(buffer)).trim();
+
+  if (text) {
+    return {
+      text,
+      summary: summarizeAttachmentText(text, 320),
+    };
+  }
+
   try {
     const dimensions = imageSize(buffer);
     return {
@@ -230,7 +301,7 @@ export async function parseAttachmentBuffer(input: AttachmentInput): Promise<Par
   }
 
   if (kind === "image") {
-    return await parseImage(input.buffer, input.fileName);
+    return await parseImageAttachment(input.buffer, input.fileName);
   }
 
   if (kind === "code" || kind === "text" || kind === "json" || kind === "document") {

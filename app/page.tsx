@@ -221,19 +221,10 @@ export default function HomePage() {
   );
 
   const removeAttachment = useCallback((attachmentId: string) => {
-    setAttachments((current) => {
-      const nextAttachments = current.filter((attachment) => attachment.id !== attachmentId);
-
-      if (draftChatId) {
-        persistPendingAttachments(
-          draftChatId,
-          nextAttachments.filter((attachment) => attachment.status === "ready"),
-        );
-      }
-
-      return nextAttachments;
-    });
-  }, [draftChatId, persistPendingAttachments]);
+    setAttachments((current) =>
+      current.filter((attachment) => attachment.id !== attachmentId),
+    );
+  }, []);
 
   const handleSend = async () => {
     const message = input.trim();

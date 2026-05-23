@@ -8,6 +8,7 @@ import {
   summarizeAttachmentText,
   formatAttachmentLabel,
 } from "../lib/attachment-types.ts";
+import { parseImageAttachment } from "../lib/attachment-processing.ts";
 
 test("getAttachmentExtension and inferAttachmentKind", () => {
   assert.equal(getAttachmentExtension("file.txt"), ".txt");
@@ -31,4 +32,15 @@ test("summarizeAttachmentText and formatAttachmentLabel", () => {
 
   const label = formatAttachmentLabel({ name: "file.txt", kind: "text" });
   assert.ok(label.includes("Text:"));
+});
+
+test("parseImageAttachment uses OCR text when available", async () => {
+  const parsed = await parseImageAttachment(
+    Buffer.from("not a real image", "utf8"),
+    "screenshot.png",
+    async () => "Hello from OCR",
+  );
+
+  assert.equal(parsed.text, "Hello from OCR");
+  assert.equal(parsed.summary, "Hello from OCR");
 });
