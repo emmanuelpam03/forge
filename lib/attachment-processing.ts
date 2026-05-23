@@ -17,7 +17,6 @@ import {
   getAttachmentLanguage,
   type UploadedAttachment,
 } from "./attachment-types.ts";
-import prisma from "./prisma.ts";
 import { uploadAttachmentToCloudinary } from "./cloudinary.ts";
 
 export type AttachmentInput = {
@@ -320,6 +319,7 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
   const parsed = await parseAttachmentBuffer(input);
   const kind = inferAttachmentKind({ name: input.fileName, mimeType: input.mimeType });
   const { storagePath, storageUrl, checksum } = await persistAttachmentFile(input, input.attachmentId);
+  const prisma = (await import("./prisma.ts")).default;
 
   // Persist metadata to the database (best-effort) using the typed Prisma client.
   try {
@@ -428,7 +428,27 @@ export function formatAttachmentContext(
 
   const sections = attachments
     .filter((attachment) => attachment.status !== "failed")
-    .map((attachment, index) => {
+    .map((attachment, index) => ({
+      attachment,
+      index,
+      score:
+        lexicalScore(query, attachment.name) * 3 +
+        lexicalScore(query, attachment.summary ?? "") * 2 +
+        lexicalScore(query, attachment.extractedText ?? ""),
+    }))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      if (left.attachment.uploadedAt === right.attachment.uploadedAt) {
+        return left.index - right.index;
+      }
+
+      return left.attachment.uploadedAt.localeCompare(right.attachment.uploadedAt);
+    })
+    .slice(0, 6)
+    .map(({ attachment }, index) => {
       const chunks = attachment.extractedText ? chunkText(attachment.extractedText) : [];
       const rankedChunks = chunks
         .map((chunk) => ({ ...chunk, score: lexicalScore(query, chunk.content) }))
@@ -454,4 +474,120 @@ export function formatAttachmentContext(
     });
 
   return [`Attached Files:`, ...sections].join("\n\n");
+}
+
+export type AttachmentMessageContentBlock =
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      type: "image_url";
+      image_url: {
+        url: string;
+        detail?: "auto" | "low" | "high";
+      };
+    };
+
+const attachmentImageDataUrlCache = new Map<string, string>();
+
+function getAttachmentCacheKey(attachment: UploadedAttachment): string {
+  return attachment.checksum || attachment.storagePath || attachment.id;
+}
+
+async function fetchAttachmentBytes(storageUrl: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const response = await fetch(storageUrl, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch attachment bytes from ${storageUrl}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+  };
+}
+
+async function toDataUrl(storageUrl: string, mimeType: string): Promise<string> {
+  if (storageUrl.startsWith("data:")) {
+    return storageUrl;
+  }
+
+  const { buffer, mimeType: resolvedMimeType } = await fetchAttachmentBytes(storageUrl);
+  return `data:${resolvedMimeType || mimeType};base64,${buffer.toString("base64")}`;
+}
+
+function scoreAttachmentForQuery(attachment: UploadedAttachment, query: string): number {
+  return (
+    lexicalScore(query, attachment.name) * 3 +
+    lexicalScore(query, attachment.summary ?? "") * 2 +
+    lexicalScore(query, attachment.extractedText ?? "")
+  );
+}
+
+export async function buildAttachmentMultimodalBlocks(
+  attachments: UploadedAttachment[] | undefined,
+  query: string,
+): Promise<AttachmentMessageContentBlock[]> {
+  if (!attachments || attachments.length === 0) {
+    return [];
+  }
+
+  const imageAttachments = attachments
+    .filter((attachment) => attachment.status !== "failed" && attachment.kind === "image" && attachment.storageUrl)
+    .map((attachment, index) => ({
+      attachment,
+      index,
+      score: scoreAttachmentForQuery(attachment, query),
+    }))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      if (left.attachment.uploadedAt === right.attachment.uploadedAt) {
+        return left.index - right.index;
+      }
+
+      return left.attachment.uploadedAt.localeCompare(right.attachment.uploadedAt);
+    })
+    .slice(0, 4)
+    .map(({ attachment }) => attachment);
+
+  const blocks: AttachmentMessageContentBlock[] = [];
+
+  if (imageAttachments.length > 0) {
+    blocks.push({
+      type: "text",
+      text: `Uploaded images are part of the current conversation context: ${imageAttachments.map((attachment) => attachment.name).join(", ")}. Analyze them directly when they matter to the question.`,
+    });
+  }
+
+  for (const attachment of imageAttachments) {
+    const cacheKey = getAttachmentCacheKey(attachment);
+    let dataUrl = attachmentImageDataUrlCache.get(cacheKey);
+
+    if (!dataUrl) {
+      try {
+        dataUrl = await toDataUrl(
+          attachment.storageUrl,
+          attachment.mimeType || "image/png",
+        );
+        attachmentImageDataUrlCache.set(cacheKey, dataUrl);
+      } catch {
+        dataUrl = attachment.storageUrl;
+      }
+    }
+
+    blocks.push({
+      type: "image_url",
+      image_url: {
+        url: dataUrl,
+        detail: "auto",
+      },
+    });
+  }
+
+  return blocks;
 }

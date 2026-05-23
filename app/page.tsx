@@ -72,6 +72,7 @@ export default function HomePage() {
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [error, setError] = useState("");
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -423,7 +424,35 @@ export default function HomePage() {
 
       <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
-          <div className="relative rounded-[28px] border border-border bg-card/90 px-4 py-3 shadow-lg backdrop-blur">
+          <div
+            className={`relative rounded-[28px] border bg-card/90 px-4 py-3 shadow-lg backdrop-blur transition ${isDraggingFiles ? "border-primary ring-2 ring-primary/30" : "border-border"}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (event.dataTransfer.types.includes("Files")) {
+                setIsDraggingFiles(true);
+              }
+            }}
+            onDragLeave={(event) => {
+              const relatedTarget = event.relatedTarget ?? event.nativeEvent.relatedTarget;
+
+              if (relatedTarget && event.currentTarget.contains(relatedTarget as Node)) {
+                return;
+              }
+
+              setIsDraggingFiles(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setIsDraggingFiles(false);
+              void uploadFiles(event.dataTransfer.files);
+            }}
+            onPaste={(event) => {
+              const pastedFiles = Array.from(event.clipboardData.files);
+              if (pastedFiles.length > 0) {
+                void uploadFiles(pastedFiles);
+              }
+            }}
+          >
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
               <div className="relative col-start-1 row-start-1 self-center">
                 <button
@@ -527,7 +556,8 @@ export default function HomePage() {
             </div>
 
             <div className="mt-2 flex items-center justify-between px-3 text-[11px] text-muted-foreground">
-              <p>Enter to send.</p>
+              <p>{isDraggingFiles ? "Drop files to upload." : "Enter to send."}</p>
+              {isUploading ? <p>Uploading files...</p> : null}
             </div>
 
             {error ? (

@@ -32,7 +32,10 @@ import { info } from "@/lib/logger";
 import { formatSelectedContext } from "@/ai/context/engine";
 import type { ChatGraphState } from "@/ai/graph/state";
 import { SELECTED_OPTION_LABELS } from "@/ai/selected-options";
-import { formatAttachmentContext as formatUploadedAttachmentContext } from "@/lib/attachment-processing";
+import {
+  buildAttachmentMultimodalBlocks,
+  formatAttachmentContext as formatUploadedAttachmentContext,
+} from "@/lib/attachment-processing";
 
 function formatSelectedOptions(state: ChatGraphState): string {
   const selectedOptions = state.selectedOptions ?? [];
@@ -490,7 +493,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   return segments.filter((s): s is PromptSegment => s !== null);
 }
 
-export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
+export async function buildChatMessages(state: ChatGraphState): Promise<BaseMessage[]> {
   const segments = buildPromptSegments(state);
   const composition = composePromptSegments(segments);
   const behaviorControls =
@@ -529,9 +532,25 @@ export function buildChatMessages(state: ChatGraphState): BaseMessage[] {
     JSON.stringify({ event: "promptComposition.summary", runId: state.runId, chatId: state.chatId }),
   );
 
+  const attachmentBlocks = await buildAttachmentMultimodalBlocks(
+    state.attachments,
+    state.userMessage,
+  );
+
+  const humanMessageContent =
+    attachmentBlocks.length > 0
+      ? [
+          {
+            type: "text",
+            text: state.userMessage,
+          },
+          ...attachmentBlocks,
+        ]
+      : state.userMessage;
+
   return [
     new SystemMessage(composition.prompt),
-    new HumanMessage(state.userMessage),
+    new HumanMessage(humanMessageContent),
   ];
 }
 

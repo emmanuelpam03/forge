@@ -46,20 +46,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve attachment IDs from the database so the prompt only sees trusted metadata.
-    const attachmentIds = parsedBody.data.attachments ?? [];
     const attachments = await prisma.attachment.findMany({
       where: {
         chatId: parsedBody.data.chatId,
-        id: { in: attachmentIds },
+        status: { not: "failed" },
       },
       orderBy: { createdAt: "asc" },
     });
 
-    const attachmentsById = new Map(attachments.map((attachment) => [attachment.id, attachment]));
-    const resolvedAttachments = attachmentIds
-      .map((attachmentId) => attachmentsById.get(attachmentId))
-      .filter((attachment): attachment is (typeof attachments)[number] => Boolean(attachment))
+    const resolvedAttachments = attachments
       .map((attachment) => ({
         id: attachment.id,
         chatId: attachment.chatId,

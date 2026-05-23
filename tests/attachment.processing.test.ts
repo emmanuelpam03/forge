@@ -8,7 +8,11 @@ import {
   summarizeAttachmentText,
   formatAttachmentLabel,
 } from "../lib/attachment-types.ts";
-import { parseImageAttachment } from "../lib/attachment-processing.ts";
+import {
+  buildAttachmentMultimodalBlocks,
+  formatAttachmentContext,
+  parseImageAttachment,
+} from "../lib/attachment-processing.ts";
 
 test("getAttachmentExtension and inferAttachmentKind", () => {
   assert.equal(getAttachmentExtension("file.txt"), ".txt");
@@ -43,4 +47,76 @@ test("parseImageAttachment uses OCR text when available", async () => {
 
   assert.equal(parsed.text, "Hello from OCR");
   assert.equal(parsed.summary, "Hello from OCR");
+});
+
+test("formatAttachmentContext ranks relevant attachments first", () => {
+  const context = formatAttachmentContext(
+    [
+      {
+        id: "1",
+        chatId: "chat",
+        name: "irrelevant.txt",
+        originalName: "irrelevant.txt",
+        mimeType: "text/plain",
+        sizeBytes: 10,
+        checksum: "a",
+        kind: "text",
+        status: "ready",
+        storageUrl: "data:text/plain;base64,QQ==",
+        storagePath: "path-a",
+        uploadedAt: "2026-05-23T00:00:00.000Z",
+        summary: "misc notes",
+      },
+      {
+        id: "2",
+        chatId: "chat",
+        name: "financial-report.pdf",
+        originalName: "financial-report.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 20,
+        checksum: "b",
+        kind: "pdf",
+        status: "ready",
+        storageUrl: "data:application/pdf;base64,QQ==",
+        storagePath: "path-b",
+        uploadedAt: "2026-05-23T00:01:00.000Z",
+        summary: "quarterly revenue forecast",
+        extractedText: "Revenue forecast and quarterly earnings",
+      },
+    ],
+    "quarterly revenue",
+  );
+
+  assert.match(context, /1\. financial-report\.pdf/);
+});
+
+test("buildAttachmentMultimodalBlocks emits image_url blocks for images", async () => {
+  const dataUrl =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO4JYlQAAAAASUVORK5CYII=";
+
+  const blocks = await buildAttachmentMultimodalBlocks(
+    [
+      {
+        id: "img-1",
+        chatId: "chat",
+        name: "diagram.png",
+        originalName: "diagram.png",
+        mimeType: "image/png",
+        sizeBytes: 123,
+        checksum: "image-checksum",
+        kind: "image",
+        status: "ready",
+        storageUrl: dataUrl,
+        storagePath: "path-image",
+        uploadedAt: "2026-05-23T00:00:00.000Z",
+      },
+    ],
+    "describe the diagram",
+  );
+
+  assert.equal(blocks[0].type, "text");
+  assert.equal(blocks[1].type, "image_url");
+  if (blocks[1].type === "image_url") {
+    assert.equal(blocks[1].image_url.url, dataUrl);
+  }
 });

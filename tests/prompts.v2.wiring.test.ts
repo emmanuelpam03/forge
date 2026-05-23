@@ -87,6 +87,16 @@ test("router includes creative fallback and behavior-control resolution", () => 
   assert.match(source, /precedence/);
 });
 
+test("router builds multimodal human messages for image attachments", () => {
+  const routerSource = readWorkspaceFile("ai/prompts/router.ts");
+  const attachmentSource = readWorkspaceFile("lib/attachment-processing.ts");
+
+  assert.match(routerSource, /buildAttachmentMultimodalBlocks/);
+  assert.match(routerSource, /await buildAttachmentMultimodalBlocks/);
+  assert.match(routerSource, /new HumanMessage\(humanMessageContent\)/);
+  assert.match(attachmentSource, /type: "image_url"/);
+});
+
 test("graph state includes prompt behavior control fields", () => {
   const source = readWorkspaceFile("ai/graph/state.ts");
 
