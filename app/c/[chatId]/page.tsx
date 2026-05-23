@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getChatById } from "@/lib/actions/chats";
 import { getBranchesForParent } from "@/lib/actions/messages";
 import { inferAttachmentKind, type UploadedAttachment } from "@/lib/attachment-types";
+import type { RetrievedImage } from "@/ai/tools/image-types";
 import { ChatClient } from "./ChatClient";
 
 export default async function ChatPage({
@@ -96,10 +97,9 @@ export default async function ChatPage({
       attachments: UploadedAttachment[];
     };
     imageBlock?: {
-      id?: string;
-      url?: string;
-      thumbnailUrl?: string;
-      title?: string;
+      images: RetrievedImage[];
+      totalFound?: number;
+      retrievalTimeMs?: number;
     };
   };
 
@@ -218,6 +218,97 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
     return { attachments };
   }
 
+  function parseRetrievedImage(input: unknown): RetrievedImage | null {
+    if (!input || typeof input !== "object") {
+      return null;
+    }
+
+    const image = input as Record<string, unknown>;
+    const id = typeof image.id === "string" && image.id ? image.id : undefined;
+    const url = typeof image.url === "string" && image.url ? image.url : undefined;
+    const thumbnailUrl =
+      typeof image.thumbnailUrl === "string" && image.thumbnailUrl
+        ? image.thumbnailUrl
+        : url;
+
+    if (!id || !url || !thumbnailUrl) {
+      return null;
+    }
+
+    return {
+      id,
+      url,
+      thumbnailUrl,
+      title: typeof image.title === "string" ? image.title : undefined,
+      sourcePage: typeof image.sourcePage === "string" ? image.sourcePage : undefined,
+      source: typeof image.source === "string" ? image.source : undefined,
+      width: typeof image.width === "number" ? image.width : undefined,
+      height: typeof image.height === "number" ? image.height : undefined,
+      provider: typeof image.provider === "string" ? image.provider : undefined,
+      relevanceScore:
+        typeof image.relevanceScore === "number" ? image.relevanceScore : undefined,
+      safetyScore:
+        typeof image.safetyScore === "number" ? image.safetyScore : undefined,
+      metadata:
+        image.metadata && typeof image.metadata === "object"
+          ? (image.metadata as RetrievedImage["metadata"])
+          : undefined,
+    };
+  }
+
+  function extractImageBlock(media: unknown) {
+    if (!media || typeof media !== "object") {
+      return undefined;
+    }
+
+    const maybeMedia = media as Record<string, unknown>;
+    const rawImageBlock = maybeMedia.imageBlock;
+
+    if (rawImageBlock && typeof rawImageBlock === "object") {
+      const maybeImageBlock = rawImageBlock as Record<string, unknown>;
+      const images = Array.isArray(maybeImageBlock.images)
+        ? maybeImageBlock.images
+            .map((image) => parseRetrievedImage(image))
+            .filter((image): image is RetrievedImage => image !== null)
+        : [];
+
+      if (images.length > 0) {
+        return {
+          images,
+          totalFound:
+            typeof maybeImageBlock.totalFound === "number"
+              ? maybeImageBlock.totalFound
+              : undefined,
+          retrievalTimeMs:
+            typeof maybeImageBlock.retrievalTimeMs === "number"
+              ? maybeImageBlock.retrievalTimeMs
+              : undefined,
+        };
+      }
+    }
+
+    const id = typeof maybeMedia.id === "string" ? maybeMedia.id : undefined;
+    const url = typeof maybeMedia.url === "string" ? maybeMedia.url : undefined;
+    const thumbnailUrl =
+      typeof maybeMedia.thumbnailUrl === "string" ? maybeMedia.thumbnailUrl : url;
+    const title = typeof maybeMedia.title === "string" ? maybeMedia.title : undefined;
+
+    if (!id || !url || !thumbnailUrl) {
+      return undefined;
+    }
+
+    return {
+      images: [
+        {
+          id,
+          url,
+          thumbnailUrl,
+          title,
+        },
+      ],
+    };
+  }
+
   const initialMessages: ChatMessage[] = [];
   for (const message of chat.messages) {
     if (message.role === "user") {
@@ -271,17 +362,6 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
       imageBlock: extractImageBlock(message.media),
       attachmentBlock: extractAttachmentBlock(message.media),
     });
-  }
-
-  function extractImageBlock(media: unknown) {
-    if (!media || typeof media !== "object") return undefined;
-    const m = media as Record<string, unknown>;
-    const id = typeof m.id === "string" ? m.id : undefined;
-    const url = typeof m.url === "string" ? m.url : undefined;
-    const thumbnailUrl = typeof m.thumbnailUrl === "string" ? m.thumbnailUrl : undefined;
-    const title = typeof m.title === "string" ? m.title : undefined;
-    if (!id && !url && !thumbnailUrl && !title) return undefined;
-    return { id, url, thumbnailUrl, title };
   }
 
   return (

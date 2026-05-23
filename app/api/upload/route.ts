@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
     }
 
     const chat = await prisma.chat.findUnique({
-      where: { id: chatId },
-      select: { id: true },
+      where: { id: chatId, userId: session.user.id },
+      select: { id: true, userId: true },
     });
 
     if (!chat) {

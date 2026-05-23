@@ -20,7 +20,7 @@ export async function GET(
 
   try {
     chat = await prisma.chat.findUnique({
-      where: { id: chatId },
+      where: { id: chatId, userId: session.user.id },
       select: { id: true, title: true },
     });
   } catch (error) {
