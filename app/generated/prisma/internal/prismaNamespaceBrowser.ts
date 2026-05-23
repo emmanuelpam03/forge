@@ -62,7 +62,8 @@ export const ModelName = {
   Preference: 'Preference',
   MemorySummary: 'MemorySummary',
   ChatRunAnalytics: 'ChatRunAnalytics',
-  Document: 'Document'
+  Document: 'Document',
+  Attachment: 'Attachment'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -265,6 +266,30 @@ export const DocumentScalarFieldEnum = {
 } as const
 
 export type DocumentScalarFieldEnum = (typeof DocumentScalarFieldEnum)[keyof typeof DocumentScalarFieldEnum]
+
+
+export const AttachmentScalarFieldEnum = {
+  id: 'id',
+  chatId: 'chatId',
+  name: 'name',
+  originalName: 'originalName',
+  mimeType: 'mimeType',
+  sizeBytes: 'sizeBytes',
+  storageUrl: 'storageUrl',
+  storagePath: 'storagePath',
+  checksum: 'checksum',
+  kind: 'kind',
+  status: 'status',
+  extractedText: 'extractedText',
+  summary: 'summary',
+  pageCount: 'pageCount',
+  width: 'width',
+  height: 'height',
+  language: 'language',
+  createdAt: 'createdAt'
+} as const
+
+export type AttachmentScalarFieldEnum = (typeof AttachmentScalarFieldEnum)[keyof typeof AttachmentScalarFieldEnum]
 
 
 export const SortOrder = {

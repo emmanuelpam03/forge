@@ -19,6 +19,7 @@ import {
   getAttachmentLanguage,
   type UploadedAttachment,
 } from "@/lib/attachment-types";
+import prisma from "@/lib/prisma";
 
 export type AttachmentInput = {
   chatId: string;
@@ -199,9 +200,9 @@ async function parseImage(buffer: Buffer, name: string): Promise<ParsedAttachmen
     const dimensions = imageSize(buffer);
     return {
       summary: `${name} (${dimensions.width ?? 0}x${dimensions.height ?? 0})`,
-      width: dimensions.width ?? undefined,
-      height: dimensions.height ?? undefined,
-    } as ParsedAttachment;
+      width: dimensions.width,
+      height: dimensions.height,
+    };
   } catch {
     return { summary: `${name} image uploaded.` };
   }
@@ -248,6 +249,36 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
   const parsed = await parseAttachmentBuffer(input);
   const kind = inferAttachmentKind({ name: input.fileName, mimeType: input.mimeType });
   const { storagePath, storageUrl, checksum } = await persistAttachmentFile(input, input.attachmentId);
+
+  // Persist metadata to the database (best-effort) using the typed Prisma client.
+  try {
+    await prisma.attachment.create({
+      data: {
+        id: input.attachmentId,
+        chatId: input.chatId,
+        name: sanitizeAttachmentName(input.fileName),
+        originalName: input.fileName,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        storageUrl,
+        storagePath,
+        checksum,
+        kind,
+        status: "ready",
+        extractedText: parsed.text ?? null,
+        summary: parsed.summary ?? null,
+        pageCount: parsed.pageCount ?? null,
+        width: parsed.width ?? null,
+        height: parsed.height ?? null,
+        language: parsed.language ?? null,
+      },
+    });
+  } catch (err) {
+    // Don't fail the upload if DB persistence fails; log and continue.
+    try {
+      console.error("Failed to persist attachment metadata:", err);
+    } catch {}
+  }
 
   return {
     id: input.attachmentId,

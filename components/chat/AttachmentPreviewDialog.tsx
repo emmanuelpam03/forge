@@ -106,15 +106,14 @@ export function AttachmentPreviewDialog({ attachment, onClose }: AttachmentPrevi
 
           <div className="flex items-center gap-2">
             <a
-              href={attachment.storageUrl}
-              download={attachment.originalName}
+              href={`/api/attachments/${attachment.chatId}/${attachment.id}?download=1`}
               className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
             >
               <Download size={14} />
               Download
             </a>
             <a
-              href={attachment.storageUrl}
+              href={`/api/attachments/${attachment.chatId}/${attachment.id}`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white"
@@ -139,8 +138,8 @@ export function AttachmentPreviewDialog({ attachment, onClose }: AttachmentPrevi
           {previewMode === "image" ? (
             <div className="flex min-h-full items-center justify-center">
               <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-                <Image
-                  src={attachment.storageUrl}
+                  <Image
+                  src={`/api/attachments/${attachment.chatId}/${attachment.id}`}
                   alt={attachment.name}
                   width={attachment.width ?? 1600}
                   height={attachment.height ?? 1200}
@@ -155,7 +154,7 @@ export function AttachmentPreviewDialog({ attachment, onClose }: AttachmentPrevi
           {previewMode === "pdf" ? (
             <div className="flex h-[78vh] w-full flex-col gap-3">
               <iframe
-                src={attachment.storageUrl}
+                src={`/api/attachments/${attachment.chatId}/${attachment.id}`}
                 title={attachment.name}
                 className="min-h-0 flex-1 rounded-2xl border border-white/10 bg-white"
               />

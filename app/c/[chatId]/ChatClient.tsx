@@ -419,9 +419,48 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<UploadedAttachment[]>(() =>
-    readPendingAttachments(chatId),
-  );
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(getPendingAttachmentsStorageKey(chatId));
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return;
+
+      const ids = parsed
+        .map((item) => (typeof item === "string" ? item : (item && typeof item === "object" ? (item as any).id : null)))
+        .filter((v): v is string => typeof v === "string");
+
+      if (ids.length === 0) return;
+
+      void (async () => {
+        const fetched: UploadedAttachment[] = [];
+        for (const id of ids) {
+          try {
+            const resp = await fetch(`/api/attachments/${chatId}/${id}/meta`);
+            if (!resp.ok) continue;
+            const data = (await resp.json()) as UploadedAttachment;
+            fetched.push(data);
+          } catch {
+            continue;
+          }
+        }
+
+        if (fetched.length > 0) {
+          setAttachments((current) => {
+            // merge any existing attachments by id
+            const existingById = new Map(current.map((a) => [a.id, a]));
+            for (const f of fetched) existingById.set(f.id, f);
+            return Array.from(existingById.values());
+          });
+        }
+      })();
+    } catch {
+      // ignore
+    }
+  }, [chatId]);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
@@ -1410,7 +1449,8 @@ export function ChatClient({
             model: requestModel.id,
             provider: requestModel.provider,
             selectedOptions: selectedOptionIds,
-            attachments,
+            // send only stable attachment IDs; server will resolve them
+            attachments: attachments.map((a) => a.id),
             promptBehavior: isForceSeniorEngineeringMode
               ? { persona: "senior-engineer" }
               : undefined,

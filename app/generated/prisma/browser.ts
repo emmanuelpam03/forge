@@ -77,3 +77,8 @@ export type ChatRunAnalytics = Prisma.ChatRunAnalyticsModel
  * 
  */
 export type Document = Prisma.DocumentModel
+/**
+ * Model Attachment
+ * 
+ */
+export type Attachment = Prisma.AttachmentModel

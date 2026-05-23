@@ -216,6 +216,7 @@ export type ChatWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectNullableScalarRelationFilter, Prisma.ProjectWhereInput> | null
   messages?: Prisma.MessageListRelationFilter
+  attachments?: Prisma.AttachmentListRelationFilter
   analytics?: Prisma.ChatRunAnalyticsListRelationFilter
   tasks?: Prisma.TaskListRelationFilter
 }
@@ -232,6 +233,7 @@ export type ChatOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
   messages?: Prisma.MessageOrderByRelationAggregateInput
+  attachments?: Prisma.AttachmentOrderByRelationAggregateInput
   analytics?: Prisma.ChatRunAnalyticsOrderByRelationAggregateInput
   tasks?: Prisma.TaskOrderByRelationAggregateInput
 }
@@ -251,6 +253,7 @@ export type ChatWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Chat"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectNullableScalarRelationFilter, Prisma.ProjectWhereInput> | null
   messages?: Prisma.MessageListRelationFilter
+  attachments?: Prisma.AttachmentListRelationFilter
   analytics?: Prisma.ChatRunAnalyticsListRelationFilter
   tasks?: Prisma.TaskListRelationFilter
 }, "id">
@@ -296,6 +299,7 @@ export type ChatCreateInput = {
   updatedAt?: Date | string
   project?: Prisma.ProjectCreateNestedOneWithoutChatsInput
   messages?: Prisma.MessageCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskCreateNestedManyWithoutChatInput
 }
@@ -311,6 +315,7 @@ export type ChatUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentUncheckedCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutChatInput
 }
@@ -326,6 +331,7 @@ export type ChatUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneWithoutChatsNestedInput
   messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUpdateManyWithoutChatNestedInput
 }
@@ -341,6 +347,7 @@ export type ChatUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUncheckedUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUncheckedUpdateManyWithoutChatNestedInput
 }
@@ -522,6 +529,20 @@ export type ChatUpdateOneRequiredWithoutAnalyticsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ChatUpdateToOneWithWhereWithoutAnalyticsInput, Prisma.ChatUpdateWithoutAnalyticsInput>, Prisma.ChatUncheckedUpdateWithoutAnalyticsInput>
 }
 
+export type ChatCreateNestedOneWithoutAttachmentsInput = {
+  create?: Prisma.XOR<Prisma.ChatCreateWithoutAttachmentsInput, Prisma.ChatUncheckedCreateWithoutAttachmentsInput>
+  connectOrCreate?: Prisma.ChatCreateOrConnectWithoutAttachmentsInput
+  connect?: Prisma.ChatWhereUniqueInput
+}
+
+export type ChatUpdateOneRequiredWithoutAttachmentsNestedInput = {
+  create?: Prisma.XOR<Prisma.ChatCreateWithoutAttachmentsInput, Prisma.ChatUncheckedCreateWithoutAttachmentsInput>
+  connectOrCreate?: Prisma.ChatCreateOrConnectWithoutAttachmentsInput
+  upsert?: Prisma.ChatUpsertWithoutAttachmentsInput
+  connect?: Prisma.ChatWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ChatUpdateToOneWithWhereWithoutAttachmentsInput, Prisma.ChatUpdateWithoutAttachmentsInput>, Prisma.ChatUncheckedUpdateWithoutAttachmentsInput>
+}
+
 export type ChatCreateWithoutProjectInput = {
   id?: string
   title?: string
@@ -532,6 +553,7 @@ export type ChatCreateWithoutProjectInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   messages?: Prisma.MessageCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskCreateNestedManyWithoutChatInput
 }
@@ -546,6 +568,7 @@ export type ChatUncheckedCreateWithoutProjectInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentUncheckedCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutChatInput
 }
@@ -601,6 +624,7 @@ export type ChatCreateWithoutMessagesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   project?: Prisma.ProjectCreateNestedOneWithoutChatsInput
+  attachments?: Prisma.AttachmentCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskCreateNestedManyWithoutChatInput
 }
@@ -615,6 +639,7 @@ export type ChatUncheckedCreateWithoutMessagesInput = {
   isArchived?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  attachments?: Prisma.AttachmentUncheckedCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutChatInput
 }
@@ -645,6 +670,7 @@ export type ChatUpdateWithoutMessagesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneWithoutChatsNestedInput
+  attachments?: Prisma.AttachmentUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUpdateManyWithoutChatNestedInput
 }
@@ -659,6 +685,7 @@ export type ChatUncheckedUpdateWithoutMessagesInput = {
   isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachments?: Prisma.AttachmentUncheckedUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUncheckedUpdateManyWithoutChatNestedInput
 }
@@ -674,6 +701,7 @@ export type ChatCreateWithoutTasksInput = {
   updatedAt?: Date | string
   project?: Prisma.ProjectCreateNestedOneWithoutChatsInput
   messages?: Prisma.MessageCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsCreateNestedManyWithoutChatInput
 }
 
@@ -688,6 +716,7 @@ export type ChatUncheckedCreateWithoutTasksInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentUncheckedCreateNestedManyWithoutChatInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedCreateNestedManyWithoutChatInput
 }
 
@@ -718,6 +747,7 @@ export type ChatUpdateWithoutTasksInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneWithoutChatsNestedInput
   messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUpdateManyWithoutChatNestedInput
 }
 
@@ -732,6 +762,7 @@ export type ChatUncheckedUpdateWithoutTasksInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUncheckedUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedUpdateManyWithoutChatNestedInput
 }
 
@@ -746,6 +777,7 @@ export type ChatCreateWithoutAnalyticsInput = {
   updatedAt?: Date | string
   project?: Prisma.ProjectCreateNestedOneWithoutChatsInput
   messages?: Prisma.MessageCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskCreateNestedManyWithoutChatInput
 }
 
@@ -760,6 +792,7 @@ export type ChatUncheckedCreateWithoutAnalyticsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
+  attachments?: Prisma.AttachmentUncheckedCreateNestedManyWithoutChatInput
   tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutChatInput
 }
 
@@ -790,6 +823,7 @@ export type ChatUpdateWithoutAnalyticsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneWithoutChatsNestedInput
   messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUpdateManyWithoutChatNestedInput
 }
 
@@ -804,6 +838,83 @@ export type ChatUncheckedUpdateWithoutAnalyticsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUncheckedUpdateManyWithoutChatNestedInput
+  tasks?: Prisma.TaskUncheckedUpdateManyWithoutChatNestedInput
+}
+
+export type ChatCreateWithoutAttachmentsInput = {
+  id?: string
+  title?: string
+  summary?: string | null
+  lastMessageAt?: Date | string
+  isPinned?: boolean
+  isArchived?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  project?: Prisma.ProjectCreateNestedOneWithoutChatsInput
+  messages?: Prisma.MessageCreateNestedManyWithoutChatInput
+  analytics?: Prisma.ChatRunAnalyticsCreateNestedManyWithoutChatInput
+  tasks?: Prisma.TaskCreateNestedManyWithoutChatInput
+}
+
+export type ChatUncheckedCreateWithoutAttachmentsInput = {
+  id?: string
+  projectId?: string | null
+  title?: string
+  summary?: string | null
+  lastMessageAt?: Date | string
+  isPinned?: boolean
+  isArchived?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  messages?: Prisma.MessageUncheckedCreateNestedManyWithoutChatInput
+  analytics?: Prisma.ChatRunAnalyticsUncheckedCreateNestedManyWithoutChatInput
+  tasks?: Prisma.TaskUncheckedCreateNestedManyWithoutChatInput
+}
+
+export type ChatCreateOrConnectWithoutAttachmentsInput = {
+  where: Prisma.ChatWhereUniqueInput
+  create: Prisma.XOR<Prisma.ChatCreateWithoutAttachmentsInput, Prisma.ChatUncheckedCreateWithoutAttachmentsInput>
+}
+
+export type ChatUpsertWithoutAttachmentsInput = {
+  update: Prisma.XOR<Prisma.ChatUpdateWithoutAttachmentsInput, Prisma.ChatUncheckedUpdateWithoutAttachmentsInput>
+  create: Prisma.XOR<Prisma.ChatCreateWithoutAttachmentsInput, Prisma.ChatUncheckedCreateWithoutAttachmentsInput>
+  where?: Prisma.ChatWhereInput
+}
+
+export type ChatUpdateToOneWithWhereWithoutAttachmentsInput = {
+  where?: Prisma.ChatWhereInput
+  data: Prisma.XOR<Prisma.ChatUpdateWithoutAttachmentsInput, Prisma.ChatUncheckedUpdateWithoutAttachmentsInput>
+}
+
+export type ChatUpdateWithoutAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  summary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastMessageAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  project?: Prisma.ProjectUpdateOneWithoutChatsNestedInput
+  messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
+  analytics?: Prisma.ChatRunAnalyticsUpdateManyWithoutChatNestedInput
+  tasks?: Prisma.TaskUpdateManyWithoutChatNestedInput
+}
+
+export type ChatUncheckedUpdateWithoutAttachmentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  summary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastMessageAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  isPinned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isArchived?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
+  analytics?: Prisma.ChatRunAnalyticsUncheckedUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUncheckedUpdateManyWithoutChatNestedInput
 }
 
@@ -828,6 +939,7 @@ export type ChatUpdateWithoutProjectInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   messages?: Prisma.MessageUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUpdateManyWithoutChatNestedInput
 }
@@ -842,6 +954,7 @@ export type ChatUncheckedUpdateWithoutProjectInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   messages?: Prisma.MessageUncheckedUpdateManyWithoutChatNestedInput
+  attachments?: Prisma.AttachmentUncheckedUpdateManyWithoutChatNestedInput
   analytics?: Prisma.ChatRunAnalyticsUncheckedUpdateManyWithoutChatNestedInput
   tasks?: Prisma.TaskUncheckedUpdateManyWithoutChatNestedInput
 }
@@ -864,12 +977,14 @@ export type ChatUncheckedUpdateManyWithoutProjectInput = {
 
 export type ChatCountOutputType = {
   messages: number
+  attachments: number
   analytics: number
   tasks: number
 }
 
 export type ChatCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   messages?: boolean | ChatCountOutputTypeCountMessagesArgs
+  attachments?: boolean | ChatCountOutputTypeCountAttachmentsArgs
   analytics?: boolean | ChatCountOutputTypeCountAnalyticsArgs
   tasks?: boolean | ChatCountOutputTypeCountTasksArgs
 }
@@ -889,6 +1004,13 @@ export type ChatCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensi
  */
 export type ChatCountOutputTypeCountMessagesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.MessageWhereInput
+}
+
+/**
+ * ChatCountOutputType without action
+ */
+export type ChatCountOutputTypeCountAttachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AttachmentWhereInput
 }
 
 /**
@@ -918,6 +1040,7 @@ export type ChatSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   updatedAt?: boolean
   project?: boolean | Prisma.Chat$projectArgs<ExtArgs>
   messages?: boolean | Prisma.Chat$messagesArgs<ExtArgs>
+  attachments?: boolean | Prisma.Chat$attachmentsArgs<ExtArgs>
   analytics?: boolean | Prisma.Chat$analyticsArgs<ExtArgs>
   tasks?: boolean | Prisma.Chat$tasksArgs<ExtArgs>
   _count?: boolean | Prisma.ChatCountOutputTypeDefaultArgs<ExtArgs>
@@ -965,6 +1088,7 @@ export type ChatOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = run
 export type ChatInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.Chat$projectArgs<ExtArgs>
   messages?: boolean | Prisma.Chat$messagesArgs<ExtArgs>
+  attachments?: boolean | Prisma.Chat$attachmentsArgs<ExtArgs>
   analytics?: boolean | Prisma.Chat$analyticsArgs<ExtArgs>
   tasks?: boolean | Prisma.Chat$tasksArgs<ExtArgs>
   _count?: boolean | Prisma.ChatCountOutputTypeDefaultArgs<ExtArgs>
@@ -981,6 +1105,7 @@ export type $ChatPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   objects: {
     project: Prisma.$ProjectPayload<ExtArgs> | null
     messages: Prisma.$MessagePayload<ExtArgs>[]
+    attachments: Prisma.$AttachmentPayload<ExtArgs>[]
     analytics: Prisma.$ChatRunAnalyticsPayload<ExtArgs>[]
     tasks: Prisma.$TaskPayload<ExtArgs>[]
   }
@@ -1390,6 +1515,7 @@ export interface Prisma__ChatClient<T, Null = never, ExtArgs extends runtime.Typ
   readonly [Symbol.toStringTag]: "PrismaPromise"
   project<T extends Prisma.Chat$projectArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$projectArgs<ExtArgs>>): Prisma.Prisma__ProjectClient<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   messages<T extends Prisma.Chat$messagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  attachments<T extends Prisma.Chat$attachmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$attachmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AttachmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   analytics<T extends Prisma.Chat$analyticsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$analyticsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ChatRunAnalyticsPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tasks<T extends Prisma.Chat$tasksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Chat$tasksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TaskPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -1871,6 +1997,30 @@ export type Chat$messagesArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.MessageScalarFieldEnum | Prisma.MessageScalarFieldEnum[]
+}
+
+/**
+ * Chat.attachments
+ */
+export type Chat$attachmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Attachment
+   */
+  select?: Prisma.AttachmentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Attachment
+   */
+  omit?: Prisma.AttachmentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AttachmentInclude<ExtArgs> | null
+  where?: Prisma.AttachmentWhereInput
+  orderBy?: Prisma.AttachmentOrderByWithRelationInput | Prisma.AttachmentOrderByWithRelationInput[]
+  cursor?: Prisma.AttachmentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AttachmentScalarFieldEnum | Prisma.AttachmentScalarFieldEnum[]
 }
 
 /**

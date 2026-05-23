@@ -88,9 +88,10 @@ export default function HomePage() {
 
   const persistPendingAttachments = useCallback((chatId: string, nextAttachments: UploadedAttachment[]) => {
     try {
+      const ids = nextAttachments.map((a) => a.id);
       sessionStorage.setItem(
         `forge:chat:${chatId}:pending-attachments`,
-        JSON.stringify(nextAttachments),
+        JSON.stringify(ids),
       );
     } catch {
       // Ignore storage failures; uploads still succeed server-side.
@@ -179,6 +180,7 @@ export default function HomePage() {
             attachment.id === tempAttachmentId ? uploadedAttachment : attachment,
           );
 
+          // persist only ids for the draft chat
           persistPendingAttachments(chatId, nextAttachments.filter((attachment) => attachment.status === "ready"));
           return nextAttachments;
         });

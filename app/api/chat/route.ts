@@ -6,39 +6,9 @@ import { initializeBackgroundWorkers } from "@/lib/background-worker";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 import { toResponse, ApiError } from "@/lib/error-response";
-
-const attachmentSchema = z.object({
-  id: z.string().min(1),
-  chatId: z.string().min(1),
-  name: z.string().min(1),
-  originalName: z.string().min(1),
-  mimeType: z.string().min(1),
-  sizeBytes: z.number().int().nonnegative(),
-  checksum: z.string().min(1),
-  kind: z.enum([
-    "image",
-    "pdf",
-    "document",
-    "code",
-    "spreadsheet",
-    "text",
-    "json",
-    "audio",
-    "video",
-    "other",
-  ]),
-  status: z.enum(["uploading", "processing", "ready", "failed"]),
-  storageUrl: z.string().min(1),
-  storagePath: z.string().min(1),
-  uploadedAt: z.string().min(1),
-  extractedText: z.string().optional(),
-  summary: z.string().optional(),
-  pageCount: z.number().int().optional(),
-  width: z.number().int().optional(),
-  height: z.number().int().optional(),
-  language: z.string().optional(),
-  error: z.string().optional(),
-});
+import { readdir, stat } from "node:fs/promises";
+import { join, extname } from "node:path";
+import { inferAttachmentKind } from "@/lib/attachment-types";
 
 export const runtime = "nodejs";
 
@@ -53,8 +23,35 @@ const chatRequestSchema = z.object({
     })
     .optional(),
   selectedOptions: z.array(selectedOptionIdSchema).optional(),
-  attachments: z.array(attachmentSchema).optional(),
+  // attachments should be an array of attachment IDs; server will resolve them
+  attachments: z.array(z.string().min(1)).optional(),
 });
+
+function extensionToMime(ext: string): string {
+  switch (ext) {
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".gif":
+      return "image/gif";
+    case ".pdf":
+      return "application/pdf";
+    case ".txt":
+      return "text/plain";
+    case ".md":
+      return "text/markdown";
+    case ".json":
+      return "application/json";
+    case ".csv":
+      return "text/csv";
+    default:
+      return "application/octet-stream";
+  }
+}
 
 export async function POST(request: NextRequest) {
   // Initialize background workers on first request (lazy initialization)
@@ -74,6 +71,41 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Resolve attachment IDs to server-trusted attachment records by
+    // inspecting the upload directory. Ignore IDs that do not resolve.
+    const attachmentIds = parsedBody.data.attachments ?? [];
+    const resolvedAttachments: unknown[] = [];
+    for (const attachmentId of attachmentIds) {
+      try {
+        const dir = join(process.cwd(), "public", "uploads", parsedBody.data.chatId, attachmentId);
+        const files = await readdir(dir);
+        if (!files || files.length === 0) continue;
+        const fileName = files[0];
+        const filePath = join(dir, fileName);
+        const stats = await stat(filePath);
+        const ext = extname(fileName).toLowerCase();
+        const mimeType = extensionToMime(ext);
+
+        resolvedAttachments.push({
+          id: attachmentId,
+          chatId: parsedBody.data.chatId,
+          name: fileName,
+          originalName: fileName,
+          mimeType,
+          sizeBytes: stats.size,
+          checksum: "",
+          kind: inferAttachmentKind({ name: fileName, mimeType }),
+          status: "ready",
+          storageUrl: `/uploads/${parsedBody.data.chatId}/${attachmentId}/${fileName}`,
+          storagePath: filePath,
+          uploadedAt: stats.mtime.toISOString(),
+        });
+      } catch {
+        // skip unresolved attachment IDs
+        continue;
+      }
     }
 
     const runId = crypto.randomUUID();
@@ -135,7 +167,7 @@ export async function POST(request: NextRequest) {
                 model: parsedBody.data.model,
                 provider: parsedBody.data.provider,
                 selectedOptions: parsedBody.data.selectedOptions ?? [],
-                attachments: parsedBody.data.attachments ?? [],
+                attachments: resolvedAttachments,
                 promptBehavior: parsedBody.data.promptBehavior
                   ? {
                       ...DEFAULT_PROMPT_BEHAVIOR_CONTROLS,

@@ -100,6 +100,7 @@ model Chat {
   isArchived Boolean @default(false)
 
   messages  Message[]
+  attachments Attachment[]
   analytics ChatRunAnalytics[]
   tasks     Task[]
 
@@ -255,6 +256,35 @@ model Document {
 
   @@index([projectId])
   @@index([name])
+}
+
+model Attachment {
+  id String @id @default(cuid())
+
+  chatId String
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  name         String
+  originalName String
+  mimeType     String?
+  sizeBytes    Int?
+  storageUrl   String?
+  storagePath  String?
+  checksum     String?
+  kind         String?
+  status       String? @default("ready")
+
+  extractedText String? @db.Text
+  summary       String? @db.Text
+  pageCount     Int?
+  width         Int?
+  height        Int?
+  language      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([chatId])
+  @@index([createdAt])
 }
 
 enum MessageRole {
