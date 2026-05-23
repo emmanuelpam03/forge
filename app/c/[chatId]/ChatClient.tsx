@@ -90,6 +90,7 @@ type ChatClientProps = {
   projectId: string | null;
   title: string;
   initialMessages: ChatMessage[];
+  initialAttachments: UploadedAttachment[];
   initialMessage?: string;
 };
 
@@ -105,52 +106,6 @@ const MODEL_OPTIONS: ModelOption[] = [
 
 const DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
 const DEFAULT_MODEL_OPTION = MODEL_OPTIONS[0];
-
-function getPendingAttachmentsStorageKey(chatId: string): string {
-  return `forge:chat:${chatId}:pending-attachments`;
-}
-
-function readPendingAttachments(chatId: string): UploadedAttachment[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = sessionStorage.getItem(getPendingAttachmentsStorageKey(chatId));
-    if (!raw) {
-      return [];
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter((attachment): attachment is UploadedAttachment => {
-      if (!attachment || typeof attachment !== "object") {
-        return false;
-      }
-
-      const value = attachment as Record<string, unknown>;
-      return (
-        typeof value.id === "string" &&
-        typeof value.chatId === "string" &&
-        typeof value.name === "string" &&
-        typeof value.originalName === "string" &&
-        typeof value.mimeType === "string" &&
-        typeof value.sizeBytes === "number" &&
-        typeof value.checksum === "string" &&
-        typeof value.kind === "string" &&
-        typeof value.status === "string" &&
-        typeof value.storageUrl === "string" &&
-        typeof value.storagePath === "string" &&
-        typeof value.uploadedAt === "string"
-      );
-    });
-  } catch {
-    return [];
-  }
-}
 
 function MessageBubble({
   message,
@@ -288,6 +243,23 @@ function MessageBubble({
               </div>
             ) : (
               <div className="text-[14px]">
+                {message.role === "user" && message.attachmentBlock?.attachments?.length ? (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {message.attachmentBlock.attachments.map((attachment) => (
+                      <AttachmentChip
+                        key={attachment.id}
+                        attachment={attachment}
+                        compact
+                        onPreview={
+                          attachment.status === "ready"
+                            ? () => setPreviewAttachment(attachment)
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
                 {message.role === "assistant" ? (
                   <MessageRenderer
                     content={message.content}
@@ -406,6 +378,7 @@ export function ChatClient({
   chatId,
   title,
   initialMessages,
+  initialAttachments,
   initialMessage,
 }: ChatClientProps) {
   const { showFeedback } = useFeedback();
@@ -419,48 +392,9 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
-
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(getPendingAttachmentsStorageKey(chatId));
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return;
-
-      const ids = parsed
-        .map((item) => (typeof item === "string" ? item : (item && typeof item === "object" ? (item as any).id : null)))
-        .filter((v): v is string => typeof v === "string");
-
-      if (ids.length === 0) return;
-
-      void (async () => {
-        const fetched: UploadedAttachment[] = [];
-        for (const id of ids) {
-          try {
-            const resp = await fetch(`/api/attachments/${chatId}/${id}/meta`);
-            if (!resp.ok) continue;
-            const data = (await resp.json()) as UploadedAttachment;
-            fetched.push(data);
-          } catch {
-            continue;
-          }
-        }
-
-        if (fetched.length > 0) {
-          setAttachments((current) => {
-            // merge any existing attachments by id
-            const existingById = new Map(current.map((a) => [a.id, a]));
-            for (const f of fetched) existingById.set(f.id, f);
-            return Array.from(existingById.values());
-          });
-        }
-      })();
-    } catch {
-      // ignore
-    }
-  }, [chatId]);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>(() =>
+    initialAttachments,
+  );
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
@@ -679,12 +613,7 @@ export function ChatClient({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    try {
-      sessionStorage.removeItem(getPendingAttachmentsStorageKey(chatId));
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [chatId]);
+  }, []);
 
   const uploadAttachment = useCallback(
     async (file: File) => {
@@ -1415,13 +1344,15 @@ export function ChatClient({
         setDraft("");
       }
 
+      const attachmentsSnapshot = attachments.map((attachment) => ({ ...attachment }));
+
       setMessages((currentMessages) => [
         ...currentMessages,
         {
           id: userMessageId,
           role: "user",
           content: message,
-          attachmentBlock: { attachments: attachments.map((a) => ({ ...a })) },
+          attachmentBlock: { attachments: attachmentsSnapshot },
         },
         {
           id: assistantPlaceholderId,
@@ -1435,6 +1366,7 @@ export function ChatClient({
       ]);
 
       abortControllerRef.current = new AbortController();
+        clearComposerAttachments();
       resetStreamBuffers();
 
       try {
@@ -1652,6 +1584,7 @@ export function ChatClient({
               currentMessage.id !== assistantPlaceholderId,
           ),
         );
+        setAttachments(attachmentsSnapshot);
         setError(errorMessage);
         showFeedback({
           type: "error",
@@ -1785,22 +1718,6 @@ export function ChatClient({
                   </div>
                 ) : null}
 
-                {message.attachmentBlock?.attachments?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {message.attachmentBlock.attachments.map((attachment) => (
-                      <AttachmentChip
-                        key={attachment.id}
-                        attachment={attachment}
-                        compact
-                        onPreview={
-                          attachment.status === "ready"
-                            ? () => setPreviewAttachment(attachment)
-                            : undefined
-                        }
-                      />
-                    ))}
-                  </div>
-                ) : null}
               </React.Fragment>
             ))
           )}

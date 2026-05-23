@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@/app/generated/prisma/client";
 
 type ChatWithMessages = Prisma.ChatGetPayload<{
-  include: { messages: true };
+  include: { messages: true; attachments: true };
 }>;
 
 export async function createChat(projectId?: string) {
@@ -71,6 +71,9 @@ export async function getChatById(
     const chat = await prisma.chat.findUnique({
       where: { id },
       include: {
+        attachments: {
+          orderBy: { createdAt: "asc" },
+        },
         messages: {
           orderBy: { createdAt: "asc" },
           take: options?.take ?? 1000,

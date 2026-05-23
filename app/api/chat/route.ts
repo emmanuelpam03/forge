@@ -6,8 +6,7 @@ import { initializeBackgroundWorkers } from "@/lib/background-worker";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 import { toResponse, ApiError } from "@/lib/error-response";
-import { readdir, stat } from "node:fs/promises";
-import { join, extname } from "node:path";
+import prisma from "@/lib/prisma";
 import { inferAttachmentKind } from "@/lib/attachment-types";
 
 export const runtime = "nodejs";
@@ -26,32 +25,6 @@ const chatRequestSchema = z.object({
   // attachments should be an array of attachment IDs; server will resolve them
   attachments: z.array(z.string().min(1)).optional(),
 });
-
-function extensionToMime(ext: string): string {
-  switch (ext) {
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    case ".gif":
-      return "image/gif";
-    case ".pdf":
-      return "application/pdf";
-    case ".txt":
-      return "text/plain";
-    case ".md":
-      return "text/markdown";
-    case ".json":
-      return "application/json";
-    case ".csv":
-      return "text/csv";
-    default:
-      return "application/octet-stream";
-  }
-}
 
 export async function POST(request: NextRequest) {
   // Initialize background workers on first request (lazy initialization)
@@ -73,40 +46,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Resolve attachment IDs to server-trusted attachment records by
-    // inspecting the upload directory. Ignore IDs that do not resolve.
+    // Resolve attachment IDs from the database so the prompt only sees trusted metadata.
     const attachmentIds = parsedBody.data.attachments ?? [];
-    const resolvedAttachments: unknown[] = [];
-    for (const attachmentId of attachmentIds) {
-      try {
-        const dir = join(process.cwd(), "public", "uploads", parsedBody.data.chatId, attachmentId);
-        const files = await readdir(dir);
-        if (!files || files.length === 0) continue;
-        const fileName = files[0];
-        const filePath = join(dir, fileName);
-        const stats = await stat(filePath);
-        const ext = extname(fileName).toLowerCase();
-        const mimeType = extensionToMime(ext);
+    const attachments = await prisma.attachment.findMany({
+      where: {
+        chatId: parsedBody.data.chatId,
+        id: { in: attachmentIds },
+      },
+      orderBy: { createdAt: "asc" },
+    });
 
-        resolvedAttachments.push({
-          id: attachmentId,
-          chatId: parsedBody.data.chatId,
-          name: fileName,
-          originalName: fileName,
-          mimeType,
-          sizeBytes: stats.size,
-          checksum: "",
-          kind: inferAttachmentKind({ name: fileName, mimeType }),
-          status: "ready",
-          storageUrl: `/uploads/${parsedBody.data.chatId}/${attachmentId}/${fileName}`,
-          storagePath: filePath,
-          uploadedAt: stats.mtime.toISOString(),
-        });
-      } catch {
-        // skip unresolved attachment IDs
-        continue;
-      }
-    }
+    const attachmentsById = new Map(attachments.map((attachment) => [attachment.id, attachment]));
+    const resolvedAttachments = attachmentIds
+      .map((attachmentId) => attachmentsById.get(attachmentId))
+      .filter((attachment): attachment is (typeof attachments)[number] => Boolean(attachment))
+      .map((attachment) => ({
+        id: attachment.id,
+        chatId: attachment.chatId,
+        name: attachment.name,
+        originalName: attachment.originalName,
+        mimeType: attachment.mimeType ?? "application/octet-stream",
+        sizeBytes: attachment.sizeBytes ?? 0,
+        checksum: attachment.checksum ?? "",
+        kind: attachment.kind && attachment.kind !== ""
+          ? attachment.kind
+          : inferAttachmentKind({
+              name: attachment.name,
+              mimeType: attachment.mimeType ?? "application/octet-stream",
+            }),
+        status: attachment.status === "failed" ? "failed" : "ready",
+        storageUrl: attachment.storageUrl ?? "",
+        storagePath: attachment.storagePath ?? "",
+        uploadedAt: attachment.createdAt.toISOString(),
+        extractedText: attachment.extractedText ?? undefined,
+        summary: attachment.summary ?? undefined,
+        pageCount: attachment.pageCount ?? undefined,
+        width: attachment.width ?? undefined,
+        height: attachment.height ?? undefined,
+        language: attachment.language ?? undefined,
+      }));
 
     const runId = crypto.randomUUID();
     const assistantMessageId = crypto.randomUUID();

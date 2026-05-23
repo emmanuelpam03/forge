@@ -1,8 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { basename, extname } from "node:path";
 import { imageSize } from "image-size";
 import mammoth from "mammoth";
 import Papa from "papaparse";
@@ -20,6 +19,7 @@ import {
   type UploadedAttachment,
 } from "@/lib/attachment-types";
 import prisma from "@/lib/prisma";
+import { uploadAttachmentToCloudinary } from "@/lib/cloudinary";
 
 export type AttachmentInput = {
   chatId: string;
@@ -83,21 +83,21 @@ export async function persistAttachmentFile(
   input: AttachmentInput,
   attachmentId: string,
 ): Promise<{ storagePath: string; storageUrl: string; checksum: string }> {
-  const safeChatId = validatePathSegment(input.chatId, "chatId");
-  const safeAttachmentId = validatePathSegment(attachmentId, "attachmentId");
   const safeName = sanitizeAttachmentName(input.fileName);
-  const extension = getAttachmentExtension(safeName) || extname(input.fileName).toLowerCase();
-  const fileName = `${safeAttachmentId}${extension || ""}`;
-  const storageDir = join(process.cwd(), "public", "uploads", safeChatId, safeAttachmentId);
-  const storagePath = join(storageDir, fileName);
-
-  await mkdir(storageDir, { recursive: true });
-  await writeFile(storagePath, input.buffer);
-
   const checksum = createHash("sha256").update(input.buffer).digest("hex");
-  const storageUrl = `/uploads/${safeChatId}/${safeAttachmentId}/${fileName}`;
+  const uploadResult = await uploadAttachmentToCloudinary({
+    chatId: input.chatId,
+    attachmentId,
+    buffer: input.buffer,
+    fileName: safeName,
+    mimeType: input.mimeType,
+  });
 
-  return { storagePath, storageUrl, checksum };
+  return {
+    storagePath: uploadResult.public_id,
+    storageUrl: uploadResult.secure_url,
+    checksum,
+  };
 }
 
 async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {

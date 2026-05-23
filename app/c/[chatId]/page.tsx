@@ -309,6 +309,66 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
     };
   }
 
+  const VALID_ATTACHMENT_KINDS = new Set<UploadedAttachment["kind"]>([
+    "image",
+    "pdf",
+    "document",
+    "code",
+    "spreadsheet",
+    "text",
+    "json",
+    "audio",
+    "video",
+    "other",
+  ]);
+
+  function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kind"] {
+    return typeof value === "string" && VALID_ATTACHMENT_KINDS.has(value as UploadedAttachment["kind"]);
+  }
+
+  const initialAttachments: UploadedAttachment[] =
+    chat.attachments
+      .map((attachment) => {
+        const name = attachment.name;
+        const originalName = attachment.originalName ?? attachment.name;
+        const mimeType = attachment.mimeType ?? "application/octet-stream";
+        const storageUrl = attachment.storageUrl ?? `/api/attachments/${attachment.chatId}/${attachment.id}`;
+        const storagePath = attachment.storagePath ?? "";
+
+        return {
+          id: attachment.id,
+          chatId: attachment.chatId,
+          name,
+          originalName,
+          mimeType,
+          sizeBytes: attachment.sizeBytes ?? 0,
+          checksum: attachment.checksum ?? "",
+          kind: isValidAttachmentKind(attachment.kind)
+            ? attachment.kind
+            : inferAttachmentKind({ name, mimeType }),
+          status:
+            attachment.status === "uploading" ||
+            attachment.status === "processing" ||
+            attachment.status === "ready" ||
+            attachment.status === "failed"
+              ? attachment.status
+              : "ready",
+          storageUrl,
+          storagePath,
+          uploadedAt:
+            attachment.createdAt instanceof Date
+              ? attachment.createdAt.toISOString()
+              : new Date().toISOString(),
+          extractedText: attachment.extractedText ?? undefined,
+          summary: attachment.summary ?? undefined,
+          pageCount: attachment.pageCount ?? undefined,
+          width: attachment.width ?? undefined,
+          height: attachment.height ?? undefined,
+          language: attachment.language ?? undefined,
+        } satisfies UploadedAttachment;
+      })
+      .filter((attachment) => Boolean(attachment.storagePath));
+
   const initialMessages: ChatMessage[] = [];
   for (const message of chat.messages) {
     if (message.role === "user") {
@@ -371,6 +431,7 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
       title={chat.title}
       initialMessage={initialMessage}
       initialMessages={initialMessages}
+      initialAttachments={initialAttachments}
     />
   );
 }

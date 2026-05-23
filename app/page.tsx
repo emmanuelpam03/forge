@@ -86,15 +86,10 @@ export default function HomePage() {
   } = useSelectedOptions(homeScopeId);
   const selectedOptions = getSelectedOptionObjects();
 
-  const persistPendingAttachments = useCallback((chatId: string, nextAttachments: UploadedAttachment[]) => {
-    try {
-      const ids = nextAttachments.map((a) => a.id);
-      sessionStorage.setItem(
-        `forge:chat:${chatId}:pending-attachments`,
-        JSON.stringify(ids),
-      );
-    } catch {
-      // Ignore storage failures; uploads still succeed server-side.
+  const clearComposerAttachments = useCallback(() => {
+    setAttachments([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   }, []);
 
@@ -175,15 +170,11 @@ export default function HomePage() {
           throw new Error(`Upload succeeded but no attachment metadata was returned for ${file.name}.`);
         }
 
-        setAttachments((current) => {
-          const nextAttachments = current.map((attachment) =>
+        setAttachments((current) =>
+          current.map((attachment) =>
             attachment.id === tempAttachmentId ? uploadedAttachment : attachment,
-          );
-
-          // persist only ids for the draft chat
-          persistPendingAttachments(chatId, nextAttachments.filter((attachment) => attachment.status === "ready"));
-          return nextAttachments;
-        });
+          ),
+        );
 
         showFeedback({
           type: "success",
@@ -205,7 +196,7 @@ export default function HomePage() {
         });
       }
     },
-    [ensureDraftChat, persistPendingAttachments, showFeedback],
+    [ensureDraftChat, showFeedback],
   );
 
   const uploadFiles = useCallback(
@@ -268,6 +259,7 @@ export default function HomePage() {
       setError("");
       setIsCreatingChat(true);
       const chatId = draftChatIdRef.current ?? draftChatId ?? (await ensureDraftChat());
+      clearComposerAttachments();
 
       try {
         localStorage.setItem(

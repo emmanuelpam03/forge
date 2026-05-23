@@ -1,38 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readdir, stat } from "node:fs/promises";
-import { join, extname, basename } from "node:path";
+import prisma from "@/lib/prisma";
 import { inferAttachmentKind } from "@/lib/attachment-types";
-
-function extensionToMime(ext: string): string {
-  switch (ext) {
-    case ".png":
-      return "image/png";
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".webp":
-      return "image/webp";
-    case ".gif":
-      return "image/gif";
-    case ".pdf":
-      return "application/pdf";
-    case ".txt":
-      return "text/plain";
-    case ".md":
-      return "text/markdown";
-    case ".json":
-      return "application/json";
-    case ".csv":
-      return "text/csv";
-    default:
-      return "application/octet-stream";
-  }
-}
 
 function validatePathSegment(value: string, label: string): string {
   const normalized = String(value ?? "").trim();
   const safePattern = /^[A-Za-z0-9_-]+$/;
-  if (!normalized || normalized !== basename(normalized) || normalized.includes("..") || normalized.includes("/") || normalized.includes("\\") || !safePattern.test(normalized)) {
+  if (!normalized || normalized.includes("..") || normalized.includes("/") || normalized.includes("\\") || !safePattern.test(normalized)) {
     throw new Error(`Invalid ${label}`);
   }
   return normalized;
@@ -43,31 +16,27 @@ export async function GET(request: NextRequest, { params }: { params: { chatId?:
     const chatId = validatePathSegment(params.chatId ?? "", "chatId");
     const attachmentId = validatePathSegment(params.attachmentId ?? "", "attachmentId");
 
-    const dir = join(process.cwd(), "public", "uploads", chatId, attachmentId);
-    const files = await readdir(dir).catch(() => []);
-    if (!files || files.length === 0) {
+    const attachment = await prisma.attachment.findFirst({
+      where: { chatId, id: attachmentId },
+    });
+
+    if (!attachment) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    const fileName = files[0];
-    const filePath = join(dir, fileName);
-    const stats = await stat(filePath);
-    const ext = extname(fileName).toLowerCase();
-    const mimeType = _extensionToMime(ext);
 
     const resolved = {
       id: attachmentId,
       chatId,
-      name: fileName,
-      originalName: fileName,
-      mimeType,
-      sizeBytes: stats.size,
-      checksum: "",
-      kind: inferAttachmentKind({ name: fileName, mimeType }),
+      name: attachment.name,
+      originalName: attachment.originalName,
+      mimeType: attachment.mimeType ?? "application/octet-stream",
+      sizeBytes: attachment.sizeBytes ?? 0,
+      checksum: attachment.checksum ?? "",
+      kind: attachment.kind && attachment.kind !== "" ? attachment.kind : inferAttachmentKind({ name: attachment.name, mimeType: attachment.mimeType ?? "application/octet-stream" }),
       status: "ready",
-      storageUrl: `/api/attachments/${chatId}/${attachmentId}`,
-      storagePath: filePath,
-      uploadedAt: stats.mtime.toISOString(),
+      storageUrl: attachment.storageUrl ?? `/api/attachments/${chatId}/${attachmentId}`,
+      storagePath: attachment.storagePath ?? "",
+      uploadedAt: attachment.createdAt.toISOString(),
     };
 
     return NextResponse.json(resolved);
