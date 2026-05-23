@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { error as logError } from "@/lib/logger";
 import prisma from "@/lib/prisma";
 import {
@@ -11,13 +10,6 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    if (!session && process.env.NODE_ENV === "production") {
-      // In production we require authentication. In local/dev, allow a relaxed
-      // flow so developers can test uploads before wiring auth.
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const formData = await request.formData();
     const chatId = String(formData.get("chatId") ?? "").trim();
 
@@ -25,32 +17,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "chatId is required." }, { status: 400 });
     }
 
-    const isDev = process.env.NODE_ENV === "development";
-
-    let chat: { id: string; userId?: string } | null = null;
-    if (session) {
-      // We only need to verify the chat exists; chats are not currently
-      // scoped to a user in the schema, so don't attempt to filter by userId.
-      chat = await prisma.chat.findUnique({
-        where: { id: chatId },
-        select: { id: true, projectId: true },
-      });
-    } else {
-      // In development allow a relaxed lookup so uploads can be tested before
-      // authentication is wired. If the chat doesn't exist, fall back to a
-      // placeholder chat for the purpose of storing the file.
-      chat = await prisma.chat.findUnique({
-        where: { id: chatId },
-        select: { id: true, projectId: true },
-      });
-
-      if (!chat && isDev) {
-        chat = { id: chatId, userId: "dev" };
-      }
-    }
+    const chat = await prisma.chat.findUnique({
+      where: { id: chatId },
+      select: { id: true, projectId: true },
+    });
 
     if (!chat) {
-      return NextResponse.json({ error: "Chat not found or access denied." }, { status: 404 });
+      return NextResponse.json({ error: "Chat not found." }, { status: 404 });
     }
 
     const MAX_FILES_PER_UPLOAD = 10;

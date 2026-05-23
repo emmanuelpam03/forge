@@ -3,7 +3,6 @@ type SiteLoadingVariant =
   | "chatpage"
   | "projectpage"
   | "marketing"
-  | "auth"
   | "projects"
   | "settings"
   | "search"
@@ -324,39 +323,6 @@ function SearchSkeleton() {
   );
 }
 
-function AuthSkeleton() {
-  return (
-    <div
-      className="flex min-h-[calc(100vh-2rem)] items-center justify-center p-6"
-      style={{ background: "var(--background)" }}
-    >
-      <div
-        className="w-full max-w-md p-6"
-        style={{
-          border: "1px solid var(--border)",
-          borderRadius: "20px",
-          background: "var(--card)",
-        }}
-      >
-        <SkeletonBlock className="h-7 w-28 mb-3" />
-        <SkeletonBlock
-          className="h-4 w-52 mb-6"
-          style={{ borderRadius: "6px" }}
-        />
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonBlock
-              key={`ar-${i}`}
-              className="h-12"
-              style={{ borderRadius: "12px" }}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function SectionSkeleton({
   title,
   blocks = 3,
@@ -405,7 +371,6 @@ export function SiteLoading({ variant }: { variant: SiteLoadingVariant }) {
   if (variant === "chatpage") return <ChatPageSkeleton />;
   if (variant === "projectpage") return <ProjectPageSkeleton />;
   if (variant === "search") return <SearchSkeleton />;
-  if (variant === "auth") return <AuthSkeleton />;
   if (variant === "marketing")
     return <SectionSkeleton title="marketing" blocks={4} />;
   if (variant === "projects")
