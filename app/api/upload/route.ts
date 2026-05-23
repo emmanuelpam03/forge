@@ -12,7 +12,9 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
-    if (!session) {
+    if (!session && process.env.NODE_ENV === "production") {
+      // In production we require authentication. In local/dev, allow a relaxed
+      // flow so developers can test uploads before wiring auth.
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -23,10 +25,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "chatId is required." }, { status: 400 });
     }
 
-    const chat = await prisma.chat.findUnique({
-      where: { id: chatId, userId: session.user.id },
-      select: { id: true, userId: true },
-    });
+    const isDev = process.env.NODE_ENV === "development";
+
+    let chat: { id: string; userId?: string } | null = null;
+    if (session) {
+      chat = await prisma.chat.findUnique({
+        where: { id: chatId, userId: session.user.id },
+        select: { id: true, userId: true },
+      });
+    } else {
+      // In development allow a relaxed lookup so uploads can be tested before
+      // authentication is wired. If the chat doesn't exist, fall back to a
+      // placeholder chat for the purpose of storing the file.
+      chat = await prisma.chat.findUnique({
+        where: { id: chatId },
+        select: { id: true, userId: true },
+      });
+
+      if (!chat && isDev) {
+        chat = { id: chatId, userId: "dev" };
+      }
+    }
 
     if (!chat) {
       return NextResponse.json({ error: "Chat not found or access denied." }, { status: 404 });

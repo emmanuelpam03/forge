@@ -675,6 +675,7 @@ export function ChatClient({
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
+          credentials: "include",
         });
 
         const payload = (await response.json().catch(() => null)) as
