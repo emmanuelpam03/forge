@@ -80,18 +80,22 @@ export function ModesMenu({
           </p>
         </div>
 
-        <label
-          htmlFor={uploadInputId}
-          className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-left text-muted-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground"
-          title="Upload photos and files"
-        >
-          <div className="flex items-center gap-3">
-            <Upload size={16} className="shrink-0" />
-            <p className="text-[13px] font-medium">Upload photos and files</p>
-          </div>
-        </label>
+        {uploadInputId ? (
+          <>
+            <label
+              htmlFor={uploadInputId}
+              className="flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-left text-muted-foreground/70 transition-colors hover:bg-accent/50 hover:text-foreground"
+              title="Upload photos and files"
+            >
+              <div className="flex items-center gap-3">
+                <Upload size={16} className="shrink-0" />
+                <p className="text-[13px] font-medium">Upload photos and files</p>
+              </div>
+            </label>
 
-        <div className="h-px bg-border/60" />
+            <div className="h-px bg-border/60" />
+          </>
+        ) : null}
 
         {Object.values(OPTIONS).map((option) => (
           <button

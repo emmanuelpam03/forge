@@ -13,7 +13,6 @@ import {
   Square,
   Mic,
   Plus,
-  Upload,
 } from "lucide-react";
 import { MessageRenderer } from "@/components/MessageRenderer";
 import ImageCarousel from "@/components/chat/images/ImageCarousel";
@@ -106,6 +105,52 @@ const MODEL_OPTIONS: ModelOption[] = [
 
 const DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
 const DEFAULT_MODEL_OPTION = MODEL_OPTIONS[0];
+
+function getPendingAttachmentsStorageKey(chatId: string): string {
+  return `forge:chat:${chatId}:pending-attachments`;
+}
+
+function readPendingAttachments(chatId: string): UploadedAttachment[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = sessionStorage.getItem(getPendingAttachmentsStorageKey(chatId));
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((attachment): attachment is UploadedAttachment => {
+      if (!attachment || typeof attachment !== "object") {
+        return false;
+      }
+
+      const value = attachment as Record<string, unknown>;
+      return (
+        typeof value.id === "string" &&
+        typeof value.chatId === "string" &&
+        typeof value.name === "string" &&
+        typeof value.originalName === "string" &&
+        typeof value.mimeType === "string" &&
+        typeof value.sizeBytes === "number" &&
+        typeof value.checksum === "string" &&
+        typeof value.kind === "string" &&
+        typeof value.status === "string" &&
+        typeof value.storageUrl === "string" &&
+        typeof value.storagePath === "string" &&
+        typeof value.uploadedAt === "string"
+      );
+    });
+  } catch {
+    return [];
+  }
+}
 
 function MessageBubble({
   message,
@@ -374,7 +419,9 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>(() =>
+    readPendingAttachments(chatId),
+  );
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
@@ -593,7 +640,12 @@ export function ChatClient({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, []);
+    try {
+      sessionStorage.removeItem(getPendingAttachmentsStorageKey(chatId));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [chatId]);
 
   const uploadAttachment = useCallback(
     async (file: File) => {
@@ -683,19 +735,7 @@ export function ChatClient({
     [uploadAttachment],
   );
 
-  const openAttachmentPicker = useCallback(() => {
-    const input = fileInputRef.current;
-    if (!input) {
-      return;
-    }
 
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-      return;
-    }
-
-    input.click();
-  }, []);
 
   const removeAttachment = useCallback((attachmentId: string) => {
     setAttachments((current) =>
@@ -1871,16 +1911,6 @@ export function ChatClient({
               />
 
               <div className="col-start-3 row-start-1 flex items-center gap-2 self-center">
-                <button
-                  type="button"
-                  onClick={openAttachmentPicker}
-                  className="rounded-full p-2 text-muted-foreground transition hover:text-foreground"
-                  aria-label="Upload file"
-                  title="Upload file"
-                >
-                  <Upload size={18} />
-                </button>
-
                 <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
                   <Mic size={18} />
                 </button>

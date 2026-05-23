@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { ArrowUp, Bookmark, Globe, Layers, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
+import { AttachmentChip } from "@/components/chat/AttachmentChip";
 import { ModesMenu } from "@/components/ModesMenu";
 import { useFeedback } from "@/components/feedback-provider";
 import { useSelectedOptions } from "@/hooks/useSelectedOptions";
+import { inferAttachmentKind, type UploadedAttachment } from "@/lib/attachment-types";
 
 function ForgeLogo({
   className,
@@ -53,6 +55,7 @@ export default function HomePage() {
   const { showFeedback } = useFeedback();
   const router = useRouter();
   const homeScopeId = "home-global";
+  const uploadInputId = "home-upload-input";
 
   const hour = new Date().getHours();
   const greetingText =
@@ -68,15 +71,175 @@ export default function HomePage() {
 
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [draftChatId, setDraftChatId] = useState<string | null>(null);
+  const draftChatIdRef = useRef<string | null>(null);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const {
     selectedOptions: selectedOptionIds,
     getSelectedOptionObjects,
     removeOption,
   } = useSelectedOptions(homeScopeId);
   const selectedOptions = getSelectedOptionObjects();
+
+  const persistPendingAttachments = useCallback((chatId: string, nextAttachments: UploadedAttachment[]) => {
+    try {
+      sessionStorage.setItem(
+        `forge:chat:${chatId}:pending-attachments`,
+        JSON.stringify(nextAttachments),
+      );
+    } catch {
+      // Ignore storage failures; uploads still succeed server-side.
+    }
+  }, []);
+
+  const ensureDraftChat = useCallback(async () => {
+    if (draftChatIdRef.current) {
+      return draftChatIdRef.current;
+    }
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    window.dispatchEvent(
+      new CustomEvent("chat:created", {
+        detail: { id: tempId, title: "New Chat" },
+      }),
+    );
+
+    const { createChat } = await import("@/lib/actions/chats");
+    const createResult = await createChat();
+
+    if (!createResult.success || !createResult.chat) {
+      throw new Error(createResult.error ?? "Failed to create chat");
+    }
+
+    const chatId = createResult.chat.id;
+    draftChatIdRef.current = chatId;
+    setDraftChatId(chatId);
+
+    window.dispatchEvent(
+      new CustomEvent("chat:confirmed", {
+        detail: { tempId, id: chatId, title: "New Chat" },
+      }),
+    );
+
+    return chatId;
+  }, []);
+
+  const uploadAttachment = useCallback(
+    async (file: File) => {
+      const chatId = await ensureDraftChat();
+      const tempAttachmentId = `temp-${crypto.randomUUID()}`;
+      const tempAttachment: UploadedAttachment = {
+        id: tempAttachmentId,
+        chatId,
+        name: file.name,
+        originalName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        checksum: "pending",
+        kind: inferAttachmentKind({ name: file.name, mimeType: file.type }),
+        status: "uploading",
+        storageUrl: "",
+        storagePath: "",
+        uploadedAt: new Date().toISOString(),
+      };
+
+      setAttachments((current) => [...current, tempAttachment]);
+
+      try {
+        const formData = new FormData();
+        formData.append("chatId", chatId);
+        formData.append("file", file);
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | { attachments?: UploadedAttachment[]; error?: string }
+          | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.error ?? `Failed to upload ${file.name}`);
+        }
+
+        const uploadedAttachment = payload?.attachments?.[0];
+        if (!uploadedAttachment) {
+          throw new Error(`Upload succeeded but no attachment metadata was returned for ${file.name}.`);
+        }
+
+        setAttachments((current) => {
+          const nextAttachments = current.map((attachment) =>
+            attachment.id === tempAttachmentId ? uploadedAttachment : attachment,
+          );
+
+          persistPendingAttachments(chatId, nextAttachments.filter((attachment) => attachment.status === "ready"));
+          return nextAttachments;
+        });
+
+        showFeedback({
+          type: "success",
+          title: "File uploaded",
+          description: uploadedAttachment.name,
+        });
+      } catch (uploadError) {
+        const description =
+          uploadError instanceof Error
+            ? uploadError.message
+            : `Failed to upload ${file.name}`;
+
+        setAttachments((current) => current.filter((attachment) => attachment.id !== tempAttachmentId));
+
+        showFeedback({
+          type: "error",
+          title: "Upload failed",
+          description,
+        });
+      }
+    },
+    [ensureDraftChat, persistPendingAttachments, showFeedback],
+  );
+
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const fileArray = Array.from(files);
+
+      if (fileArray.length === 0) {
+        return;
+      }
+
+      setIsUploading(true);
+
+      try {
+        for (const file of fileArray) {
+          await uploadAttachment(file);
+        }
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [uploadAttachment],
+  );
+
+  const removeAttachment = useCallback((attachmentId: string) => {
+    setAttachments((current) => {
+      const nextAttachments = current.filter((attachment) => attachment.id !== attachmentId);
+
+      if (draftChatId) {
+        persistPendingAttachments(
+          draftChatId,
+          nextAttachments.filter((attachment) => attachment.status === "ready"),
+        );
+      }
+
+      return nextAttachments;
+    });
+  }, [draftChatId, persistPendingAttachments]);
 
   const handleSend = async () => {
     const message = input.trim();
@@ -89,32 +252,19 @@ export default function HomePage() {
       return;
     }
 
-    // Optimistic update: dispatch chat:created with temp ID
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    window.dispatchEvent(
-      new CustomEvent("chat:created", {
-        detail: { id: tempId, title: "New Chat" },
-      })
-    );
+    if (isUploading || attachments.some((attachment) => attachment.status !== "ready")) {
+      showFeedback({
+        type: "error",
+        title: "Wait for uploads to finish",
+        description: "All attachments must finish uploading before you send.",
+      });
+      return;
+    }
 
     try {
       setError("");
       setIsCreatingChat(true);
-      const { createChat } = await import("@/lib/actions/chats");
-      const createResult = await createChat();
-
-      if (!createResult.success || !createResult.chat) {
-        throw new Error(createResult.error ?? "Failed to create chat");
-      }
-
-      const chatId = createResult.chat.id;
-
-      // Confirm real chat: replace temp with real
-      window.dispatchEvent(
-        new CustomEvent("chat:confirmed", {
-          detail: { tempId, id: chatId, title: "New Chat" },
-        })
-      );
+      const chatId = draftChatIdRef.current ?? draftChatId ?? (await ensureDraftChat());
 
       try {
         localStorage.setItem(
@@ -307,6 +457,7 @@ export default function HomePage() {
                   onClose={() => setIsModesMenuOpen(false)}
                   chatId={homeScopeId}
                   triggerRef={modesMenuTriggerRef}
+                  uploadInputId={uploadInputId}
                   className="absolute bottom-full left-0 mb-3 z-50 w-[20rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-lg"
                 />
               </div>
@@ -330,6 +481,19 @@ export default function HomePage() {
                   <Mic size={18} />
                 </button>
 
+                <input
+                  id={uploadInputId}
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    void uploadFiles(event.target.files ?? []);
+                    event.target.value = "";
+                    setIsModesMenuOpen(false);
+                  }}
+                />
+
                 {isCreatingChat ? (
                   <button
                     className="rounded-full bg-muted/50 p-2 text-muted-foreground cursor-not-allowed"
@@ -343,7 +507,7 @@ export default function HomePage() {
                 ) : (
                   <button
                     onClick={() => void handleSend()}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || isCreatingChat || isUploading}
                     className="rounded-full bg-primary p-2 text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <ArrowUp size={16} />
@@ -358,6 +522,18 @@ export default function HomePage() {
                       key={option.id}
                       option={option}
                       onRemove={() => removeOption(option.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {attachments.length > 0 ? (
+                <div className="col-start-2 row-start-3 flex flex-wrap gap-2">
+                  {attachments.map((attachment) => (
+                    <AttachmentChip
+                      key={attachment.id}
+                      attachment={attachment}
+                      onRemove={() => removeAttachment(attachment.id)}
                     />
                   ))}
                 </div>
