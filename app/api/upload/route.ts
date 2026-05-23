@@ -29,9 +29,11 @@ export async function POST(request: NextRequest) {
 
     let chat: { id: string; userId?: string } | null = null;
     if (session) {
+      // We only need to verify the chat exists; chats are not currently
+      // scoped to a user in the schema, so don't attempt to filter by userId.
       chat = await prisma.chat.findUnique({
-        where: { id: chatId, userId: session.user.id },
-        select: { id: true, userId: true },
+        where: { id: chatId },
+        select: { id: true, projectId: true },
       });
     } else {
       // In development allow a relaxed lookup so uploads can be tested before
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
       // placeholder chat for the purpose of storing the file.
       chat = await prisma.chat.findUnique({
         where: { id: chatId },
-        select: { id: true, userId: true },
+        select: { id: true, projectId: true },
       });
 
       if (!chat && isDev) {

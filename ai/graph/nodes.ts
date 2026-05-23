@@ -206,15 +206,22 @@ function resolveToolPlanForQueryIntent(
   const structuredTools = mapStructuredToolUsage(
     state.structuredIntent?.toolUsage ?? [],
   );
+  const hasImageAttachment = (state.attachments ?? []).some((a) =>
+    a.kind === "image" || (a.mimeType ?? "").startsWith("image/"),
+  );
   // If intent does not need tools, still allow user-selected options to
   // force use of tools. We merge inferred tools with any selected options
   // provided by the client (UI chips).
   const inferredTools: string[] = [];
   if (queryIntent.needsTools && structuredTools.length === 0) {
     if (queryIntent.type === "real_time") {
-      inferredTools.push(
-        looksLikeDateTimeQuery(message) ? "currentDateTime" : "webSearch",
-      );
+      // If the user already included an image attachment, prefer to use
+      // the image as local context rather than issuing a web search.
+      if (!hasImageAttachment) {
+        inferredTools.push(
+          looksLikeDateTimeQuery(message) ? "currentDateTime" : "webSearch",
+        );
+      }
     }
   }
 
@@ -253,7 +260,10 @@ function resolveToolPlanForQueryIntent(
 
   // Heuristic: If the message looks like it would benefit from visual context, add imageSearch.
   const visualContextPattern = /\b(explain|diagram|how does|how do|visualize|show|illustrate|architecture|structure|design|flow|process|system|bridge|map|picture|image|images|photo|photos|visual|draw|sketch|render|display|suspension bridge|circuit|layout|ui|interface|pattern|component|example|inspire|reference)\b/i;
-  if (visualContextPattern.test(message)) {
+  // Only add an imageSearch tool when we don't already have an uploaded image
+  // to use as the primary visual context. Uploaded images should be used
+  // directly rather than triggering a provider image search.
+  if (!hasImageAttachment && visualContextPattern.test(message)) {
     selectedTools.push("imageSearch");
   }
 

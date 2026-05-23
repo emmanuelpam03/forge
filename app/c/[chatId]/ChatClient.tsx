@@ -1382,6 +1382,7 @@ export function ChatClient({
           id: userMessageId,
           role: "user",
           content: message,
+          attachmentBlock: { attachments: attachments.map((a) => ({ ...a })) },
         },
         {
           id: assistantPlaceholderId,
