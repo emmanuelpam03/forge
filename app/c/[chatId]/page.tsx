@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 import { getChatById } from "@/lib/actions/chats";
 import { getBranchesForParent } from "@/lib/actions/messages";
-import { inferAttachmentKind, type UploadedAttachment } from "@/lib/attachment-types";
+import type { UploadedAttachment } from "@/lib/attachment-types";
+import {
+  assignAttachmentsToUserMessages,
+  extractAttachmentBlockFromMedia,
+  mapRecordToUploadedAttachment,
+} from "@/lib/attachment-display";
 import type { RetrievedImage } from "@/ai/tools/image-types";
 import { ChatClient } from "./ChatClient";
 
@@ -10,10 +15,15 @@ export default async function ChatPage({
   searchParams,
 }: {
   params: Promise<{ chatId: string }>;
-  searchParams: Promise<{ initialMessage?: string }>;
+  searchParams: Promise<{ initialMessage?: string; attachmentIds?: string }>;
 }) {
   const { chatId } = await params;
-  const { initialMessage } = await searchParams;
+  const { initialMessage, attachmentIds } = await searchParams;
+  const pendingAttachmentIds =
+    attachmentIds
+      ?.split(",")
+      .map((value) => value.trim())
+      .filter(Boolean) ?? [];
   const chat = await getChatById(chatId, { take: 1000 });
 
   if (!chat) {
@@ -102,121 +112,6 @@ export default async function ChatPage({
       retrievalTimeMs?: number;
     };
   };
-
-  function parseAttachment(input: unknown): UploadedAttachment | null {
-    if (!input || typeof input !== "object") {
-      return null;
-    }
-
-    const attachment = input as Record<string, unknown>;
-    const name = typeof attachment.name === "string" ? attachment.name : undefined;
-    const originalName =
-      typeof attachment.originalName === "string"
-        ? attachment.originalName
-        : name;
-    const mimeType =
-      typeof attachment.mimeType === "string"
-        ? attachment.mimeType
-        : "application/octet-stream";
-    const storageUrl =
-      typeof attachment.storageUrl === "string" ? attachment.storageUrl : "";
-const VALID_ATTACHMENT_KINDS = new Set<UploadedAttachment["kind"]>([
-  "image",
-  "pdf",
-  "document",
-  "code",
-  "spreadsheet",
-  "text",
-  "json",
-  "audio",
-  "video",
-  "other",
-]);
-
-function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kind"] {
-  return typeof value === "string" && VALID_ATTACHMENT_KINDS.has(value as UploadedAttachment["kind"]);
-}
-    const storagePath =
-      typeof attachment.storagePath === "string" ? attachment.storagePath : "";
-
-    if (!name || !originalName || !storageUrl || !storagePath) {
-      return null;
-    }
-
-    return {
-      id:
-        typeof attachment.id === "string" && attachment.id
-          ? attachment.id
-          : storagePath,
-      chatId: typeof attachment.chatId === "string" ? attachment.chatId : chatId,
-      name,
-      originalName,
-      mimeType,
-      sizeBytes:
-        typeof attachment.sizeBytes === "number" ? attachment.sizeBytes : 0,
-      checksum:
-        typeof attachment.checksum === "string" ? attachment.checksum : "",
-      kind:
-        isValidAttachmentKind(attachment.kind)
-          ? attachment.kind
-          : inferAttachmentKind({ name, mimeType }),
-      status:
-        attachment.status === "uploading" ||
-        attachment.status === "processing" ||
-        attachment.status === "ready" ||
-        attachment.status === "failed"
-          ? attachment.status
-          : "failed",
-      storageUrl,
-      storagePath,
-      uploadedAt:
-        typeof attachment.uploadedAt === "string"
-          ? attachment.uploadedAt
-          : new Date().toISOString(),
-      extractedText:
-        typeof attachment.extractedText === "string"
-          ? attachment.extractedText
-          : undefined,
-      summary:
-        typeof attachment.summary === "string"
-          ? attachment.summary
-          : undefined,
-      pageCount:
-        typeof attachment.pageCount === "number"
-          ? attachment.pageCount
-          : undefined,
-      width:
-        typeof attachment.width === "number" ? attachment.width : undefined,
-      height:
-        typeof attachment.height === "number" ? attachment.height : undefined,
-      language:
-        typeof attachment.language === "string"
-          ? attachment.language
-          : undefined,
-      error:
-        typeof attachment.error === "string" ? attachment.error : undefined,
-    };
-  }
-
-  function extractAttachmentBlock(media: unknown) {
-    if (!media || typeof media !== "object") {
-      return undefined;
-    }
-
-    const maybeMedia = media as Record<string, unknown>;
-    const rawAttachments = Array.isArray(maybeMedia.attachments)
-      ? maybeMedia.attachments
-      : [];
-    const attachments = rawAttachments
-      .map((attachment) => parseAttachment(attachment))
-      .filter((attachment): attachment is UploadedAttachment => attachment !== null);
-
-    if (attachments.length === 0) {
-      return undefined;
-    }
-
-    return { attachments };
-  }
 
   function parseRetrievedImage(input: unknown): RetrievedImage | null {
     if (!input || typeof input !== "object") {
@@ -309,39 +204,90 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
     };
   }
 
-  const VALID_ATTACHMENT_KINDS = new Set<UploadedAttachment["kind"]>([
-    "image",
-    "pdf",
-    "document",
-    "code",
-    "spreadsheet",
-    "text",
-    "json",
-    "audio",
-    "video",
-    "other",
-  ]);
-
-  function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kind"] {
-    return typeof value === "string" && VALID_ATTACHMENT_KINDS.has(value as UploadedAttachment["kind"]);
+  const linkedAttachmentIds = new Set<string>();
+  for (const message of chat.messages) {
+    const block = extractAttachmentBlockFromMedia(message.media, chatId);
+    for (const attachment of block?.attachments ?? []) {
+      linkedAttachmentIds.add(attachment.id);
+    }
   }
+
+  const userMessagesForAttachments = chat.messages
+    .filter((message) => message.role === "user")
+    .map((message) => ({ id: message.id, createdAt: message.createdAt }));
+
+  const attachmentsByUserMessageId = assignAttachmentsToUserMessages(
+    userMessagesForAttachments,
+    chat.attachments
+      .filter((attachment) => !linkedAttachmentIds.has(attachment.id))
+      .map((attachment) => ({
+      id: attachment.id,
+      chatId: attachment.chatId,
+      name: attachment.name,
+      originalName: attachment.originalName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      storageUrl: attachment.storageUrl,
+      storagePath: attachment.storagePath,
+      checksum: attachment.checksum,
+      kind: attachment.kind,
+      status: attachment.status,
+      extractedText: attachment.extractedText,
+      summary: attachment.summary,
+      pageCount: attachment.pageCount,
+      width: attachment.width,
+      height: attachment.height,
+      language: attachment.language,
+      createdAt: attachment.createdAt,
+    })),
+  );
 
   function resolveUserAttachmentBlock(
     userMessage: (typeof chat.messages)[number],
   ): ChatMessage["attachmentBlock"] {
-    const direct = extractAttachmentBlock(userMessage.media);
-    if (direct) {
-      return direct;
+    const fromMedia = extractAttachmentBlockFromMedia(userMessage.media, chatId);
+    if (fromMedia) {
+      return fromMedia;
+    }
+
+    const assigned = attachmentsByUserMessageId.get(userMessage.id);
+    if (assigned && assigned.length > 0) {
+      return { attachments: assigned };
     }
 
     // Legacy: uploads were persisted on the assistant message media payload.
     const legacyAssistant = latestAssistantByParentId.get(userMessage.id);
     if (legacyAssistant) {
-      return extractAttachmentBlock(legacyAssistant.media);
+      return extractAttachmentBlockFromMedia(legacyAssistant.media, chatId);
     }
 
     return undefined;
   }
+
+  const pendingInitialAttachments: UploadedAttachment[] = chat.attachments
+    .filter((attachment) => pendingAttachmentIds.includes(attachment.id))
+    .map((attachment) =>
+      mapRecordToUploadedAttachment({
+        id: attachment.id,
+        chatId: attachment.chatId,
+        name: attachment.name,
+        originalName: attachment.originalName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        storageUrl: attachment.storageUrl,
+        storagePath: attachment.storagePath,
+        checksum: attachment.checksum,
+        kind: attachment.kind,
+        status: attachment.status,
+        extractedText: attachment.extractedText,
+        summary: attachment.summary,
+        pageCount: attachment.pageCount,
+        width: attachment.width,
+        height: attachment.height,
+        language: attachment.language,
+        createdAt: attachment.createdAt,
+      }),
+    );
 
   const initialMessages: ChatMessage[] = [];
   for (const message of chat.messages) {
@@ -369,7 +315,7 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
         branchId: message.branchId,
         // include persisted media if present
         imageBlock: extractImageBlock(message.media),
-        attachmentBlock: extractAttachmentBlock(message.media),
+        attachmentBlock: extractAttachmentBlockFromMedia(message.media, chatId),
       });
       continue;
     }
@@ -394,7 +340,7 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
         createdAt: branch.createdAt.toISOString(),
       })),
       imageBlock: extractImageBlock(message.media),
-      attachmentBlock: extractAttachmentBlock(message.media),
+      attachmentBlock: extractAttachmentBlockFromMedia(message.media, chatId),
     });
   }
 
@@ -405,7 +351,7 @@ function isValidAttachmentKind(value: unknown): value is UploadedAttachment["kin
       title={chat.title}
       initialMessage={initialMessage}
       initialMessages={initialMessages}
-      initialAttachments={[]}
+      pendingInitialAttachments={pendingInitialAttachments}
     />
   );
 }

@@ -274,9 +274,13 @@ export default function HomePage() {
       });
 
       setInput("");
+      const attachmentQuery =
+        attachments.length > 0
+          ? `&attachmentIds=${encodeURIComponent(attachments.map((attachment) => attachment.id).join(","))}`
+          : "";
       window.setTimeout(() => {
         router.push(
-          `/c/${chatId}?initialMessage=${encodeURIComponent(message)}`,
+          `/c/${chatId}?initialMessage=${encodeURIComponent(message)}${attachmentQuery}`,
         );
       }, 0);
     } catch (caughtError) {

@@ -1,100 +1,140 @@
 import "server-only";
 
-// Lightweight ESM-safe OCR adapter.
-// - Lazy-loads tesseract.js only when needed
-// - Exposes isAvailable() and extractText(buffer)
-// - Respects DISABLE_IMAGE_OCR=1 to short-circuit
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+
+const require = createRequire(import.meta.url);
+
+// Lightweight ESM-safe OCR adapter for tesseract.js v7.
+// - Document OCR (PDF scans) is on by default
+// - Image OCR is opt-in via ENABLE_IMAGE_OCR=1
+
+export type OcrScope = "image" | "document";
+
+type TesseractModule = {
+  recognize?: (
+    image: Buffer,
+    langs?: string,
+    options?: { workerPath?: string; langPath?: string; corePath?: string },
+  ) => Promise<{ data?: { text?: string } }>;
+  createWorker?: (
+    langs?: string,
+    oem?: number,
+    options?: { workerPath?: string; langPath?: string; corePath?: string },
+  ) => Promise<{
+    recognize: (image: Buffer) => Promise<{ data?: { text?: string } }>;
+    terminate: () => Promise<unknown>;
+  }>;
+};
+
+export async function isDocumentOcrEnabled(): Promise<boolean> {
+  if (process.env.DISABLE_IMAGE_OCR === "1") return false;
+  if (process.env.DISABLE_DOCUMENT_OCR === "1") return false;
+  return true;
+}
 
 export async function isOcrEnabled(): Promise<boolean> {
   if (process.env.DISABLE_IMAGE_OCR === "1") return false;
-  // Use explicit opt-in via ENABLE_IMAGE_OCR to avoid running OCR by default
   if (process.env.ENABLE_IMAGE_OCR === "1") return true;
   return false;
 }
 
-export async function isAvailable(): Promise<boolean> {
-  if (!(await isOcrEnabled())) return false;
+async function isScopeEnabled(scope: OcrScope): Promise<boolean> {
+  return scope === "document" ? isDocumentOcrEnabled() : isOcrEnabled();
+}
 
+function resolveWorkerOptions(workerPath?: string): { workerPath?: string } {
+  if (workerPath?.trim() && existsSync(workerPath.trim())) {
+    return { workerPath: workerPath.trim() };
+  }
+
+  // Prefer tesseract.js built-in worker (has correct dependency resolution).
   try {
-    const tesseractModule: unknown = await import("tesseract.js");
-    const hasCreateWorker =
-      typeof (tesseractModule as any)?.createWorker === "function" ||
-      typeof (tesseractModule as any)?.default?.createWorker === "function";
-    return Boolean(hasCreateWorker);
+    const pkgPath = require.resolve("tesseract.js/package.json");
+    const builtinWorker = join(
+      dirname(pkgPath),
+      "src",
+      "worker-script",
+      "node",
+      "index.js",
+    );
+    if (existsSync(builtinWorker)) {
+      return { workerPath: builtinWorker };
+    }
   } catch {
-    return false;
+    // fall through to copied worker
+  }
+
+  const copiedWorker = resolve(
+    process.cwd(),
+    "tesseract-worker",
+    "node",
+    "index.js",
+  );
+  if (existsSync(copiedWorker)) {
+    return { workerPath: copiedWorker };
+  }
+
+  return {};
+}
+
+async function loadTesseract(): Promise<TesseractModule | null> {
+  try {
+    const imported: unknown = await import("tesseract.js");
+    if (imported && typeof imported === "object") {
+      return imported as TesseractModule;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
-export async function extractText(buffer: Buffer, opts?: { lang?: string; workerPath?: string }): Promise<string> {
-  if (!(await isOcrEnabled())) return "";
+export async function isAvailable(scope: OcrScope = "image"): Promise<boolean> {
+  if (!(await isScopeEnabled(scope))) return false;
+
+  const tesseract = await loadTesseract();
+  return (
+    typeof tesseract?.recognize === "function" ||
+    typeof tesseract?.createWorker === "function"
+  );
+}
+
+export async function extractText(
+  buffer: Buffer,
+  opts?: { lang?: string; workerPath?: string; scope?: OcrScope },
+): Promise<string> {
+  const scope = opts?.scope ?? "image";
+  if (!(await isScopeEnabled(scope))) return "";
+
+  const tesseract = await loadTesseract();
+  if (!tesseract) return "";
+
+  const lang = opts?.lang ?? "eng";
+  const workerOptions = {
+    ...resolveWorkerOptions(opts?.workerPath),
+    // Prevent tesseract.js from throwing on worker thread errors (we handle below).
+    errorHandler: () => {},
+  };
 
   try {
-    const tesseractModule: unknown = await import("tesseract.js");
-    const tMod = tesseractModule as { createWorker?: unknown; default?: { createWorker?: unknown } };
-    const createWorker = (typeof tMod.createWorker === "function"
-      ? tMod.createWorker
-      : typeof tMod.default?.createWorker === "function"
-      ? tMod.default!.createWorker
-      : undefined) as unknown as ((opts?: unknown) => Promise<unknown>) | undefined;
-
-    if (typeof createWorker !== "function") return "";
-
-    // If a workerPath wasn't provided, prefer a repo-local copied worker
-    // (scripts/copy-tesseract-worker.mjs) to avoid relying on pnpm virtual
-    // store internal paths which can be fragile in some environments.
-    let workerOptions: unknown | undefined = undefined;
-    try {
-      if (opts?.workerPath) {
-        workerOptions = { workerPath: opts.workerPath };
-      } else {
-        const pathMod = await import("node:path");
-        const fs = await import("node:fs");
-        const fallback = pathMod.resolve(process.cwd(), "tesseract-worker", "node", "index.js");
-        if (fs.existsSync(fallback)) {
-          workerOptions = { workerPath: fallback };
-        }
-      }
-    } catch {
-      // ignore
+    if (typeof tesseract.recognize === "function") {
+      const result = await tesseract.recognize(buffer, lang, workerOptions);
+      return (result.data?.text ?? "").trim();
     }
 
-    const worker = await createWorker(workerOptions);
-
-    try {
-      const w = worker as unknown as Record<string, unknown>;
-      const lang = opts?.lang ?? "eng";
-      if (typeof w.recognize === "function") {
-        // Try passing the language option to recognize; if the worker's
-        // recognize signature doesn't accept an options param, fall back to
-        // calling it without options.
-        try {
-          const result = await (w.recognize as (input: Buffer, options?: unknown) => Promise<unknown>)(buffer, { lang });
-          const data = (result as any)?.data;
-          return (typeof data?.text === "string" ? data.text : "").trim();
-        } catch (err) {
-          // Fallback to calling without options
-          const result = await (w.recognize as (input: Buffer) => Promise<unknown>)(buffer);
-          const data = (result as any)?.data;
-          return (typeof data?.text === "string" ? data.text : "").trim();
-        }
-      }
-
-      if (typeof w.load === "function") {
-        await (w.load as () => Promise<void>)();
-        if (typeof w.loadLanguage === "function") await (w.loadLanguage as (lang: string) => Promise<void>)(opts?.lang ?? "eng");
-        if (typeof w.initialize === "function") await (w.initialize as (lang: string) => Promise<void>)(opts?.lang ?? "eng");
-        const result = await (w.recognize as (input: Buffer) => Promise<unknown>)(buffer);
-        const data = (result as any)?.data;
-        return (typeof data?.text === "string" ? data.text : "").trim();
-      }
-
-      return "";
-    } finally {
+    if (typeof tesseract.createWorker === "function") {
+      const worker = await tesseract.createWorker(lang, undefined, workerOptions);
       try {
-        if (typeof (worker as any).terminate === "function") await (worker as any).terminate();
-      } catch {}
+        const result = await worker.recognize(buffer);
+        return (result.data?.text ?? "").trim();
+      } finally {
+        await worker.terminate();
+      }
     }
+
+    return "";
   } catch (err) {
     try {
       console.warn("OCR extractText failed:", (err as Error)?.message ?? String(err));
@@ -103,4 +143,9 @@ export async function extractText(buffer: Buffer, opts?: { lang?: string; worker
   }
 }
 
-export default { isAvailable, extractText, isOcrEnabled };
+export default {
+  isAvailable,
+  extractText,
+  isOcrEnabled,
+  isDocumentOcrEnabled,
+};

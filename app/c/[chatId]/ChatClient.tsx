@@ -90,8 +90,13 @@ type ChatClientProps = {
   projectId: string | null;
   title: string;
   initialMessages: ChatMessage[];
-  initialAttachments?: UploadedAttachment[];
+  /** Attachments for the first auto-sent message only (never shown in the composer). */
+  pendingInitialAttachments?: UploadedAttachment[];
   initialMessage?: string;
+};
+
+type SendMessageOptions = {
+  sendAttachments?: UploadedAttachment[];
 };
 
 type ModelOption = {
@@ -380,7 +385,7 @@ export function ChatClient({
   chatId,
   title,
   initialMessages,
-  initialAttachments,
+  pendingInitialAttachments = [],
   initialMessage,
 }: ChatClientProps) {
   const { showFeedback } = useFeedback();
@@ -394,9 +399,7 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<UploadedAttachment[]>(
-    () => initialAttachments ?? [],
-  );
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
@@ -1305,8 +1308,9 @@ export function ChatClient({
   };
 
   const sendMessage = useCallback(
-    async (messageToSend?: string) => {
+    async (messageToSend?: string, options?: SendMessageOptions) => {
       const message = (messageToSend ?? draft).trim();
+      const attachmentsToSend = options?.sendAttachments ?? attachments;
 
       if (!message || isSending) {
         if (!message && !messageToSend) {
@@ -1319,7 +1323,7 @@ export function ChatClient({
         return;
       }
 
-      if (attachments.some((attachment) => attachment.status !== "ready")) {
+      if (attachmentsToSend.some((attachment) => attachment.status !== "ready")) {
         showFeedback({
           type: "error",
           title: "Wait for uploads to finish",
@@ -1330,6 +1334,12 @@ export function ChatClient({
 
       const userMessageId = `local-user-${crypto.randomUUID()}`;
       const assistantPlaceholderId = `local-assistant-${crypto.randomUUID()}`;
+
+      const attachmentsSnapshot = attachmentsToSend.map((attachment) => ({
+        ...attachment,
+      }));
+
+      clearComposerAttachments();
 
       setIsSending(true);
       setError(null);
@@ -1345,8 +1355,6 @@ export function ChatClient({
       if (!messageToSend) {
         setDraft("");
       }
-
-      const attachmentsSnapshot = attachments.map((attachment) => ({ ...attachment }));
 
       setMessages((currentMessages) => [
         ...currentMessages,
@@ -1368,7 +1376,6 @@ export function ChatClient({
       ]);
 
       abortControllerRef.current = new AbortController();
-        clearComposerAttachments();
       resetStreamBuffers();
 
       try {
@@ -1384,7 +1391,7 @@ export function ChatClient({
             provider: requestModel.provider,
             selectedOptions: selectedOptionIds,
             // send only stable attachment IDs; server will resolve them
-            attachments: attachments.map((a) => a.id),
+            attachments: attachmentsSnapshot.map((a) => a.id),
             promptBehavior: isForceSeniorEngineeringMode
               ? { persona: "senior-engineer" }
               : undefined,
@@ -1624,8 +1631,17 @@ export function ChatClient({
     }
 
     hasAutoSentRef.current = true;
-    void sendMessage(initialMessage);
-  }, [initialMessage, hasMessages, isSending, sendMessage]);
+    void sendMessage(initialMessage, {
+      sendAttachments:
+        pendingInitialAttachments.length > 0 ? pendingInitialAttachments : undefined,
+    });
+  }, [
+    initialMessage,
+    hasMessages,
+    isSending,
+    pendingInitialAttachments,
+    sendMessage,
+  ]);
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-background">

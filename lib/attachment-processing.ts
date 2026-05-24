@@ -163,15 +163,20 @@ async function fetchAttachmentBytesForParsing(storageUrl: string): Promise<{ buf
   };
 }
 
+function attachmentHasExtractedText(attachment: AttachmentRecordLike): boolean {
+  return (attachment.extractedText ?? "").trim().length > 0;
+}
+
 export async function ensureAttachmentParsed(
   attachment: AttachmentRecordLike,
   options?: { forceOcr?: boolean },
 ): Promise<UploadedAttachment> {
-  if (
+  const isComplete =
     attachment.status === "ready" &&
-    typeof attachment.extractedText === "string" &&
-    typeof attachment.summary === "string"
-  ) {
+    typeof attachment.summary === "string" &&
+    attachmentHasExtractedText(attachment);
+
+  if (isComplete && !options?.forceOcr) {
     return normalizeAttachmentRecord(attachment);
   }
 
@@ -217,7 +222,10 @@ export async function ensureAttachmentParsed(
   });
 }
 
-async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
+async function parsePdf(
+  buffer: Buffer,
+  options?: { forceOcr?: boolean },
+): Promise<ParsedAttachment> {
   try {
     const parserModule = await import("pdf-parse");
     const parser = (parserModule as { default?: (input: Buffer) => Promise<{ text?: string; numpages?: number }> }).default ??
@@ -233,7 +241,7 @@ async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
       };
     }
 
-    const ocrText = await extractPdfOcrText(buffer);
+    const ocrText = await extractPdfOcrText(buffer, { force: true });
     if (ocrText) {
       return {
         text: ocrText,
@@ -256,8 +264,24 @@ async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
   }
 }
 
-async function extractPdfOcrText(buffer: Buffer): Promise<string> {
+function getPdfOcrMaxPages(): number {
+  const configured = Number.parseInt(process.env.PDF_OCR_MAX_PAGES ?? "8", 10);
+  if (!Number.isFinite(configured) || configured < 1) {
+    return 8;
+  }
+
+  return Math.min(configured, 20);
+}
+
+async function extractPdfOcrText(
+  buffer: Buffer,
+  options?: { force?: boolean },
+): Promise<string> {
   try {
+    if (!options?.force && !(await ocrIsDocumentAvailable())) {
+      return "";
+    }
+
     const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const { createCanvas } = await import("@napi-rs/canvas");
 
@@ -270,7 +294,7 @@ async function extractPdfOcrText(buffer: Buffer): Promise<string> {
     });
 
     const pdfDocument = await documentTask.promise;
-    const maxPages = Math.min(pdfDocument.numPages, 2);
+    const maxPages = Math.min(pdfDocument.numPages, getPdfOcrMaxPages());
     const recognizedText: string[] = [];
 
     for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
@@ -284,8 +308,8 @@ async function extractPdfOcrText(buffer: Buffer): Promise<string> {
       const imgBuf = canvas.toBuffer("image/png");
       let text = "";
       try {
-        if (await ocrIsAvailable()) {
-          text = await ocrExtractText(imgBuf, { lang: "eng" });
+        if (await ocrIsDocumentAvailable()) {
+          text = await ocrExtractText(imgBuf, { lang: "eng", scope: "document" });
         }
       } catch {
         text = "";
@@ -296,7 +320,13 @@ async function extractPdfOcrText(buffer: Buffer): Promise<string> {
     }
 
     return recognizedText.join("\n\n").trim();
-  } catch {
+  } catch (err) {
+    try {
+      console.warn(
+        "extractPdfOcrText failed:",
+        (err as Error)?.message ?? String(err),
+      );
+    } catch {}
     return "";
   }
 }
@@ -374,7 +404,20 @@ function parseText(buffer: Buffer, kind: string, name: string): ParsedAttachment
   };
 }
 
-import { extractText as ocrExtractText, isAvailable as ocrIsAvailable, isOcrEnabled as ocrIsEnabled } from "./ocr.ts";
+import {
+  extractText as ocrExtractText,
+  isAvailable as ocrIsAvailable,
+  isDocumentOcrEnabled as ocrIsDocumentOcrEnabled,
+  isOcrEnabled as ocrIsEnabled,
+} from "./ocr.ts";
+
+async function ocrIsDocumentAvailable(): Promise<boolean> {
+  if (!(await ocrIsDocumentOcrEnabled())) {
+    return false;
+  }
+
+  return ocrIsAvailable("document");
+}
 
 // Helper: conservative heuristic to decide whether OCR should run for an image.
 function shouldRunOcrForImage(fileName: string, mimeType: string): boolean {
@@ -441,7 +484,7 @@ export async function parseAttachmentBuffer(input: AttachmentInput, options?: { 
   const language = getAttachmentLanguage(input.fileName);
 
   if (kind === "pdf") {
-    return parsePdf(input.buffer);
+    return parsePdf(input.buffer, { forceOcr: Boolean(options?.forceOcr) });
   }
 
   if (kind === "document" && extension === ".docx") {
@@ -514,7 +557,8 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
     // Only request OCR in the background if heuristics indicate text likely
     // (e.g., filename suggests a document) — otherwise background job will do
     // lightweight parsing without OCR by default.
-    const requireOcr = shouldRunOcrForImage(input.fileName, input.mimeType);
+    const requireOcr =
+      shouldRunOcrForImage(input.fileName, input.mimeType) || kind === "pdf";
     try {
       await queueJob("processAttachment", { chatId: input.chatId, attachmentId: input.attachmentId, requireOcr });
     } catch (err) {

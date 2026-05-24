@@ -93,7 +93,15 @@ export async function POST(request: NextRequest) {
           return normalizeAttachmentRecord(mapped);
         }
 
-        return ensureAttachmentParsed(mapped);
+        const isPdf =
+          attachment.kind === "pdf" ||
+          (attachment.mimeType ?? "").includes("pdf");
+        const needsDocumentOcr =
+          isPdf && !(attachment.extractedText ?? "").trim();
+
+        return ensureAttachmentParsed(mapped, {
+          forceOcr: needsDocumentOcr,
+        });
       }),
     );
 

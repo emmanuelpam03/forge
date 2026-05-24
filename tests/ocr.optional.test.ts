@@ -1,6 +1,15 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { parseImageAttachment } from '../lib/attachment-processing.ts';
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parseImageAttachment } from "../lib/attachment-processing.ts";
+
+test("ocr adapter uses tesseract.js v7 recognize API", () => {
+  const source = readFileSync(join(process.cwd(), "lib/ocr.ts"), "utf8");
+  assert.match(source, /tesseract\.recognize\(buffer, lang, workerOptions\)/);
+  assert.match(source, /createWorker\(lang, undefined, workerOptions\)/);
+  assert.doesNotMatch(source, /createWorker\(workerOptions\)/);
+});
 
 // Small 1x1 PNG (data URL)
 const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO4JYlQAAAAASUVORK5CYII=';
