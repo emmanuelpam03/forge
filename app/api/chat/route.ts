@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
                 provider: parsedBody.data.provider,
                 selectedOptions: parsedBody.data.selectedOptions ?? [],
                 attachments: resolvedAttachments,
+                messageAttachmentIds: requestedAttachmentIds,
                 promptBehavior: parsedBody.data.promptBehavior
                   ? {
                       ...DEFAULT_PROMPT_BEHAVIOR_CONTROLS,

@@ -56,6 +56,17 @@ export async function persistSaveMessagesJobData(
     update: {},
   });
 
+  const legacyMedia =
+    data.media && typeof data.media === "object"
+      ? (data.media as Record<string, unknown>)
+      : null;
+  const userMedia =
+    data.userMedia ??
+    (legacyMedia?.attachments ? { attachments: legacyMedia.attachments } : undefined);
+  const assistantMedia =
+    data.assistantMedia ??
+    (legacyMedia?.imageBlock ? { imageBlock: legacyMedia.imageBlock } : undefined);
+
   let createdUserMessageId: string | null = null;
   if (!data.skipUserCreate) {
     const userMessagePayload = {
@@ -64,6 +75,7 @@ export async function persistSaveMessagesJobData(
       content: data.userMessage ?? "",
       parentId: data.parentMessageId,
       branchId: data.branchId ?? undefined,
+      ...(userMedia ? { media: userMedia } : {}),
     };
 
     if (data.userMessageId) {
@@ -94,7 +106,7 @@ export async function persistSaveMessagesJobData(
     latencyMs: data.latencyMs,
     runId: data.runId,
     traceId: data.traceId,
-    media: data.media ?? undefined,
+    ...(assistantMedia ? { media: assistantMedia } : {}),
   };
 
   let persistedAssistantMessageId = data.assistantMessageId ?? null;

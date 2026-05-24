@@ -90,7 +90,7 @@ type ChatClientProps = {
   projectId: string | null;
   title: string;
   initialMessages: ChatMessage[];
-  initialAttachments: UploadedAttachment[];
+  initialAttachments?: UploadedAttachment[];
   initialMessage?: string;
 };
 
@@ -394,8 +394,8 @@ export function ChatClient({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<UploadedAttachment[]>(() =>
-    initialAttachments,
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>(
+    () => initialAttachments ?? [],
   );
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);

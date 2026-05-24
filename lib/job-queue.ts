@@ -89,7 +89,11 @@ export interface SaveMessagesJobData {
   runId: string;
   traceId: string | null;
   generatedTitle?: string;
-  // Optional media payload (e.g., image block) serialized as JSON-serializable object
+  /** Attachments sent with the user message (shown on the user bubble after reload). */
+  userMedia?: unknown | null;
+  /** Tool-retrieved images and similar assistant-only media. */
+  assistantMedia?: unknown | null;
+  /** @deprecated Use userMedia / assistantMedia. Kept for in-flight jobs. */
   media?: unknown | null;
 }
 

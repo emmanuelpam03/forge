@@ -106,6 +106,8 @@ export type ChatGraphState = {
   memorySummary: MemorySummarySnapshot | null;
   selectedContext?: SelectedContext;
   attachments?: UploadedAttachment[];
+  /** Attachment IDs explicitly sent with the current user message (for persistence). */
+  messageAttachmentIds?: string[];
   _timings?: ChatPipelineTimings;
   contextBudgetTokens?: number;
   retrievedSnippets?: string[];
@@ -211,6 +213,10 @@ export const chatGraphState = Annotation.Root({
     reducer: lastValue,
   }),
   attachments: Annotation<UploadedAttachment[] | undefined>({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  messageAttachmentIds: Annotation<string[] | undefined>({
     default: () => undefined,
     reducer: lastValue,
   }),
@@ -395,6 +401,7 @@ export type ChatGraphInput = Pick<
   | "promptBehavior"
   | "selectedOptions"
   | "attachments"
+  | "messageAttachmentIds"
 > & {
   model?: string;
   provider?: string;
@@ -413,6 +420,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   memorySummary: null,
   selectedContext: undefined,
   attachments: input.attachments ?? undefined,
+  messageAttachmentIds: input.messageAttachmentIds ?? undefined,
   _timings: undefined,
   contextBudgetTokens: undefined,
   retrievedSnippets: undefined,
