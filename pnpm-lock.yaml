@@ -105,7 +105,7 @@ importers:
         specifier: ^3.5.0
         version: 3.5.0
       tesseract.js:
-        specifier: ^7.0.0
+        specifier: 7.0.0
         version: 7.0.0
       tw-animate-css:
         specifier: ^1.4.0

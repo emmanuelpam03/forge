@@ -5,6 +5,7 @@ import { ArrowUp, Bookmark, Globe, Layers, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
 import { AttachmentChip } from "@/components/chat/AttachmentChip";
+import { AttachmentPreviewDialog } from "@/components/chat/AttachmentPreviewDialog";
 import { ModesMenu } from "@/components/ModesMenu";
 import { useFeedback } from "@/components/feedback-provider";
 import { useSelectedOptions } from "@/hooks/useSelectedOptions";
@@ -75,6 +76,7 @@ export default function HomePage() {
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [error, setError] = useState("");
   const [isModesMenuOpen, setIsModesMenuOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<UploadedAttachment | null>(null);
   const modesMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [draftChatId, setDraftChatId] = useState<string | null>(null);
@@ -549,6 +551,11 @@ export default function HomePage() {
                       key={attachment.id}
                       attachment={attachment}
                       onRemove={() => removeAttachment(attachment.id)}
+                      onPreview={
+                        attachment.status === "ready"
+                          ? () => setPreviewAttachment(attachment)
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
@@ -566,6 +573,11 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      <AttachmentPreviewDialog
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </div>
   );
 }

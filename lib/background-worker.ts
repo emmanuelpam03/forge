@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getRedisClient } from "@/lib/redis";
-import { dequeueJob, completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
+import { dequeueJob, completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type ProcessAttachmentJobData } from "@/lib/job-queue";
 import { error as logError, info } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import { HumanMessage } from "@langchain/core/messages";
@@ -8,6 +8,7 @@ import { createGeminiModel } from "@/ai/models";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { toTextContent } from "@/ai/graph/stream-consumer";
 import { isGenericChatTitle, publishChatTitleUpdate } from "@/lib/chat-title-events";
+import { ensureAttachmentParsed } from "@/lib/attachment-processing";
 // buildLangSmithRunConfig not needed in worker
 
 /**
@@ -254,6 +255,60 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
   }
 }
 
+async function processAttachmentJob(job: Job<ProcessAttachmentJobData>): Promise<void> {
+  const { data } = job;
+  const timer = startTimer("process_attachment", { chatId: data.chatId, attachmentId: data.attachmentId });
+
+  try {
+    const attachment = await prisma.attachment.findFirst({
+      where: { id: data.attachmentId, chatId: data.chatId },
+    });
+
+    if (!attachment) {
+      throw new Error(`Attachment ${data.attachmentId} not found for chat ${data.chatId}`);
+    }
+
+    await ensureAttachmentParsed({
+      id: attachment.id,
+      chatId: attachment.chatId,
+      name: attachment.name,
+      originalName: attachment.originalName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      storageUrl: attachment.storageUrl,
+      storagePath: attachment.storagePath,
+      checksum: attachment.checksum,
+      kind: attachment.kind,
+      status: attachment.status,
+      extractedText: attachment.extractedText,
+      summary: attachment.summary,
+      pageCount: attachment.pageCount,
+      width: attachment.width,
+      height: attachment.height,
+      language: attachment.language,
+      createdAt: attachment.createdAt,
+    }, { forceOcr: Boolean(data.requireOcr) });
+
+    info("job_processAttachment_completed", {
+      jobId: job.id,
+      chatId: data.chatId,
+      attachmentId: data.attachmentId,
+    });
+
+    await completeJob(job.id, "processAttachment");
+  } catch (err) {
+    logError("job_processAttachment_failed", {
+      jobId: job.id,
+      chatId: data.chatId,
+      attachmentId: data.attachmentId,
+      error: err,
+    });
+    await requeueJobWithBackoff(job);
+  } finally {
+    void endTimer(timer);
+  }
+}
+
 // Enrich/extract background handlers removed; those jobs are no longer queued.
 
 /**
@@ -261,7 +316,7 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
  * Each job type is processed by its own worker.
  */
 async function startWorkerForQueue<T>(
-  jobType: "saveMessages" | "generateTitle",
+  jobType: "saveMessages" | "generateTitle" | "processAttachment",
   processor: (job: Job<T>) => Promise<void>,
 ): Promise<void> {
   while (!workersStopping) {
@@ -354,10 +409,11 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
   workerLoopPromises = [
     startWorkerForQueue("saveMessages", processSaveMessagesJob),
     startWorkerForQueue("generateTitle", processGenerateTitleJob),
+    startWorkerForQueue("processAttachment", processAttachmentJob),
   ];
 
   info("background_workers_initialized", {
-    jobTypes: ["saveMessages", "generateTitle"],
+    jobTypes: ["saveMessages", "generateTitle", "processAttachment"],
   });
 
   return {
@@ -366,4 +422,4 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
 }
 
 // Export for testing
-export { processSaveMessagesJob, processGenerateTitleJob };
+export { processSaveMessagesJob, processGenerateTitleJob, processAttachmentJob };

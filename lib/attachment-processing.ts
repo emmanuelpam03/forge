@@ -17,6 +17,7 @@ import {
   getAttachmentLanguage,
   type UploadedAttachment,
 } from "./attachment-types.ts";
+import { queueJob } from "./job-queue.ts";
 import { uploadAttachmentToCloudinary } from "./cloudinary.ts";
 
 export type AttachmentInput = {
@@ -25,6 +26,27 @@ export type AttachmentInput = {
   mimeType: string;
   sizeBytes: number;
   buffer: Buffer;
+};
+
+export type AttachmentRecordLike = {
+  id: string;
+  chatId: string;
+  name: string;
+  originalName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  storageUrl: string | null;
+  storagePath: string | null;
+  checksum: string | null;
+  kind: string | null;
+  status: string | null;
+  extractedText: string | null;
+  summary: string | null;
+  pageCount: number | null;
+  width: number | null;
+  height: number | null;
+  language: string | null;
+  createdAt: Date;
 };
 
 type ParsedAttachment = {
@@ -85,6 +107,114 @@ export async function persistAttachmentFile(
     storageUrl: uploadResult.secure_url,
     checksum,
   };
+}
+
+export function normalizeAttachmentRecord(
+  attachment: AttachmentRecordLike,
+): UploadedAttachment {
+  const name = attachment.name;
+  const mimeType = attachment.mimeType ?? "application/octet-stream";
+
+  return {
+    id: attachment.id,
+    chatId: attachment.chatId,
+    name,
+    originalName: attachment.originalName,
+    mimeType,
+    sizeBytes: attachment.sizeBytes ?? 0,
+    checksum: attachment.checksum ?? "",
+    kind:
+      attachment.kind && attachment.kind !== ""
+        ? (attachment.kind as UploadedAttachment["kind"])
+        : inferAttachmentKind({ name, mimeType }),
+    status:
+      attachment.status === "uploading" ||
+      attachment.status === "processing" ||
+      attachment.status === "ready" ||
+      attachment.status === "failed"
+        ? attachment.status
+        : "ready",
+    storageUrl: attachment.storageUrl ?? "",
+    storagePath: attachment.storagePath ?? "",
+    uploadedAt:
+      attachment.createdAt instanceof Date
+        ? attachment.createdAt.toISOString()
+        : new Date().toISOString(),
+    extractedText: attachment.extractedText ?? undefined,
+    summary: attachment.summary ?? undefined,
+    pageCount: attachment.pageCount ?? undefined,
+    width: attachment.width ?? undefined,
+    height: attachment.height ?? undefined,
+    language: attachment.language ?? undefined,
+  };
+}
+
+async function fetchAttachmentBytesForParsing(storageUrl: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const response = await fetch(storageUrl, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch attachment bytes from ${storageUrl}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+  };
+}
+
+export async function ensureAttachmentParsed(
+  attachment: AttachmentRecordLike,
+  options?: { forceOcr?: boolean },
+): Promise<UploadedAttachment> {
+  if (
+    attachment.status === "ready" &&
+    typeof attachment.extractedText === "string" &&
+    typeof attachment.summary === "string"
+  ) {
+    return normalizeAttachmentRecord(attachment);
+  }
+
+  const storageUrl = attachment.storageUrl ?? "";
+  if (!storageUrl) {
+    throw new Error(`Attachment ${attachment.id} is missing a storage URL.`);
+  }
+
+  const fileName = attachment.originalName || attachment.name;
+  const mimeType = attachment.mimeType ?? "application/octet-stream";
+  const { buffer } = await fetchAttachmentBytesForParsing(storageUrl);
+  const parsed = await parseAttachmentBuffer({
+    chatId: attachment.chatId,
+    fileName,
+    mimeType,
+    sizeBytes: attachment.sizeBytes ?? buffer.byteLength,
+    buffer,
+  }, { forceOcr: Boolean(options?.forceOcr) });
+
+  const prisma = (await import("./prisma.ts")).default;
+  await prisma.attachment.update({
+    where: { id: attachment.id },
+    data: {
+      status: "ready",
+      extractedText: parsed.text ?? null,
+      summary: parsed.summary ?? null,
+      pageCount: parsed.pageCount ?? null,
+      width: parsed.width ?? null,
+      height: parsed.height ?? null,
+      language: parsed.language ?? null,
+    },
+  });
+
+  return normalizeAttachmentRecord({
+    ...attachment,
+    status: "ready",
+    extractedText: parsed.text ?? null,
+    summary: parsed.summary ?? null,
+    pageCount: parsed.pageCount ?? null,
+    width: parsed.width ?? null,
+    height: parsed.height ?? null,
+    language: parsed.language ?? null,
+  });
 }
 
 async function parsePdf(buffer: Buffer): Promise<ParsedAttachment> {
@@ -151,7 +281,15 @@ async function extractPdfOcrText(buffer: Buffer): Promise<string> {
 
       await page.render({ canvasContext: context as any, canvas: canvas as any, viewport } as any).promise;
 
-      const text = await extractImageText(canvas.toBuffer("image/png"));
+      const imgBuf = canvas.toBuffer("image/png");
+      let text = "";
+      try {
+        if (await ocrIsAvailable()) {
+          text = await ocrExtractText(imgBuf, { lang: "eng" });
+        }
+      } catch {
+        text = "";
+      }
       if (text) {
         recognizedText.push(text);
       }
@@ -236,28 +374,47 @@ function parseText(buffer: Buffer, kind: string, name: string): ParsedAttachment
   };
 }
 
-async function extractImageText(buffer: Buffer): Promise<string> {
-  try {
-    const { createWorker } = await import("tesseract.js");
-    const worker = await createWorker("eng");
+import { extractText as ocrExtractText, isAvailable as ocrIsAvailable, isOcrEnabled as ocrIsEnabled } from "./ocr.ts";
 
-    try {
-      const result = await worker.recognize(buffer);
-      return (result.data.text ?? "").trim();
-    } finally {
-      await worker.terminate();
-    }
-  } catch {
-    return "";
+// Helper: conservative heuristic to decide whether OCR should run for an image.
+function shouldRunOcrForImage(fileName: string, mimeType: string): boolean {
+  // Explicit opt-in via ENABLE_IMAGE_OCR
+  if (process.env.ENABLE_IMAGE_OCR === "1") return true;
+
+  const lower = fileName.toLowerCase();
+  // Common indicators that the image likely contains text
+  const indicators = ["screenshot", "scan", "document", "receipt", "invoice", "ocr"];
+  for (const ind of indicators) {
+    if (lower.includes(ind)) return true;
   }
+
+  // Do not run OCR by default for images.
+  return false;
 }
 
 export async function parseImageAttachment(
   buffer: Buffer,
   name: string,
-  extractor: (buffer: Buffer) => Promise<string> = extractImageText,
+  extractor?: (buffer: Buffer) => Promise<string>,
+  forceOcr: boolean = false,
 ): Promise<ParsedAttachment> {
-  const text = (await extractor(buffer)).trim();
+  let text = "";
+  if (typeof extractor === "function") {
+    try {
+      text = (await extractor(buffer)).trim();
+    } catch {
+      text = "";
+    }
+  } else {
+    try {
+      const runOcr = forceOcr || shouldRunOcrForImage(name, "");
+      if (runOcr && (await ocrIsAvailable())) {
+        text = (await ocrExtractText(buffer, { lang: "eng" })).trim();
+      }
+    } catch {
+      text = "";
+    }
+  }
 
   if (text) {
     return {
@@ -278,7 +435,7 @@ export async function parseImageAttachment(
   }
 }
 
-export async function parseAttachmentBuffer(input: AttachmentInput): Promise<ParsedAttachment> {
+export async function parseAttachmentBuffer(input: AttachmentInput, options?: { forceOcr?: boolean }): Promise<ParsedAttachment> {
   const kind = inferAttachmentKind({ name: input.fileName, mimeType: input.mimeType });
   const extension = getAttachmentExtension(input.fileName);
   const language = getAttachmentLanguage(input.fileName);
@@ -300,7 +457,7 @@ export async function parseAttachmentBuffer(input: AttachmentInput): Promise<Par
   }
 
   if (kind === "image") {
-    return await parseImageAttachment(input.buffer, input.fileName);
+    return await parseImageAttachment(input.buffer, input.fileName, undefined, Boolean(options?.forceOcr));
   }
 
   if (kind === "code" || kind === "text" || kind === "json" || kind === "document") {
@@ -316,10 +473,12 @@ export async function parseAttachmentBuffer(input: AttachmentInput): Promise<Par
 }
 
 export async function buildUploadedAttachment(input: AttachmentInput & { attachmentId: string }): Promise<UploadedAttachment> {
-  const parsed = await parseAttachmentBuffer(input);
   const kind = inferAttachmentKind({ name: input.fileName, mimeType: input.mimeType });
   const { storagePath, storageUrl, checksum } = await persistAttachmentFile(input, input.attachmentId);
   const prisma = (await import("./prisma.ts")).default;
+  const shouldDeferParsing = input.sizeBytes >= 5 * 1024 * 1024;
+  const parsed = shouldDeferParsing ? null : await parseAttachmentBuffer(input);
+  const status = shouldDeferParsing ? "processing" : "ready";
 
   // Persist metadata to the database (best-effort) using the typed Prisma client.
   try {
@@ -335,13 +494,13 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
         storagePath,
         checksum,
         kind,
-        status: "ready",
-        extractedText: parsed.text ?? null,
-        summary: parsed.summary ?? null,
-        pageCount: parsed.pageCount ?? null,
-        width: parsed.width ?? null,
-        height: parsed.height ?? null,
-        language: parsed.language ?? null,
+        status,
+        extractedText: parsed?.text ?? null,
+        summary: parsed?.summary ?? null,
+        pageCount: parsed?.pageCount ?? null,
+        width: parsed?.width ?? null,
+        height: parsed?.height ?? null,
+        language: parsed?.language ?? null,
       },
     });
   } catch (err) {
@@ -349,6 +508,14 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
     try {
       console.error("Failed to persist attachment metadata:", err);
     } catch {}
+  }
+
+  if (shouldDeferParsing) {
+    // Only request OCR in the background if heuristics indicate text likely
+    // (e.g., filename suggests a document) — otherwise background job will do
+    // lightweight parsing without OCR by default.
+    const requireOcr = shouldRunOcrForImage(input.fileName, input.mimeType);
+    void queueJob("processAttachment", { chatId: input.chatId, attachmentId: input.attachmentId, requireOcr }).catch(() => undefined);
   }
 
   return {
@@ -360,16 +527,16 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
     sizeBytes: input.sizeBytes,
     checksum,
     kind,
-    status: "ready",
+    status,
     storageUrl,
     storagePath,
     uploadedAt: new Date().toISOString(),
-    extractedText: parsed.text,
-    summary: parsed.summary,
-    pageCount: parsed.pageCount,
-    width: parsed.width,
-    height: parsed.height,
-    language: parsed.language,
+    extractedText: parsed?.text,
+    summary: parsed?.summary,
+    pageCount: parsed?.pageCount,
+    width: parsed?.width,
+    height: parsed?.height,
+    language: parsed?.language,
   };
 }
 

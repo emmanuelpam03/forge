@@ -36,6 +36,15 @@ test("chat UI displays only DeepSeek (with expandable model picker)", () => {
   assert.doesNotMatch(source, /Llama|llama|claude|Claude|GPT|gpt/);
 });
 
+test("homepage composer supports upload previews and file-drop interactions", () => {
+  const source = readWorkspaceFile("app/page.tsx");
+
+  assert.match(source, /AttachmentPreviewDialog/);
+  assert.match(source, /onDragOver/);
+  assert.match(source, /onPaste/);
+  assert.match(source, /onPreview=/);
+});
+
 test("API routes only accept openrouter provider", () => {
   const chatRoute = readWorkspaceFile("app/api/chat/route.ts");
   const editRoute = readWorkspaceFile("app/api/chat/edit/route.ts");

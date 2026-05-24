@@ -1,9 +1,9 @@
 import "server-only";
 
-import { getRedisClient } from "./redis";
-import { error as logError, info, debug } from "./logger";
+import { getRedisClient } from "./redis.ts";
+import { error as logError, info, debug } from "./logger.ts";
 
-export type JobType = "saveMessages" | "generateTitle";
+export type JobType = "saveMessages" | "generateTitle" | "processAttachment";
 
 export interface Job<T = unknown> {
   id: string;
@@ -27,6 +27,8 @@ function getProcessingMetricName(type: JobType): string | null {
       return "process_save_messages";
     case "generateTitle":
       return "process_generate_title";
+    case "processAttachment":
+      return "process_attachment";
     default:
       return null;
   }
@@ -100,6 +102,13 @@ export interface GenerateTitleJobData {
   chatSummary?: string | null;
   memorySummary?: unknown | null;
   runId: string;
+}
+
+export interface ProcessAttachmentJobData {
+  chatId: string;
+  attachmentId: string;
+  // When true, background worker should run OCR even for images.
+  requireOcr?: boolean;
 }
 
 export async function queueJob<T>(
@@ -246,7 +255,7 @@ export async function getQueueMetrics(): Promise<Record<string, unknown>> {
   if (!redis) return { available: false };
 
   try {
-    const types: JobType[] = ["saveMessages", "generateTitle"];
+    const types: JobType[] = ["saveMessages", "generateTitle", "processAttachment"];
     const metrics: Record<string, unknown> = { available: true };
 
     for (const type of types) {

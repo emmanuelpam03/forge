@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { error as logError } from "./logger";
+import { error as logError } from "./logger.ts";
 
 let client: Redis | null = null;
 

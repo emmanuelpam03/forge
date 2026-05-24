@@ -7,7 +7,7 @@ import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 import { toResponse, ApiError } from "@/lib/error-response";
 import prisma from "@/lib/prisma";
-import { inferAttachmentKind } from "@/lib/attachment-types";
+import { ensureAttachmentParsed } from "@/lib/attachment-processing";
 
 export const runtime = "nodejs";
 
@@ -54,32 +54,56 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    const resolvedAttachments = attachments
-      .map((attachment) => ({
-        id: attachment.id,
-        chatId: attachment.chatId,
-        name: attachment.name,
-        originalName: attachment.originalName,
-        mimeType: attachment.mimeType ?? "application/octet-stream",
-        sizeBytes: attachment.sizeBytes ?? 0,
-        checksum: attachment.checksum ?? "",
-        kind: attachment.kind && attachment.kind !== ""
-          ? attachment.kind
-          : inferAttachmentKind({
-              name: attachment.name,
-              mimeType: attachment.mimeType ?? "application/octet-stream",
-            }),
-        status: attachment.status === "failed" ? "failed" : "ready",
-        storageUrl: attachment.storageUrl ?? "",
-        storagePath: attachment.storagePath ?? "",
-        uploadedAt: attachment.createdAt.toISOString(),
-        extractedText: attachment.extractedText ?? undefined,
-        summary: attachment.summary ?? undefined,
-        pageCount: attachment.pageCount ?? undefined,
-        width: attachment.width ?? undefined,
-        height: attachment.height ?? undefined,
-        language: attachment.language ?? undefined,
-      }));
+    const resolvedAttachments = await Promise.all(
+      attachments.map(async (attachment) => {
+        // Do not eagerly parse images for OCR — images are passed to DeepSeek
+        // as multimodal inputs and OCR is optional/background-only.
+        if (attachment.kind === "image") {
+          const { normalizeAttachmentRecord } = await import("@/lib/attachment-processing");
+          return normalizeAttachmentRecord({
+            id: attachment.id,
+            chatId: attachment.chatId,
+            name: attachment.name,
+            originalName: attachment.originalName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            storageUrl: attachment.storageUrl,
+            storagePath: attachment.storagePath,
+            checksum: attachment.checksum,
+            kind: attachment.kind,
+            status: attachment.status,
+            extractedText: attachment.extractedText,
+            summary: attachment.summary,
+            pageCount: attachment.pageCount,
+            width: attachment.width,
+            height: attachment.height,
+            language: attachment.language,
+            createdAt: attachment.createdAt,
+          });
+        }
+
+        return ensureAttachmentParsed({
+          id: attachment.id,
+          chatId: attachment.chatId,
+          name: attachment.name,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes,
+          storageUrl: attachment.storageUrl,
+          storagePath: attachment.storagePath,
+          checksum: attachment.checksum,
+          kind: attachment.kind,
+          status: attachment.status,
+          extractedText: attachment.extractedText,
+          summary: attachment.summary,
+          pageCount: attachment.pageCount,
+          width: attachment.width,
+          height: attachment.height,
+          language: attachment.language,
+          createdAt: attachment.createdAt,
+        });
+      }),
+    );
 
     const runId = crypto.randomUUID();
     const assistantMessageId = crypto.randomUUID();
