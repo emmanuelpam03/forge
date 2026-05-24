@@ -1,14 +1,19 @@
 'use strict';
 
-const { simd, relaxedSimd } = require('wasm-feature-detect');
-const OEM = require('../../constants/OEM');
+import { simd, relaxedSimd } from 'wasm-feature-detect';
+// Inlined OEM constants to avoid relying on relative package layout after
+// copying the worker scripts into this repo. These match the upstream
+// tesseract.js/src/constants/OEM.js values.
+const OEM = {
+  TESSERACT_ONLY: 0,
+  LSTM_ONLY: 1,
+  TESSERACT_LSTM_COMBINED: 2,
+  DEFAULT: 3,
+};
 
 let TesseractCore = null;
-/*
- * getCore is a sync function to load and return
- * TesseractCore.
- */
-module.exports = async (oem, _, res) => {
+
+export default async function getCore(oem, _, res) {
   if (TesseractCore === null) {
     const statusText = 'loading tesseract core';
 
@@ -17,22 +22,28 @@ module.exports = async (oem, _, res) => {
     res.progress({ status: statusText, progress: 0 });
     if (relaxedSimdSupport) {
       if ([OEM.DEFAULT, OEM.LSTM_ONLY].includes(oem)) {
-        TesseractCore = require('tesseract.js-core/tesseract-core-relaxedsimd-lstm');
+        const mod = await import('tesseract.js-core/tesseract-core-relaxedsimd-lstm');
+        TesseractCore = mod.default ?? mod;
       } else {
-        TesseractCore = require('tesseract.js-core/tesseract-core-relaxedsimd');
+        const mod = await import('tesseract.js-core/tesseract-core-relaxedsimd');
+        TesseractCore = mod.default ?? mod;
       }
     } else if (simdSupport) {
       if ([OEM.DEFAULT, OEM.LSTM_ONLY].includes(oem)) {
-        TesseractCore = require('tesseract.js-core/tesseract-core-simd-lstm');
+        const mod = await import('tesseract.js-core/tesseract-core-simd-lstm');
+        TesseractCore = mod.default ?? mod;
       } else {
-        TesseractCore = require('tesseract.js-core/tesseract-core-simd');
+        const mod = await import('tesseract.js-core/tesseract-core-simd');
+        TesseractCore = mod.default ?? mod;
       }
     } else if ([OEM.DEFAULT, OEM.LSTM_ONLY].includes(oem)) {
-      TesseractCore = require('tesseract.js-core/tesseract-core-lstm');
+      const mod = await import('tesseract.js-core/tesseract-core-lstm');
+      TesseractCore = mod.default ?? mod;
     } else {
-      TesseractCore = require('tesseract.js-core/tesseract-core');
+      const mod = await import('tesseract.js-core/tesseract-core');
+      TesseractCore = mod.default ?? mod;
     }
     res.progress({ status: statusText, progress: 1 });
   }
   return TesseractCore;
-};
+}

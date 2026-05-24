@@ -1,21 +1,34 @@
 'use strict';
 
 /**
- *
- * Tesseract Worker Script for Node
- *
- * @fileoverview Node worker implementation
- * @author Kevin Kwok <antimatter15@gmail.com>
- * @author Guillermo Webster <gui@mit.edu>
- * @author Jerome Wu <jeromewus@gmail.com>
+ * ESM-converted Tesseract Worker Script for Node
  */
-// Use built-in fetch if available, otherwise fallback to node-fetch
-const fetch = global.fetch || require('node-fetch');
-const { parentPort } = require('worker_threads');
-const worker = require('..');
-const getCore = require('./getCore');
-const gunzip = require('./gunzip');
-const cache = require('./cache');
+import { parentPort } from 'worker_threads';
+import getCore from './getCore.js';
+import { gunzip } from './gunzip.js';
+import * as cache from './cache.js';
+
+// Use built-in fetch if available, otherwise dynamically import node-fetch
+let fetch = global.fetch;
+if (!fetch) {
+  try {
+    const mod = await import('node-fetch');
+    fetch = mod.default ?? mod;
+  } catch (err) {
+    // leave fetch undefined; adapter consumers should handle absence
+    fetch = undefined;
+  }
+}
+
+// Import upstream worker handlers dynamically
+let worker;
+try {
+  const mod = await import('tesseract.js/src/worker-script');
+  worker = mod.default ?? mod;
+} catch (err) {
+  // If upstream worker import fails, rethrow so the host can fallback
+  throw err;
+}
 
 /*
  * register message handler

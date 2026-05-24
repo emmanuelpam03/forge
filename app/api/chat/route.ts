@@ -54,54 +54,38 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
+    function buildAttachmentPayload(a: typeof attachments[number]) {
+      return {
+        id: a.id,
+        chatId: a.chatId,
+        name: a.name,
+        originalName: a.originalName,
+        mimeType: a.mimeType,
+        sizeBytes: a.sizeBytes,
+        storageUrl: a.storageUrl,
+        storagePath: a.storagePath,
+        checksum: a.checksum,
+        kind: a.kind,
+        status: a.status,
+        extractedText: a.extractedText,
+        summary: a.summary,
+        pageCount: a.pageCount,
+        width: a.width,
+        height: a.height,
+        language: a.language,
+        createdAt: a.createdAt,
+      };
+    }
+
     const resolvedAttachments = await Promise.all(
       attachments.map(async (attachment) => {
-        // Do not eagerly parse images for OCR — images are passed to DeepSeek
-        // as multimodal inputs and OCR is optional/background-only.
+        const mapped = buildAttachmentPayload(attachment);
         if (attachment.kind === "image") {
           const { normalizeAttachmentRecord } = await import("@/lib/attachment-processing");
-          return normalizeAttachmentRecord({
-            id: attachment.id,
-            chatId: attachment.chatId,
-            name: attachment.name,
-            originalName: attachment.originalName,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-            storageUrl: attachment.storageUrl,
-            storagePath: attachment.storagePath,
-            checksum: attachment.checksum,
-            kind: attachment.kind,
-            status: attachment.status,
-            extractedText: attachment.extractedText,
-            summary: attachment.summary,
-            pageCount: attachment.pageCount,
-            width: attachment.width,
-            height: attachment.height,
-            language: attachment.language,
-            createdAt: attachment.createdAt,
-          });
+          return normalizeAttachmentRecord(mapped);
         }
 
-        return ensureAttachmentParsed({
-          id: attachment.id,
-          chatId: attachment.chatId,
-          name: attachment.name,
-          originalName: attachment.originalName,
-          mimeType: attachment.mimeType,
-          sizeBytes: attachment.sizeBytes,
-          storageUrl: attachment.storageUrl,
-          storagePath: attachment.storagePath,
-          checksum: attachment.checksum,
-          kind: attachment.kind,
-          status: attachment.status,
-          extractedText: attachment.extractedText,
-          summary: attachment.summary,
-          pageCount: attachment.pageCount,
-          width: attachment.width,
-          height: attachment.height,
-          language: attachment.language,
-          createdAt: attachment.createdAt,
-        });
+        return ensureAttachmentParsed(mapped);
       }),
     );
 

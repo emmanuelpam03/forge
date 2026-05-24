@@ -1,3 +1,5 @@
 'use strict';
 
-module.exports = require('zlib').gunzipSync;
+import zlib from 'zlib';
+
+export const gunzip = zlib.gunzipSync;

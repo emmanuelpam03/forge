@@ -7,7 +7,17 @@ const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1H
 const buffer = Buffer.from(dataUrl.split(',')[1], 'base64');
 
 test('parseImageAttachment does not throw when OCR disabled', async () => {
-  process.env.DISABLE_IMAGE_OCR = '1';
-  const parsed = await parseImageAttachment(buffer, 'diagram.png');
-  assert(parsed.summary.includes('diagram.png') || parsed.summary.length > 0);
+  const prev = process.env.DISABLE_IMAGE_OCR;
+  try {
+    process.env.DISABLE_IMAGE_OCR = '1';
+    const parsed = await parseImageAttachment(buffer, 'diagram.png');
+    assert(typeof parsed.summary === 'string', 'Summary should be a string when OCR is disabled');
+    assert(parsed.summary!.includes('diagram.png'), 'Summary should contain filename when OCR is disabled');
+  } finally {
+    if (typeof prev === 'undefined') {
+      delete process.env.DISABLE_IMAGE_OCR;
+    } else {
+      process.env.DISABLE_IMAGE_OCR = prev;
+    }
+  }
 });

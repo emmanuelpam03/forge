@@ -2,11 +2,12 @@
   "name": "forge",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "node ./scripts/copy-tesseract-worker.mjs || true",
+    "postinstall": "node ./scripts/copy-tesseract-worker.mjs || echo 'Warning: Failed to copy tesseract worker files'",
     "start-worker": "tsx scripts/background-worker.ts",
     "lint": "eslint",
     "prisma:seed": "prisma db seed",

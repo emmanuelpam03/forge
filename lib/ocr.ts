@@ -63,10 +63,21 @@ export async function extractText(buffer: Buffer, opts?: { lang?: string; worker
 
     try {
       const w = worker as unknown as Record<string, unknown>;
+      const lang = opts?.lang ?? "eng";
       if (typeof w.recognize === "function") {
-        const result = await (w.recognize as (input: Buffer) => Promise<unknown>)(buffer);
-        const data = (result as any)?.data;
-        return (typeof data?.text === "string" ? data.text : "").trim();
+        // Try passing the language option to recognize; if the worker's
+        // recognize signature doesn't accept an options param, fall back to
+        // calling it without options.
+        try {
+          const result = await (w.recognize as (input: Buffer, options?: unknown) => Promise<unknown>)(buffer, { lang });
+          const data = (result as any)?.data;
+          return (typeof data?.text === "string" ? data.text : "").trim();
+        } catch (err) {
+          // Fallback to calling without options
+          const result = await (w.recognize as (input: Buffer) => Promise<unknown>)(buffer);
+          const data = (result as any)?.data;
+          return (typeof data?.text === "string" ? data.text : "").trim();
+        }
       }
 
       if (typeof w.load === "function") {

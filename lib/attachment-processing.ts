@@ -515,7 +515,22 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
     // (e.g., filename suggests a document) — otherwise background job will do
     // lightweight parsing without OCR by default.
     const requireOcr = shouldRunOcrForImage(input.fileName, input.mimeType);
-    void queueJob("processAttachment", { chatId: input.chatId, attachmentId: input.attachmentId, requireOcr }).catch(() => undefined);
+    try {
+      await queueJob("processAttachment", { chatId: input.chatId, attachmentId: input.attachmentId, requireOcr });
+    } catch (err) {
+      try {
+        console.error("Failed to queue processAttachment job", { attachmentId: input.attachmentId, chatId: input.chatId, error: err });
+      } catch {}
+
+      // Mark attachment as failed so UI/state doesn't remain stuck in 'processing'
+      try {
+        await prisma.attachment.update({ where: { id: input.attachmentId }, data: { status: "failed" } });
+      } catch (err2) {
+        try {
+          console.error("Failed to mark attachment as failed after queue error", { attachmentId: input.attachmentId, error: err2 });
+        } catch {}
+      }
+    }
   }
 
   return {
