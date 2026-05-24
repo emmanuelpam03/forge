@@ -77,8 +77,16 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    const requestedAttachmentIds = parsedBody.data.attachments ?? [];
+    const attachmentsForTurn =
+      requestedAttachmentIds.length > 0
+        ? attachments.filter((attachment) =>
+            requestedAttachmentIds.includes(attachment.id),
+          )
+        : attachments;
+
     const resolvedAttachments = await Promise.all(
-      attachments.map(async (attachment) => {
+      attachmentsForTurn.map(async (attachment) => {
         const mapped = buildAttachmentPayload(attachment);
         if (attachment.kind === "image") {
           const { normalizeAttachmentRecord } = await import("@/lib/attachment-processing");

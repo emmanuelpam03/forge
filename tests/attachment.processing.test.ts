@@ -90,6 +90,35 @@ test("formatAttachmentContext ranks relevant attachments first", () => {
   assert.match(context, /1\. financial-report\.pdf/);
 });
 
+test("buildAttachmentMultimodalBlocks uses remote https URLs without re-encoding", async () => {
+  const remoteUrl = "https://res.cloudinary.com/demo/image/upload/sample.png";
+
+  const blocks = await buildAttachmentMultimodalBlocks(
+    [
+      {
+        id: "img-remote",
+        chatId: "chat",
+        name: "sample.png",
+        originalName: "sample.png",
+        mimeType: "image/png",
+        sizeBytes: 123,
+        checksum: "remote-checksum",
+        kind: "image",
+        status: "ready",
+        storageUrl: remoteUrl,
+        storagePath: "path-remote",
+        uploadedAt: "2026-05-23T00:00:00.000Z",
+      },
+    ],
+    "describe this image",
+  );
+
+  assert.equal(blocks[1].type, "image_url");
+  if (blocks[1].type === "image_url") {
+    assert.equal(blocks[1].image_url.url, remoteUrl);
+  }
+});
+
 test("buildAttachmentMultimodalBlocks emits image_url blocks for images", async () => {
   const dataUrl =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO4JYlQAAAAASUVORK5CYII=";

@@ -2,8 +2,9 @@ import "server-only";
 
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import {
+  chatHasImageAttachments,
   createGeminiModel,
-  getChatModelConfig,
+  resolveChatModelConfig,
   type ModelOverride,
 } from "@/ai/models";
 import { buildChatMessages } from "@/ai/prompts/router.ts";
@@ -525,8 +526,9 @@ export async function generateResponseNode(state: ChatGraphState) {
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
   };
-  const model = createGeminiModel(override);
-  const modelConfig = getChatModelConfig(override);
+  const hasImageAttachments = chatHasImageAttachments(state.attachments);
+  const modelConfig = resolveChatModelConfig(override, { hasImageAttachments });
+  const model = createGeminiModel(override, { hasImageAttachments });
 
     try {
       const invoker = model as unknown as ModelInvoker;

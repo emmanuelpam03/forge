@@ -7,15 +7,22 @@ function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
 }
 
-test("model routing is DeepSeek-only via OpenRouter", () => {
+test("generateResponseNode routes vision model when attachments include images", () => {
+  const source = readWorkspaceFile("ai/graph/nodes.ts");
+
+  assert.match(source, /chatHasImageAttachments\(state\.attachments\)/);
+  assert.match(source, /resolveChatModelConfig\(override, \{ hasImageAttachments \}\)/);
+});
+
+test("model routing uses DeepSeek by default and vision model for images", () => {
   const source = readWorkspaceFile("ai/models/index.ts");
 
-  // Verify DeepSeek is the only default model
   assert.match(source, /DEFAULT_MODEL\s*=\s*"deepseek\/deepseek-v4-flash"/);
-  // Verify provider is always openrouter
+  assert.match(source, /DEFAULT_VISION_MODEL/);
+  assert.match(source, /resolveChatModelConfig/);
+  assert.match(source, /chatHasImageAttachments/);
   assert.match(source, /provider:\s*"openrouter"/);
-  // Verify no alternate model support
-  assert.doesNotMatch(source, /ollama|google-genai|gemini|llama|claude|gpt/);
+  assert.doesNotMatch(source, /ollama|google-genai|llama/);
 });
 
 test("chat UI displays only DeepSeek (with expandable model picker)", () => {
@@ -68,7 +75,8 @@ test("environment config is DeepSeek-only", () => {
   // Verify env example only mentions OpenRouter
   assert.match(envExample, /OPENROUTER_API_KEY/);
   assert.match(envExample, /DeepSeek/);
-  assert.doesNotMatch(envExample, /OLLAMA_|GEMINI_|GOOGLE_API_KEY/);
+  assert.doesNotMatch(envExample, /OLLAMA_|GOOGLE_API_KEY/);
+  assert.match(envExample, /OPENROUTER_VISION_MODEL/);
 
   // Verify README reflects DeepSeek-only
   assert.match(readme, /deepseek|DeepSeek/);

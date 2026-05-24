@@ -747,25 +747,35 @@ export async function buildAttachmentMultimodalBlocks(
   }
 
   for (const attachment of imageAttachments) {
-    const cacheKey = getAttachmentCacheKey(attachment);
-    let dataUrl = attachmentImageDataUrlCache.get(cacheKey);
+    const storageUrl = attachment.storageUrl;
+    const canUseRemoteUrl =
+      storageUrl.startsWith("https://") || storageUrl.startsWith("http://");
 
-    if (!dataUrl) {
-      try {
-        dataUrl = await toDataUrl(
-          attachment.storageUrl,
-          attachment.mimeType || "image/png",
-        );
-        attachmentImageDataUrlCache.set(cacheKey, dataUrl);
-      } catch {
-        dataUrl = attachment.storageUrl;
+    let imageUrl = storageUrl;
+
+    if (!canUseRemoteUrl) {
+      const cacheKey = getAttachmentCacheKey(attachment);
+      let dataUrl = attachmentImageDataUrlCache.get(cacheKey);
+
+      if (!dataUrl) {
+        try {
+          dataUrl = await toDataUrl(
+            storageUrl,
+            attachment.mimeType || "image/png",
+          );
+          attachmentImageDataUrlCache.set(cacheKey, dataUrl);
+        } catch {
+          dataUrl = storageUrl;
+        }
       }
+
+      imageUrl = dataUrl;
     }
 
     blocks.push({
       type: "image_url",
       image_url: {
-        url: dataUrl,
+        url: imageUrl,
         detail: "auto",
       },
     });
