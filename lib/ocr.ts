@@ -111,16 +111,46 @@ export async function extractText(
   if (!tesseract) return "";
 
   const lang = opts?.lang ?? "eng";
+  const noTessdataNetworkDownload =
+    process.env.OCR_NO_TESSDATA_DOWNLOAD === "1" ||
+    process.env.OCR_NO_NETWORK === "1";
+
+  // Path to a directory containing `${lang}.traineddata.gz`
+  // Example: .../node_modules/@tesseract.js-data/eng/4.0.0_best_int
+  const tessdataDir = process.env.TESSDATA_DIR?.trim();
+  const localLangPath =
+    tessdataDir && tessdataDir.length > 0
+      ? tessdataDir
+      : null;
+
+  if (noTessdataNetworkDownload && !localLangPath) {
+    try {
+      console.warn(
+        "OCR is configured to disallow traineddata downloads, but TESSDATA_DIR is not set.",
+      );
+    } catch {}
+    return "";
+  }
+
+  const hasLocalLang =
+    localLangPath &&
+    (existsSync(join(localLangPath, `${lang}.traineddata.gz`)) ||
+      existsSync(join(localLangPath, `${lang}.traineddata`)));
 
   try {
     if (typeof tesseract.recognize === "function") {
-      // Let tesseract.js pick its default node worker + dependency resolution.
-      const result = await tesseract.recognize(buffer, lang);
+      const result = hasLocalLang
+        ? await tesseract.recognize(buffer, lang, { langPath: localLangPath })
+        : await tesseract.recognize(buffer, lang);
       return (result.data?.text ?? "").trim();
     }
 
     if (typeof tesseract.createWorker === "function") {
-      const worker = await tesseract.createWorker(lang);
+      const worker = hasLocalLang
+        ? await tesseract.createWorker(lang, undefined, {
+            langPath: localLangPath,
+          })
+        : await tesseract.createWorker(lang);
       try {
         const result = await worker.recognize(buffer);
         return (result.data?.text ?? "").trim();
