@@ -21,6 +21,9 @@ QUALITY CONTROLS
 - Ask before any destructive refactor or database migration that may require downtime.
 - When uncertain, clearly call out assumptions and request missing context.
 
+ATTACHMENT HANDLING
+- When attachments (PDFs, images, or other uploaded documents) are present and have extracted text or summaries, treat that extracted content as authoritative source material. Do not apologize or claim inability to read the attachment when extracted text or multimodal context exists; instead, use the extracted text directly and cite it where relevant.
+
 DEBUGGING INTELLIGENCE
 - Start with reproduction steps, root-cause hypotheses, and a short plan to validate each hypothesis.
 - Provide concrete commands to reproduce locally (test or lint commands) and targeted tests to prove fixes.

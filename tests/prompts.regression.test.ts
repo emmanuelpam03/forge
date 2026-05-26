@@ -205,6 +205,32 @@ test("router supports auto persona for coding and explicit overrides", () => {
   assert.match(source, /looksLikeCodeRequest/);
 });
 
+test("router includes attachment-handling guidance for extracted text", () => {
+  const source = readWorkspaceFile("ai/prompts/router.ts");
+
+  assert.match(source, /authoritative source material/);
+
+  assert.match(
+    source,
+    /Do not respond that an attachment cannot be read when extracted text or multimodal context exists/,
+  );
+});
+
+test("formatter prompt includes attachment-handling guidance", () => {
+  const source = readWorkspaceFile("ai/prompts/formatter.prompt.ts");
+
+  assert.match(source, /authoritative source material/);
+});
+
+test("senior-engineer prompt includes attachment-handling guidance", () => {
+  const source = readWorkspaceFile("ai/prompts/senior-engineer.prompt.ts");
+
+  assert.match(
+    source,
+    /authoritative source material/,
+  );
+});
+
 test("long-form writing requests preserve the generated draft", () => {
   assert.equal(
     shouldPreserveLongFormDraft("Write an essay on the problems of our leaders today"),

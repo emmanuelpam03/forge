@@ -327,6 +327,24 @@ function formatToolPlan(state: ChatGraphState): string {
 
 function buildRuntimeContext(state: ChatGraphState): string {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
+  function formatAttachmentHandlingGuidance(state: ChatGraphState): string {
+    if (!state.attachments || state.attachments.length === 0) return "";
+
+    const hasExtractedContent = state.attachments.some((att) => {
+      try {
+        const text = (att.extractedText ?? att.summary ?? "") as string;
+        return typeof text === "string" && text.trim().length > 0;
+      } catch {
+        return false;
+      }
+    });
+
+    if (!hasExtractedContent) return "";
+
+    return "ATTACHMENT HANDLING: Treat extracted text and summaries from uploaded PDFs and images as authoritative source material. Do not respond that an attachment cannot be read when extracted text or multimodal context exists, unless the file is genuinely unavailable.";
+  }
+
+  const attachmentHandlingInstruction = formatAttachmentHandlingGuidance(state);
   const attachmentContext = formatUploadedAttachmentContext(
     state.attachments,
     state.userMessage,
@@ -334,12 +352,18 @@ function buildRuntimeContext(state: ChatGraphState): string {
 
   if (state.selectedContext) {
     const selectedContext = formatSelectedContext(state.selectedContext);
-    return [evidencePriorityContext, attachmentContext, selectedContext]
+    return [
+      evidencePriorityContext,
+      attachmentHandlingInstruction,
+      attachmentContext,
+      selectedContext,
+    ]
       .filter(Boolean)
       .join(" ");
   }
   const runtimeLines = [
     evidencePriorityContext,
+    attachmentHandlingInstruction,
     attachmentContext,
     formatSelectedOptions(state),
     formatIntent(state),

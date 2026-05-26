@@ -66,6 +66,9 @@ export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
   const formattingProfile =
     controls.formatting === "auto" ? "default" : controls.formatting;
 
+  const ATTACHMENT_HANDLING_GUIDANCE =
+    "ATTACHMENT HANDLING: Treat extracted text and summaries from uploaded PDFs and images as authoritative source material. Do not respond that an attachment cannot be read when extracted text or multimodal context exists, unless the file is genuinely unavailable.";
+
   // Small, high-priority header that communicates selected formatting profile
   // and audience/verbosity so the model can tailor the rest of the formatter
   // guidance that follows.
@@ -80,5 +83,5 @@ export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
   // Keep the rich legacy formatter guidance after the small header to avoid
   // invalidating downstream expectations while making the formatter
   // responsive to classifier outputs.
-  return header + FORMATTER_PROMPT;
+  return ATTACHMENT_HANDLING_GUIDANCE + "\n\n" + header + FORMATTER_PROMPT;
 }

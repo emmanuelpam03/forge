@@ -567,7 +567,11 @@ export default function HomePage() {
             </div>
 
             <div className="mt-2 flex items-center justify-between px-3 text-[11px] text-muted-foreground">
-              <p>{isDraggingFiles ? "Drop files to upload." : "Enter to send."}</p>
+              <p>
+                {isDraggingFiles
+                  ? "Drop files to upload."
+                  : "Enter to send. We extract text from uploaded PDFs and images and use it as source material for responses."}
+              </p>
               {isUploading ? <p>Uploading files...</p> : null}
             </div>
 
