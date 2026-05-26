@@ -1934,7 +1934,11 @@ export function ChatClient({
           </div>
 
           <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground px-3">
-            <p>Enter to send. Shift+Enter for a new line.</p>
+            <p>
+              {isDraggingFiles
+                ? "Drop files to upload."
+                : "Enter to send. Shift+Enter for a new line. We extract text from uploaded PDFs and images and use it as source material for responses."}
+            </p>
             {lastUserMessage && error && (
               <button
                 onClick={() => void sendMessage(lastUserMessage)}

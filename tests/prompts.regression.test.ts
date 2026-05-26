@@ -212,22 +212,23 @@ test("router includes attachment-handling guidance for extracted text", () => {
 
   assert.match(
     source,
-    /Do not respond that an attachment cannot be read when extracted text or multimodal context exists/,
+    /do not apologize or claim inability to read the attachment when extracted text or multimodal context exists/i,
   );
 });
 
 test("formatter prompt includes attachment-handling guidance", () => {
   const source = readWorkspaceFile("ai/prompts/formatter.prompt.ts");
-
-  assert.match(source, /authoritative source material/);
+  assert.match(
+    source,
+    /do not apologize or claim inability to read the attachment when extracted text or multimodal context exists/i,
+  );
 });
 
 test("senior-engineer prompt includes attachment-handling guidance", () => {
   const source = readWorkspaceFile("ai/prompts/senior-engineer.prompt.ts");
-
   assert.match(
     source,
-    /authoritative source material/,
+    /do not apologize or claim inability to read the attachment when extracted text or multimodal context exists/i,
   );
 });
 

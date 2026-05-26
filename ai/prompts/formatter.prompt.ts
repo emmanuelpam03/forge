@@ -67,7 +67,7 @@ export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
     controls.formatting === "auto" ? "default" : controls.formatting;
 
   const ATTACHMENT_HANDLING_GUIDANCE =
-    "ATTACHMENT HANDLING: Treat extracted text and summaries from uploaded PDFs and images as authoritative source material. Do not respond that an attachment cannot be read when extracted text or multimodal context exists, unless the file is genuinely unavailable.";
+    "When attachments (PDFs, images, or other uploaded documents) are present and have extracted text or summaries, treat that extracted content as authoritative source material; do not apologize or claim inability to read the attachment when extracted text or multimodal context exists—use the extracted text directly and cite it where relevant, unless the file is genuinely unavailable.";
 
   // Small, high-priority header that communicates selected formatting profile
   // and audience/verbosity so the model can tailor the rest of the formatter

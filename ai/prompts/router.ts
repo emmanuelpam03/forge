@@ -341,7 +341,7 @@ function buildRuntimeContext(state: ChatGraphState): string {
 
     if (!hasExtractedContent) return "";
 
-    return "ATTACHMENT HANDLING: Treat extracted text and summaries from uploaded PDFs and images as authoritative source material. Do not respond that an attachment cannot be read when extracted text or multimodal context exists, unless the file is genuinely unavailable.";
+    return "When attachments (PDFs, images, or other uploaded documents) are present and have extracted text or summaries, treat that extracted content as authoritative source material; do not apologize or claim inability to read the attachment when extracted text or multimodal context exists—use the extracted text directly and cite it where relevant, unless the file is genuinely unavailable.";
   }
 
   const attachmentHandlingInstruction = formatAttachmentHandlingGuidance(state);
