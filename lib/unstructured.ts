@@ -84,7 +84,7 @@ function parseUnstructuredPayload(payload: unknown): UnstructuredExtractionOutpu
 
   return {
     text: chunks.join("\n\n").trim(),
-    pageCount: pageNumbers.size > 0 ? pageNumbers.size : undefined,
+    pageCount: pageNumbers.size > 0 ? Math.max(...pageNumbers) : undefined,
   };
 }
 

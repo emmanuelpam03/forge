@@ -299,6 +299,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // Use unified error response helper for consistent payloads
     logError("chat_route_error", { error });
-    return toResponse(error instanceof Error ? new ApiError(error.message, 500) : error);
+    return toResponse(error);
   }
 }

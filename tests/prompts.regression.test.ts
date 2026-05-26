@@ -282,6 +282,18 @@ test("chat API accepts persona opt-in payload", () => {
   assert.match(source, /DEFAULT_PROMPT_BEHAVIOR_CONTROLS/);
 });
 
+test("chat API keeps strict attachment validation and preserves ApiError statuses", () => {
+  const source = readWorkspaceFile("app/api/chat/route.ts");
+
+  assert.match(source, /Unknown attachment IDs:/);
+  assert.match(source, /previously failed extraction/);
+  assert.match(source, /could not be parsed:/);
+  assert.match(source, /new ApiError\([\s\S]*400/);
+  assert.match(source, /new ApiError\([\s\S]*422/);
+  assert.match(source, /return toResponse\(error\);/);
+  assert.doesNotMatch(source, /new ApiError\(error\.message, 500\)/);
+});
+
 test("chat client can send senior mode selection", () => {
   const source = readWorkspaceFile("app/c/[chatId]/ChatClient.tsx");
   assert.match(source, /useSeniorEngineeringMode/);
