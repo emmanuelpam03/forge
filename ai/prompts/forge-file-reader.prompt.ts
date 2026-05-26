@@ -23,6 +23,9 @@ IMAGE PIPELINE:
 DOCUMENTS:
 - DOCX: extract paragraphs and tables separately. TXT: read raw. CSV: parse into table form.
 
+TOOLING INTEGRATION:
+- When instructing the intent classifier or planner to request a file read, prefer the tool name "read_any_file" in the "tool_usage" array so the planner invokes the registered file-reader tool. Do NOT invent alternative tool names for file reading.
+
 POST-PROCESSING:
 - Produce a structured output: optional document title, then Page N: <cleaned text> blocks, then an internal Summary block (key points, tables found).
 

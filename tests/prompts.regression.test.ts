@@ -10,6 +10,7 @@ import {
 } from "../ai/prompts/intent.ts";
 import { PROMPTS } from "../ai/prompts/promptRegistry.ts";
 import { shouldPreserveLongFormDraft } from "../ai/graph/response-shaping.ts";
+import { parseStructuredIntentClassification } from "../ai/graph/classification.ts";
 
 function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -315,4 +316,23 @@ test("classifier prompt recognizes explanation as a teaching category", () => {
 
   assert.match(source, /explanation/);
   assert.match(source, /teaching, conceptual breakdowns, comparisons/);
+});
+
+test("classifier accepts read_any_file in tool_usage", () => {
+  const json = JSON.stringify({
+    intent: "research",
+    difficulty: "medium",
+    verbosity: "balanced",
+    audience_level: "intermediate",
+    tool_usage: ["read_any_file"],
+    response_mode: "analyze",
+    confidence: "high",
+    memory_relevance: false,
+    reasoning_depth: "standard",
+    multi_intent: [],
+  });
+
+  const parsed = parseStructuredIntentClassification(json);
+  // Normalization should preserve known tool names including read_any_file
+  assert.deepEqual(parsed.toolUsage, ["read_any_file"]);
 });

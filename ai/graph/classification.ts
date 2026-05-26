@@ -67,6 +67,7 @@ const KNOWN_TOOL_USAGE = new Set([
   "datetime",
   "memory_lookup",
   "project_context",
+  "read_any_file",
   "code_execution",
 ]);
 
