@@ -179,11 +179,27 @@ export default function HomePage() {
           ),
         );
 
-        showFeedback({
-          type: "success",
-          title: "File uploaded",
-          description: uploadedAttachment.name,
-        });
+        if (uploadedAttachment.status === "failed") {
+          showFeedback({
+            type: "error",
+            title: "Upload completed, extraction failed",
+            description:
+              uploadedAttachment.summary?.trim() ||
+              `${uploadedAttachment.name || file.name} could not be processed.`,
+          });
+        } else if (uploadedAttachment.status === "processing") {
+          showFeedback({
+            type: "info",
+            title: "Upload queued",
+            description: `${uploadedAttachment.name} is being processed.`,
+          });
+        } else {
+          showFeedback({
+            type: "success",
+            title: "File uploaded",
+            description: uploadedAttachment.name,
+          });
+        }
       } catch (uploadError) {
         const description =
           uploadError instanceof Error
@@ -240,11 +256,29 @@ export default function HomePage() {
       return;
     }
 
-    if (isUploading || attachments.some((attachment) => attachment.status !== "ready")) {
+    if (isUploading) {
       showFeedback({
         type: "error",
         title: "Wait for uploads to finish",
         description: "All attachments must finish uploading before you send.",
+      });
+      return;
+    }
+
+    if (attachments.some((attachment) => attachment.status === "failed")) {
+      showFeedback({
+        type: "error",
+        title: "Remove failed attachments",
+        description: "One or more files failed extraction. Remove them or re-upload before sending.",
+      });
+      return;
+    }
+
+    if (attachments.some((attachment) => attachment.status === "processing")) {
+      showFeedback({
+        type: "error",
+        title: "Wait for uploads to finish",
+        description: "Attachment processing is still running. Please wait a moment.",
       });
       return;
     }

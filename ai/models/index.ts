@@ -10,6 +10,8 @@ export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
 /** Vision-capable model on OpenRouter (used when the user uploads images). */
 export const DEFAULT_VISION_MODEL = "google/gemini-2.0-flash-001";
+export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 8192;
+export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 32000;
 
 export type ChatModelProvider = "openrouter";
 
@@ -109,13 +111,24 @@ export function createModel(
   }
 
   const maxTokensEnv = process.env.OPENROUTER_MAX_COMPLETION_TOKENS?.trim();
-  const maxTokens =
+  const parsedMaxTokens =
     maxTokensEnv && Number.isFinite(Number.parseInt(maxTokensEnv, 10))
       ? Number.parseInt(maxTokensEnv, 10)
-      : undefined;
-  if (maxTokens) {
-    info("openrouter_max_tokens", { maxTokens });
+      : DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS;
+
+  const maxTokens = Math.max(
+    1,
+    Math.min(parsedMaxTokens, MAX_OPENROUTER_MAX_COMPLETION_TOKENS),
+  );
+
+  if (parsedMaxTokens !== maxTokens) {
+    warn("openrouter_max_tokens_clamped", {
+      configuredMaxTokens: parsedMaxTokens,
+      clampedMaxTokens: maxTokens,
+      maximumAllowed: MAX_OPENROUTER_MAX_COMPLETION_TOKENS,
+    });
   }
+  info("openrouter_max_tokens", { maxTokens });
 
   return new ChatOpenAI({
     apiKey,

@@ -74,6 +74,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ attachments });
   } catch (error) {
     logError("upload_route_failed", { error });
-    return NextResponse.json({ error: "Failed to upload file." }, { status: 500 });
+    const message =
+      error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : "Failed to upload file.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -347,17 +347,16 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
   const prisma = (await import("./prisma.ts")).default;
   const shouldDeferParsing = input.sizeBytes >= 5 * 1024 * 1024;
   let parsed: ParsedAttachment | null = null;
-  let status: "processing" | "ready" | "failed" = shouldDeferParsing ? "processing" : "ready";
+  let status: "processing" | "ready" = shouldDeferParsing ? "processing" : "ready";
 
   if (!shouldDeferParsing) {
     try {
       parsed = await parseAttachmentBuffer(input);
     } catch (error) {
-      status = "failed";
       const failureMessage =
         error instanceof Error ? error.message : "Failed to extract attachment text.";
       parsed = {
-        summary: failureMessage,
+        summary: `Uploaded, but extraction failed: ${failureMessage}`,
       };
     }
   }

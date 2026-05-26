@@ -7,7 +7,10 @@ import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
 import { toResponse, ApiError } from "@/lib/error-response";
 import prisma from "@/lib/prisma";
-import { ensureAttachmentParsed } from "@/lib/attachment-processing";
+import {
+  resolveAttachmentsForTurn,
+  selectAttachmentsForTurn,
+} from "@/lib/chat-attachment-resolution";
 
 export const runtime = "nodejs";
 
@@ -53,85 +56,14 @@ export async function POST(request: NextRequest) {
       orderBy: { createdAt: "asc" },
     });
 
-    function buildAttachmentPayload(a: typeof attachments[number]) {
-      return {
-        id: a.id,
-        chatId: a.chatId,
-        name: a.name,
-        originalName: a.originalName,
-        mimeType: a.mimeType,
-        sizeBytes: a.sizeBytes,
-        storageUrl: a.storageUrl,
-        storagePath: a.storagePath,
-        checksum: a.checksum,
-        kind: a.kind,
-        status: a.status,
-        extractedText: a.extractedText,
-        summary: a.summary,
-        pageCount: a.pageCount,
-        width: a.width,
-        height: a.height,
-        language: a.language,
-        createdAt: a.createdAt,
-      };
-    }
-
     const requestedAttachmentIds = parsedBody.data.attachments ?? [];
-    if (requestedAttachmentIds.length > 0) {
-      const attachmentById = new Map(
-        attachments.map((attachment) => [attachment.id, attachment]),
-      );
+    const attachmentsForTurn = selectAttachmentsForTurn(
+      attachments,
+      requestedAttachmentIds,
+    );
 
-      const missingAttachmentIds = requestedAttachmentIds.filter(
-        (attachmentId) => !attachmentById.has(attachmentId),
-      );
-      if (missingAttachmentIds.length > 0) {
-        throw new ApiError(
-          `Unknown attachment IDs: ${missingAttachmentIds.join(", ")}`,
-          400,
-        );
-      }
-
-      const failedAttachments = requestedAttachmentIds
-        .map((attachmentId) => attachmentById.get(attachmentId))
-        .filter(
-          (attachment): attachment is NonNullable<typeof attachment> =>
-            Boolean(attachment && attachment.status === "failed"),
-        );
-
-      if (failedAttachments.length > 0) {
-        throw new ApiError(
-          `One or more attachments previously failed extraction: ${failedAttachments
-            .map((attachment) => attachment.originalName || attachment.name)
-            .join(", ")}`,
-          422,
-        );
-      }
-    }
-
-    const attachmentsForTurn =
-      requestedAttachmentIds.length > 0
-        ? attachments.filter((attachment) =>
-            requestedAttachmentIds.includes(attachment.id),
-          )
-        : attachments.filter((attachment) => attachment.status !== "failed");
-
-    const resolvedAttachments = await Promise.all(
-      attachmentsForTurn.map(async (attachment) => {
-        const mapped = buildAttachmentPayload(attachment);
-        try {
-          return await ensureAttachmentParsed(mapped);
-        } catch (error) {
-          const reason =
-            error instanceof Error
-              ? error.message
-              : "Attachment extraction failed.";
-          throw new ApiError(
-            `Attachment \"${attachment.originalName || attachment.name}\" could not be parsed: ${reason}`,
-            422,
-          );
-        }
-      }),
+    const resolvedAttachments = await resolveAttachmentsForTurn(
+      attachmentsForTurn,
     );
 
     const runId = crypto.randomUUID();
