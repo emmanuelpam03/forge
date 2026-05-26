@@ -2,6 +2,7 @@ import "server-only";
 
 import prisma from "@/lib/prisma";
 import fetchWithTimeout from "@/lib/fetchWithTimeout";
+import { ensureAttachmentParsed } from "@/lib/attachment-processing";
 import type { ImageSearchInput, ImageSearchResult, ProviderImage } from "./image-types";
 import { serpapiImageSearch } from "./providers/serpapi";
 import { pexelsSearch } from "./providers/pexels";
@@ -32,6 +33,11 @@ type RankedChunk = {
   label: string;
   content: string;
   score: number;
+};
+
+type ReadAnyFileInput = {
+  chatId: string;
+  attachmentId: string;
 };
 
 function tokenize(value: string): string[] {
@@ -1205,6 +1211,81 @@ export async function projectContextLookupTool(
       resultCount: top.length,
     },
   };
+}
+
+export async function readAnyFileToolAsync(
+  input: ReadAnyFileInput,
+): Promise<ToolResult> {
+  const attachmentId = input.attachmentId?.trim();
+  if (!attachmentId) {
+    return {
+      success: false,
+      result: "",
+      error: "attachmentId is required.",
+    };
+  }
+
+  const attachment = await prisma.attachment.findFirst({
+    where: {
+      id: attachmentId,
+      chatId: input.chatId,
+    },
+  });
+
+  if (!attachment) {
+    return {
+      success: false,
+      result: "",
+      error: `Attachment not found: ${attachmentId}`,
+    };
+  }
+
+  try {
+    const resolved = await ensureAttachmentParsed({
+      id: attachment.id,
+      chatId: attachment.chatId,
+      name: attachment.name,
+      originalName: attachment.originalName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      storageUrl: attachment.storageUrl,
+      storagePath: attachment.storagePath,
+      checksum: attachment.checksum,
+      kind: attachment.kind,
+      status: attachment.status,
+      extractedText: attachment.extractedText,
+      summary: attachment.summary,
+      pageCount: attachment.pageCount,
+      width: attachment.width,
+      height: attachment.height,
+      language: attachment.language,
+      createdAt: attachment.createdAt,
+    });
+
+    const text = (resolved.extractedText ?? "").trim();
+    if (text) {
+      return {
+        success: true,
+        result: text,
+      };
+    }
+
+    return {
+      success: true,
+      result:
+        resolved.summary?.trim() ||
+        "The file was processed but no readable text content was found.",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      result: "",
+      error:
+        error instanceof Error
+          ? error.message
+          : `Failed to parse attachment ${attachmentId}.`,
+    };
+  }
 }
 
 /**

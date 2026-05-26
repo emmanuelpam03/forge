@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
     const attachments = await prisma.attachment.findMany({
       where: {
         chatId: parsedBody.data.chatId,
-        status: { not: "failed" },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -78,30 +77,60 @@ export async function POST(request: NextRequest) {
     }
 
     const requestedAttachmentIds = parsedBody.data.attachments ?? [];
+    if (requestedAttachmentIds.length > 0) {
+      const attachmentById = new Map(
+        attachments.map((attachment) => [attachment.id, attachment]),
+      );
+
+      const missingAttachmentIds = requestedAttachmentIds.filter(
+        (attachmentId) => !attachmentById.has(attachmentId),
+      );
+      if (missingAttachmentIds.length > 0) {
+        throw new ApiError(
+          `Unknown attachment IDs: ${missingAttachmentIds.join(", ")}`,
+          400,
+        );
+      }
+
+      const failedAttachments = requestedAttachmentIds
+        .map((attachmentId) => attachmentById.get(attachmentId))
+        .filter(
+          (attachment): attachment is NonNullable<typeof attachment> =>
+            Boolean(attachment && attachment.status === "failed"),
+        );
+
+      if (failedAttachments.length > 0) {
+        throw new ApiError(
+          `One or more attachments previously failed extraction: ${failedAttachments
+            .map((attachment) => attachment.originalName || attachment.name)
+            .join(", ")}`,
+          422,
+        );
+      }
+    }
+
     const attachmentsForTurn =
       requestedAttachmentIds.length > 0
         ? attachments.filter((attachment) =>
             requestedAttachmentIds.includes(attachment.id),
           )
-        : attachments;
+        : attachments.filter((attachment) => attachment.status !== "failed");
 
     const resolvedAttachments = await Promise.all(
       attachmentsForTurn.map(async (attachment) => {
         const mapped = buildAttachmentPayload(attachment);
-        if (attachment.kind === "image") {
-          const { normalizeAttachmentRecord } = await import("@/lib/attachment-processing");
-          return normalizeAttachmentRecord(mapped);
+        try {
+          return await ensureAttachmentParsed(mapped);
+        } catch (error) {
+          const reason =
+            error instanceof Error
+              ? error.message
+              : "Attachment extraction failed.";
+          throw new ApiError(
+            `Attachment \"${attachment.originalName || attachment.name}\" could not be parsed: ${reason}`,
+            422,
+          );
         }
-
-        const isPdf =
-          attachment.kind === "pdf" ||
-          (attachment.mimeType ?? "").includes("pdf");
-        const needsDocumentOcr =
-          isPdf && !(attachment.extractedText ?? "").trim();
-
-        return ensureAttachmentParsed(mapped, {
-          forceOcr: needsDocumentOcr,
-        });
       }),
     );
 

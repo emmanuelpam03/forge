@@ -19,6 +19,7 @@ import {
 } from "./attachment-types.ts";
 import { queueJob } from "./job-queue.ts";
 import { uploadAttachmentToCloudinary } from "./cloudinary.ts";
+import { extractTextWithUnstructured } from "./unstructured.ts";
 
 export type AttachmentInput = {
   chatId: string;
@@ -163,18 +164,27 @@ async function fetchAttachmentBytesForParsing(storageUrl: string): Promise<{ buf
   };
 }
 
-function attachmentHasExtractedText(attachment: AttachmentRecordLike): boolean {
-  return (attachment.extractedText ?? "").trim().length > 0;
+function attachmentHasParseResult(attachment: AttachmentRecordLike): boolean {
+  return (
+    (attachment.extractedText ?? "").trim().length > 0 ||
+    (attachment.summary ?? "").trim().length > 0
+  );
 }
 
 export async function ensureAttachmentParsed(
   attachment: AttachmentRecordLike,
   options?: { forceOcr?: boolean },
 ): Promise<UploadedAttachment> {
+  if (attachment.status === "failed") {
+    throw new Error(
+      attachment.summary?.trim() ||
+        `Attachment ${attachment.originalName || attachment.name} previously failed parsing.`,
+    );
+  }
+
   const isComplete =
     attachment.status === "ready" &&
-    typeof attachment.summary === "string" &&
-    attachmentHasExtractedText(attachment);
+    attachmentHasParseResult(attachment);
 
   if (isComplete && !options?.forceOcr) {
     return normalizeAttachmentRecord(attachment);
@@ -189,13 +199,31 @@ export async function ensureAttachmentParsed(
   const mimeType = attachment.mimeType ?? "application/octet-stream";
   const isPdf = attachment.kind === "pdf" || mimeType === "application/pdf";
   const { buffer } = await fetchAttachmentBytesForParsing(storageUrl);
-  const parsed = await parseAttachmentBuffer({
-    chatId: attachment.chatId,
-    fileName,
-    mimeType,
-    sizeBytes: attachment.sizeBytes ?? buffer.byteLength,
-    buffer,
-  }, { forceOcr: Boolean(options?.forceOcr) });
+  let parsed: ParsedAttachment;
+  try {
+    parsed = await parseAttachmentBuffer(
+      {
+        chatId: attachment.chatId,
+        fileName,
+        mimeType,
+        sizeBytes: attachment.sizeBytes ?? buffer.byteLength,
+        buffer,
+      },
+      { forceOcr: Boolean(options?.forceOcr) },
+    );
+  } catch (error) {
+    const reason =
+      error instanceof Error ? error.message : "Failed to extract text from attachment.";
+    const prisma = (await import("./prisma.ts")).default;
+    await prisma.attachment.update({
+      where: { id: attachment.id },
+      data: {
+        status: "failed",
+        summary: reason,
+      },
+    });
+    throw new Error(reason);
+  }
 
   if (isPdf && !(parsed.text ?? "").trim()) {
     try {
@@ -553,35 +581,36 @@ export async function parseAttachmentBuffer(input: AttachmentInput, options?: { 
   const extension = getAttachmentExtension(input.fileName);
   const language = getAttachmentLanguage(input.fileName);
 
-  if (kind === "pdf") {
-    return parsePdf(input.buffer, { forceOcr: Boolean(options?.forceOcr) });
-  }
-
-  if (kind === "document" && extension === ".docx") {
-    return parseDocx(input.buffer);
-  }
-
-  if (kind === "spreadsheet" && extension === ".xlsx") {
-    return parseXlsx(input.buffer);
-  }
-
   if (kind === "spreadsheet" && extension === ".csv") {
     return parseCsv(input.buffer);
   }
 
-  if (kind === "image") {
-    return await parseImageAttachment(input.buffer, input.fileName, undefined, Boolean(options?.forceOcr));
-  }
+  const isPlainTextDocument =
+    kind === "document" &&
+    (extension === ".txt" || extension === ".md" || extension === ".rtf");
 
-  if (kind === "code" || kind === "text" || kind === "json" || kind === "document") {
+  if (kind === "code" || kind === "text" || kind === "json" || isPlainTextDocument) {
     return {
       ...parseText(input.buffer, kind, input.fileName),
       language: kind === "code" || kind === "json" ? language : undefined,
     };
   }
 
+  void options;
+  const extracted = await extractTextWithUnstructured({
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    buffer: input.buffer,
+  });
+  const text = extracted.text.trim();
+
   return {
-    summary: `${input.fileName} uploaded.`,
+    text,
+    summary: summarizeAttachmentText(
+      text || `${input.fileName} uploaded. No extractable text found.`,
+      320,
+    ),
+    pageCount: extracted.pageCount,
   };
 }
 
@@ -590,8 +619,21 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
   const { storagePath, storageUrl, checksum } = await persistAttachmentFile(input, input.attachmentId);
   const prisma = (await import("./prisma.ts")).default;
   const shouldDeferParsing = input.sizeBytes >= 5 * 1024 * 1024;
-  const parsed = shouldDeferParsing ? null : await parseAttachmentBuffer(input);
-  const status = shouldDeferParsing ? "processing" : "ready";
+  let parsed: ParsedAttachment | null = null;
+  let status: "processing" | "ready" | "failed" = shouldDeferParsing ? "processing" : "ready";
+
+  if (!shouldDeferParsing) {
+    try {
+      parsed = await parseAttachmentBuffer(input);
+    } catch (error) {
+      status = "failed";
+      const failureMessage =
+        error instanceof Error ? error.message : "Failed to extract attachment text.";
+      parsed = {
+        summary: failureMessage,
+      };
+    }
+  }
 
   // Persist metadata to the database (best-effort) using the typed Prisma client.
   try {
@@ -624,11 +666,7 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
   }
 
   if (shouldDeferParsing) {
-    // Only request OCR in the background if heuristics indicate text likely
-    // (e.g., filename suggests a document) — otherwise background job will do
-    // lightweight parsing without OCR by default.
-    const requireOcr =
-      shouldRunOcrForImage(input.fileName, input.mimeType) || kind === "pdf";
+    const requireOcr = false;
     try {
       await queueJob("processAttachment", { chatId: input.chatId, attachmentId: input.attachmentId, requireOcr });
     } catch (err) {
