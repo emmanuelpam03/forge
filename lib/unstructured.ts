@@ -119,11 +119,10 @@ export async function extractTextWithUnstructured(
   );
 
   if (!response.ok) {
-    const responseText = (await response.text().catch(() => "")).slice(0, 500);
+    const responseText = (await response.text().catch(() => "")).slice(0, 2000);
+    // Include the endpoint in the error to make debugging 404/route issues easier
     throw new Error(
-      `Unstructured extraction failed (${response.status} ${response.statusText})${
-        responseText ? `: ${responseText}` : ""
-      }`,
+      `Unstructured extraction failed for endpoint ${endpoint} (${response.status} ${response.statusText})${responseText ? `: ${responseText}` : ""}`,
     );
   }
 
