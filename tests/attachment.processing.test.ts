@@ -162,3 +162,29 @@ test("buildAttachmentMultimodalBlocks emits image_url blocks for images", async 
     assert.equal(blocks[1].image_url.url, dataUrl);
   }
 });
+
+test("getCleanedAttachmentText returns structured pages and summary", async () => {
+  const attachment = {
+    id: "pdf-1",
+    chatId: "chat",
+    name: "contract.pdf",
+    originalName: "contract.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 1234,
+    checksum: "c1",
+    kind: "pdf",
+    status: "ready",
+    storageUrl: "data:application/pdf;base64,QQ==",
+    storagePath: "path-c",
+    uploadedAt: "2026-05-23T00:00:00.000Z",
+    extractedText: "Contract Title\nPage 1\nThis is the first page.\nPage 2\nThis is the second page.",
+  } as any;
+
+  const { getCleanedAttachmentText } = await import("../lib/attachment-processing.ts");
+  const out = await getCleanedAttachmentText(attachment);
+  console.log("=== CLEANED OUTPUT START ===\n" + out + "\n=== CLEANED OUTPUT END ===");
+  assert.ok(typeof out === "string");
+  assert.ok(out.includes("Page 1:"));
+  assert.ok(out.includes("Page 2:"));
+  assert.ok(out.includes("Summary:"));
+});

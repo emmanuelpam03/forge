@@ -653,6 +653,131 @@ function chunkText(text: string, size: number = 700): AttachmentContextChunk[] {
   return chunks;
 }
 
+// Clean extracted text: normalize line endings, remove common page-number
+// and header/footer artifacts, collapse repeated blank lines, and trim.
+export function cleanExtractedText(input: string): string {
+  if (!input) return "";
+  let text = input.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  // Remove common page number lines like "Page 1 of 10" or standalone numbers
+  text = text
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return true; // keep blank lines for now
+      // Remove verbose page number patterns like "1 of 10" but preserve
+      // explicit "Page N" markers which are useful for page splitting.
+      if (/^\d+\s*of\s*\d+$/i.test(trimmed)) return false;
+      if (/^\d+$/.test(trimmed) && trimmed.length <= 4) return false;
+      // common footer/header separators
+      if (/^[-_=]{3,}$/.test(trimmed)) return false;
+      return true;
+    })
+    .join("\n");
+
+  // Remove repeated header/footer lines that appear many times
+  const lines = text.split("\n");
+  const counts = new Map<string, number>();
+  for (const line of lines.slice(0, 50)) {
+    const key = line.trim().toLowerCase();
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const repeatedHeaders = new Set<string>();
+  for (const [k, v] of counts.entries()) {
+    if (v > 1) repeatedHeaders.add(k);
+  }
+
+  const filtered = lines.filter((l) => !repeatedHeaders.has(l.trim().toLowerCase()));
+
+  // Collapse multiple blank lines to a maximum of two
+  const collapsed = filtered.join("\n").replace(/\n{3,}/g, "\n\n");
+
+  // Trim trailing/leading whitespace
+  return collapsed.trim();
+}
+
+// Structure cleaned text into pages. Tries to detect form-feed or "Page N" markers;
+// falls back to fixed-size chunking when needed.
+export function structureTextByPage(cleaned: string, approxCharsPerPage = 2000): { title?: string; pages: string[]; summary: string } {
+  const result = { title: undefined as string | undefined, pages: [] as string[], summary: "" };
+  if (!cleaned) return result;
+
+  // Try to split on form-feed
+  if (cleaned.includes("\f")) {
+    result.pages = cleaned.split(/\f+/).map((p) => p.trim()).filter(Boolean);
+  } else {
+    // Try to split on explicit 'Page N' markers
+    const pageMarkerRegex = /(^|\n)(?:page\s+\d+[:\-]?\s*)/i;
+    if (pageMarkerRegex.test(cleaned)) {
+      const parts = cleaned.split(/\n(?=page\s+\d+)/i);
+      result.pages = parts.map((p) => p.trim()).filter(Boolean);
+    } else {
+      // Fallback: chunk by approxCharsPerPage
+      for (let i = 0; i < cleaned.length; i += approxCharsPerPage) {
+        result.pages.push(cleaned.slice(i, i + approxCharsPerPage).trim());
+      }
+    }
+  }
+
+  // Try to detect a document title on the first page (first non-empty line)
+  if (result.pages.length > 0) {
+    const firstLines = result.pages[0].split("\n").map((l) => l.trim()).filter(Boolean);
+    if (firstLines.length > 0 && firstLines[0].length < 200 && firstLines[0].split(" ").length < 12) {
+      result.title = firstLines[0];
+      // remove title line from page 1
+      result.pages[0] = result.pages[0].split("\n").slice(1).join("\n").trim();
+    }
+  }
+
+  // Build a short internal summary (use existing summarizer)
+  try {
+    const joined = result.pages.join("\n\n").trim();
+    result.summary = summarizeAttachmentText(joined, 200);
+  } catch {
+    result.summary = "";
+  }
+
+  return result;
+}
+
+// Public helper: get cleaned, structured text for an attachment. If `extractedText`
+// exists on the attachment, prefer that; otherwise attempt to fetch and parse.
+export async function getCleanedAttachmentText(attachment: UploadedAttachment): Promise<string> {
+  let raw = (attachment.extractedText ?? "") as string;
+
+  if (!raw || raw.trim().length === 0) {
+    if (attachment.storageUrl) {
+      try {
+        const { buffer } = await fetchAttachmentBytes(attachment.storageUrl);
+        const parsed = await parseAttachmentBuffer(
+          { chatId: attachment.chatId, fileName: attachment.originalName || attachment.name, mimeType: attachment.mimeType || "", sizeBytes: attachment.sizeBytes ?? 0, buffer },
+          { forceOcr: true },
+        );
+        raw = parsed.text ?? "";
+      } catch (err) {
+        raw = "";
+      }
+    }
+  }
+
+  const cleaned = cleanExtractedText(raw || "");
+  const structured = structureTextByPage(cleaned);
+
+  const parts: string[] = [];
+  if (structured.title) parts.push(structured.title);
+  structured.pages.forEach((p, i) => {
+    parts.push(`Page ${i + 1}:`);
+    parts.push(p || "");
+  });
+  if (structured.summary) {
+    parts.push("Summary:");
+    parts.push(structured.summary);
+  }
+
+  return parts.join("\n\n").trim();
+}
+
 function lexicalScore(query: string, content: string): number {
   const normalizedQuery = query.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
   const normalizedContent = content.toLowerCase().replace(/[^a-z0-9\s]/g, " ");

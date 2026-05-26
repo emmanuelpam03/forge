@@ -108,11 +108,21 @@ export function createModel(
     throw new Error("OPENROUTER_API_KEY is required for DeepSeek inference.");
   }
 
+  const maxTokensEnv = process.env.OPENROUTER_MAX_COMPLETION_TOKENS?.trim();
+  const maxTokens =
+    maxTokensEnv && Number.isFinite(Number.parseInt(maxTokensEnv, 10))
+      ? Number.parseInt(maxTokensEnv, 10)
+      : undefined;
+  if (maxTokens) {
+    info("openrouter_max_tokens", { maxTokens });
+  }
+
   return new ChatOpenAI({
     apiKey,
     model: config.model,
     temperature: 0.7,
     maxRetries: 2,
+    maxTokens,
     configuration: {
       baseURL: config.baseUrl,
       defaultHeaders: {

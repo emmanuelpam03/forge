@@ -341,7 +341,7 @@ function buildRuntimeContext(state: ChatGraphState): string {
 
     if (!hasExtractedContent) return "";
 
-    return "When attachments (PDFs, images, or other uploaded documents) are present and have extracted text or summaries, treat that extracted content as authoritative source material; do not apologize or claim inability to read the attachment when extracted text or multimodal context exists—use the extracted text directly and cite it where relevant, unless the file is genuinely unavailable.";
+    return "When attachments (PDFs, images, or other uploaded documents) are present and have extracted text or summaries, treat that extracted content as authoritative source material. Do not apologize or claim inability to read the attachment when extracted text or multimodal context exists—use the extracted text directly and cite it where relevant. Do NOT call external image-search or web-image lookup tools (for example `imageSearch`, SerpAPI, Pexels, or similar) to retrieve content from uploaded files; those tools are only for finding external images and must not be used to replace the file's extracted text.";
   }
 
   const attachmentHandlingInstruction = formatAttachmentHandlingGuidance(state);
