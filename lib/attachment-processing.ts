@@ -1,10 +1,6 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { imageSize } from "image-size";
-import mammoth from "mammoth";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import {
   ATTACHMENT_MAX_BYTES,
   ALLOWED_ATTACHMENT_EXTENSIONS,
@@ -261,218 +257,22 @@ export async function ensureAttachmentParsed(
   });
 }
 
-type PdfParseResult = {
-  text?: string;
-  numpages?: number;
-};
-
-type PdfParser = (buffer: Buffer) => Promise<PdfParseResult>;
-
-type PdfOcrExtractor = (buffer: Buffer) => Promise<string>;
-
-async function loadPdfParser(): Promise<PdfParser> {
-  const parserModule = await import("pdf-parse");
-  return (parserModule as { default?: PdfParser }).default ?? (parserModule as unknown as PdfParser);
-}
-
-export async function parsePdf(
-  buffer: Buffer,
-  options?: {
-    forceOcr?: boolean;
-    parse?: PdfParser;
-    extractOcrText?: PdfOcrExtractor;
-  },
-): Promise<ParsedAttachment> {
-  const extractOcrText =
-    options?.extractOcrText ?? ((input: Buffer) => extractPdfOcrText(input, { force: Boolean(options?.forceOcr) }));
-
-  try {
-    const parser = options?.parse ?? (await loadPdfParser());
-    const result = await parser(buffer);
-
-    const text = (result.text ?? "").trim();
-    if (text) {
-      return {
-        text,
-        summary: summarizeAttachmentText(text || "PDF uploaded. No extractable text found.", 320),
-        pageCount: result.numpages ?? undefined,
-      };
-    }
-
-    const ocrText = await extractOcrText(buffer);
-    if (ocrText) {
-      return {
-        text: ocrText,
-        summary: summarizeAttachmentText(ocrText, 320),
-        pageCount: result.numpages ?? undefined,
-      };
-    }
-
-    return {
-      text: "",
-      summary: summarizeAttachmentText("PDF uploaded. No extractable text found.", 320),
-      pageCount: result.numpages ?? undefined,
-    };
-  } catch {
-    const ocrText = await extractOcrText(buffer);
-    if (ocrText) {
-      return {
-        text: ocrText,
-        summary: summarizeAttachmentText(ocrText, 320),
-      };
-    }
-
-    return {
-      text: "",
-      summary: "PDF uploaded. Failed to extract text.",
-      pageCount: undefined,
-    };
-  }
-}
-
-function getPdfOcrMaxPages(): number {
-  const configured = Number.parseInt(process.env.PDF_OCR_MAX_PAGES ?? "8", 10);
-  if (!Number.isFinite(configured) || configured < 1) {
-    return 8;
-  }
-
-  return Math.min(configured, 20);
-}
-
-async function extractPdfOcrText(
-  buffer: Buffer,
-  options?: { force?: boolean },
-): Promise<string> {
-  try {
-    const requireOcr = Boolean(options?.force);
-    const documentOcrAvailable = requireOcr ? true : await ocrIsDocumentAvailable();
-
-    const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const { createCanvas } = await import("@napi-rs/canvas");
-
-    const pdfjs = pdfjsModule as any;
-
-    const documentTask = pdfjs.getDocument({
-      data: new Uint8Array(buffer),
-      useWorkerFetch: false,
-      isEvalSupported: false,
-    });
-
-    const pdfDocument = await documentTask.promise;
-    const maxPages = Math.min(pdfDocument.numPages, getPdfOcrMaxPages());
-    const recognizedText: string[] = [];
-    const debugPdfOcr = process.env.DEBUG_ATTACHMENT_OCR === "1";
-    if (debugPdfOcr) {
-      try {
-        console.info("PDF OCR started", {
-          totalPages: pdfDocument.numPages,
-          maxPages,
-          force: requireOcr,
-          documentOcrAvailable,
-        });
-      } catch {}
-    }
-
-    for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
-      const page = await pdfDocument.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: 2 });
-      const canvas = createCanvas(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
-      const context = canvas.getContext("2d");
-
-      await page.render({ canvasContext: context as any, canvas: canvas as any, viewport } as any).promise;
-
-      const imgBuf = canvas.toBuffer("image/png");
-      let text = "";
-      try {
-        if (documentOcrAvailable) {
-          text = await ocrExtractText(imgBuf, { lang: "eng", scope: "document" });
-        }
-      } catch (err) {
-        try {
-          console.warn("extractPdfOcrText page OCR failed:", (err as Error)?.message ?? String(err));
-        } catch {}
-        text = "";
-      }
-      if (debugPdfOcr) {
-        try {
-          console.info("PDF OCR page processed", {
-            pageNumber,
-            pngBytes: imgBuf.byteLength,
-            hasText: text.trim().length > 0,
-          });
-        } catch {}
-      }
-      if (text) {
-        recognizedText.push(text);
-      }
-    }
-
-    const combined = recognizedText.join("\n\n").trim();
-    if (debugPdfOcr) {
-      try {
-        console.info("PDF OCR finished", {
-          pagesProcessed: maxPages,
-          pagesWithText: recognizedText.length,
-          extractedLength: combined.length,
-        });
-      } catch {}
-    }
-    return combined;
-  } catch (err) {
-    try {
-      console.warn(
-        "extractPdfOcrText failed:",
-        (err as Error)?.message ?? String(err),
-      );
-    } catch {}
-    return "";
-  }
-}
-
-async function parseDocx(buffer: Buffer): Promise<ParsedAttachment> {
-  const result = await mammoth.extractRawText({ buffer });
-  const text = (result.value ?? "").trim();
-  return {
-    text,
-    summary: summarizeAttachmentText(text || "Document uploaded. No extractable text found.", 320),
-  };
-}
-
 function parseCsv(buffer: Buffer): ParsedAttachment {
   const csvText = buffer.toString("utf8");
-  const parsed = Papa.parse(csvText, { skipEmptyLines: true }) as { data: unknown[] };
-  const rows = Array.isArray(parsed.data) ? parsed.data : [];
+  const rows = csvText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => line.split(",").map((part) => part.trim()));
+
   const text = rows
     .slice(0, 25)
-    .map((row: unknown) => (Array.isArray(row) ? row.join(", ") : String(row)))
+    .map((row) => row.join(", "))
     .join("\n");
 
   return {
     text,
     summary: summarizeAttachmentText(text || "CSV uploaded.", 320),
-  };
-}
-
-function parseXlsx(buffer: Buffer): ParsedAttachment {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const firstSheetName = workbook.SheetNames[0];
-  const sheet = firstSheetName ? workbook.Sheets[firstSheetName] : undefined;
-
-  if (!sheet) {
-    return { summary: "Spreadsheet uploaded. No readable sheets found." };
-  }
-
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
-    defval: "",
-  });
-  const text = rows
-    .slice(0, 25)
-    .map((row) => JSON.stringify(row))
-    .join("\n");
-
-  return {
-    text,
-    summary: summarizeAttachmentText(text || "Spreadsheet uploaded.", 320),
   };
 }
 
@@ -502,79 +302,6 @@ function parseText(buffer: Buffer, kind: string, name: string): ParsedAttachment
   };
 }
 
-import {
-  extractText as ocrExtractText,
-  isAvailable as ocrIsAvailable,
-  isDocumentOcrEnabled as ocrIsDocumentOcrEnabled,
-  isOcrEnabled as ocrIsEnabled,
-} from "./ocr.ts";
-
-async function ocrIsDocumentAvailable(): Promise<boolean> {
-  if (!(await ocrIsDocumentOcrEnabled())) {
-    return false;
-  }
-
-  return ocrIsAvailable("document");
-}
-
-// Helper: conservative heuristic to decide whether OCR should run for an image.
-function shouldRunOcrForImage(fileName: string, mimeType: string): boolean {
-  // Explicit opt-in via ENABLE_IMAGE_OCR
-  if (process.env.ENABLE_IMAGE_OCR === "1") return true;
-
-  const lower = fileName.toLowerCase();
-  // Common indicators that the image likely contains text
-  const indicators = ["screenshot", "scan", "document", "receipt", "invoice", "ocr"];
-  for (const ind of indicators) {
-    if (lower.includes(ind)) return true;
-  }
-
-  // Do not run OCR by default for images.
-  return false;
-}
-
-export async function parseImageAttachment(
-  buffer: Buffer,
-  name: string,
-  extractor?: (buffer: Buffer) => Promise<string>,
-  forceOcr: boolean = false,
-): Promise<ParsedAttachment> {
-  let text = "";
-  if (typeof extractor === "function") {
-    try {
-      text = (await extractor(buffer)).trim();
-    } catch {
-      text = "";
-    }
-  } else {
-    try {
-      const runOcr = forceOcr || shouldRunOcrForImage(name, "");
-      if (runOcr && (await ocrIsAvailable())) {
-        text = (await ocrExtractText(buffer, { lang: "eng" })).trim();
-      }
-    } catch {
-      text = "";
-    }
-  }
-
-  if (text) {
-    return {
-      text,
-      summary: summarizeAttachmentText(text, 320),
-    };
-  }
-
-  try {
-    const dimensions = imageSize(buffer);
-    return {
-      summary: `${name} (${dimensions.width ?? 0}x${dimensions.height ?? 0})`,
-      width: dimensions.width,
-      height: dimensions.height,
-    };
-  } catch {
-    return { summary: `${name} image uploaded.` };
-  }
-}
 
 export async function parseAttachmentBuffer(input: AttachmentInput, options?: { forceOcr?: boolean }): Promise<ParsedAttachment> {
   const kind = inferAttachmentKind({ name: input.fileName, mimeType: input.mimeType });

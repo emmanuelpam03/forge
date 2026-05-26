@@ -13,7 +13,7 @@ CORE RULES:
 - Only after extraction, cleaning, and structuring may you answer; use the cleaned text as authoritative.
 
 PDF PIPELINE:
-1) Try PDF text extraction (pdf-parse or equivalent).
+1) Use the unified extraction provider (Unstructured) first.
 2) If extraction yields no usable text, convert pages to images and run OCR page-by-page (Tesseract or equivalent).
 3) Merge page outputs in correct order; produce a per-page block and a short internal summary.
 

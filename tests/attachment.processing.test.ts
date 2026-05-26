@@ -11,8 +11,7 @@ import {
 import {
   buildAttachmentMultimodalBlocks,
   formatAttachmentContext,
-  parsePdf,
-  parseImageAttachment,
+  parseAttachmentBuffer,
 } from "../lib/attachment-processing.ts";
 
 test("getAttachmentExtension and inferAttachmentKind", () => {
@@ -39,27 +38,30 @@ test("summarizeAttachmentText and formatAttachmentLabel", () => {
   assert.ok(label.includes("Text:"));
 });
 
-test("parseImageAttachment uses OCR text when available", async () => {
-  const parsed = await parseImageAttachment(
-    Buffer.from("not a real image", "utf8"),
-    "screenshot.png",
-    async () => "Hello from OCR",
-  );
-
-  assert.equal(parsed.text, "Hello from OCR");
-  assert.equal(parsed.summary, "Hello from OCR");
-});
-
-test("parsePdf falls back to OCR when pdf parsing fails", async () => {
-  const parsed = await parsePdf(Buffer.from("fake pdf", "utf8"), {
-    parse: async () => {
-      throw new Error("pdf parse failed");
-    },
-    extractOcrText: async () => "Recovered text from OCR",
+test("parseAttachmentBuffer handles csv locally", async () => {
+  const parsed = await parseAttachmentBuffer({
+    chatId: "chat",
+    fileName: "report.csv",
+    mimeType: "text/csv",
+    sizeBytes: 40,
+    buffer: Buffer.from("name,score\nalpha,10\nbeta,20", "utf8"),
   });
 
-  assert.equal(parsed.text, "Recovered text from OCR");
-  assert.equal(parsed.summary, "Recovered text from OCR");
+  assert.match(parsed.text ?? "", /alpha, 10/);
+  assert.ok((parsed.summary ?? "").length > 0);
+});
+
+test("parseAttachmentBuffer handles json/text locally", async () => {
+  const parsed = await parseAttachmentBuffer({
+    chatId: "chat",
+    fileName: "payload.json",
+    mimeType: "application/json",
+    sizeBytes: 32,
+    buffer: Buffer.from('{"ok":true,"count":2}', "utf8"),
+  });
+
+  assert.match(parsed.text ?? "", /"ok": true/);
+  assert.ok((parsed.summary ?? "").length > 0);
 });
 
 test("formatAttachmentContext ranks relevant attachments first", () => {
