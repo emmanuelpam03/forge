@@ -6,9 +6,9 @@ import { parseImageAttachment } from "../lib/attachment-processing.ts";
 
 test("ocr adapter uses tesseract.js v7 recognize API", () => {
   const source = readFileSync(join(process.cwd(), "lib/ocr.ts"), "utf8");
-  assert.match(source, /tesseract\.recognize\(buffer, lang, workerOptions\)/);
-  assert.match(source, /createWorker\(lang, undefined, workerOptions\)/);
-  assert.doesNotMatch(source, /createWorker\(workerOptions\)/);
+  assert.match(source, /tesseract\.recognize\(buffer, lang\)/);
+  assert.match(source, /createWorker\(lang\)/);
+  assert.doesNotMatch(source, /workerOptions/);
 });
 
 // Small 1x1 PNG (data URL)

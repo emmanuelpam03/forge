@@ -16,6 +16,7 @@ import {
   getTaskPrompt,
   getToolsPrompt,
   getVisualContextToolPrompt,
+  getFileReaderPrompt,
 } from "@/ai/prompts/promptRegistry";
 // humanization routing removed from live prompt assembly
 import {
@@ -445,6 +446,12 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.formatting": controls.formatting,
         "response.persona": resolvedPersonaRole,
       },
+    },
+    {
+      id: "file-reader",
+      layer: "task",
+      priority: 84,
+      content: getFileReaderPrompt(),
     },
     {
       id: "visual-context-tool",

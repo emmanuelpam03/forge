@@ -29,7 +29,6 @@ type TesseractModule = {
 };
 
 export async function isDocumentOcrEnabled(): Promise<boolean> {
-  if (process.env.DISABLE_IMAGE_OCR === "1") return false;
   if (process.env.DISABLE_DOCUMENT_OCR === "1") return false;
   return true;
 }
@@ -112,20 +111,16 @@ export async function extractText(
   if (!tesseract) return "";
 
   const lang = opts?.lang ?? "eng";
-  const workerOptions = {
-    ...resolveWorkerOptions(opts?.workerPath),
-    // Prevent tesseract.js from throwing on worker thread errors (we handle below).
-    errorHandler: () => {},
-  };
 
   try {
     if (typeof tesseract.recognize === "function") {
-      const result = await tesseract.recognize(buffer, lang, workerOptions);
+      // Let tesseract.js pick its default node worker + dependency resolution.
+      const result = await tesseract.recognize(buffer, lang);
       return (result.data?.text ?? "").trim();
     }
 
     if (typeof tesseract.createWorker === "function") {
-      const worker = await tesseract.createWorker(lang, undefined, workerOptions);
+      const worker = await tesseract.createWorker(lang);
       try {
         const result = await worker.recognize(buffer);
         return (result.data?.text ?? "").trim();
@@ -137,7 +132,10 @@ export async function extractText(
     return "";
   } catch (err) {
     try {
-      console.warn("OCR extractText failed:", (err as Error)?.message ?? String(err));
+      console.warn(
+        `OCR extractText failed (scope=${scope}, lang=${lang}):`,
+        (err as Error)?.message ?? String(err),
+      );
     } catch {}
     return "";
   }

@@ -10,6 +10,7 @@ import { PLANNING_PROMPT } from "./planning.prompt.ts";
 import { SELF_IMPROVE_PROMPT } from "./self_improve.prompt.ts";
 import { buildModePrompt } from "./mode.prompt.ts";
 import { SENIOR_ENGINEER_PROMPT } from "./senior-engineer.prompt.ts";
+import { FORGE_FILE_READER_PROMPT } from "./forge-file-reader.prompt.ts";
 import { HUMANIZATION_PROMPT } from "./humanization.prompt.ts";
 import { REFLECTION_PROMPT } from "../graph/reflection.prompt.ts";
 import type { PromptBehaviorControls } from "./control.types.ts";
@@ -193,6 +194,10 @@ export function getVisualContextToolPrompt(): string {
   return UTILITY_PROMPTS.visualContextTool.content;
 }
 
+export function getFileReaderPrompt(): string {
+  return FORGE_FILE_READER_PROMPT;
+}
+
 export function getReflectionPrompt(): string {
   return UTILITY_PROMPTS.reflection.content;
 }
@@ -203,6 +208,7 @@ export const PROMPTS = {
   classifier: UTILITY_PROMPTS.classifier.content,
   tools: getToolsPrompt(),
   visualContextTool: getVisualContextToolPrompt(),
+  fileReader: getFileReaderPrompt(),
   formatter: getFormatterPrompt(),
   humanization: getHumanizationPrompt(),
   reflection: getReflectionPrompt(),

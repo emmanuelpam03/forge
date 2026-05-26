@@ -26,6 +26,7 @@ import {
   deriveStructuredFromLegacy,
   shouldForceWebSearchFromClassification,
   type QueryIntentClassification,
+  type StructuredIntentClassification,
 } from "@/ai/graph/classification.ts";
 import type { ClassifiedIntent } from "@/ai/graph/state";
 import { buildIntentClassificationMessage, buildFreshnessClassificationMessage } from "@/ai/prompts/intent.ts";
@@ -199,6 +200,39 @@ function deriveQueryIntentFromClassification(
   return { needsTools: false, type: "knowledge" };
 }
 
+function hasAnyActiveAttachment(state: ChatGraphState): boolean {
+  return (state.attachments ?? []).some((attachment) => attachment.status !== "failed");
+}
+
+function shouldPreferAttachmentExtractionIntent(state: ChatGraphState): boolean {
+  if (!hasAnyActiveAttachment(state)) {
+    return false;
+  }
+
+  const message = state.userMessage.toLowerCase();
+  const extractionPattern =
+    /\b(extract|read|text|summari[sz]e|analy[sz]e|review|what(?:'s| is)\s+in|content)\b/i;
+  const codingPattern =
+    /\b(code|typescript|javascript|python|java|c\+\+|c#|api|endpoint|function|class|compile|stack trace|debug|refactor)\b/i;
+
+  return extractionPattern.test(message) && !codingPattern.test(message);
+}
+
+function buildAttachmentExtractionStructuredIntent(): StructuredIntentClassification {
+  return {
+    intent: "research",
+    difficulty: "easy",
+    verbosity: "balanced",
+    audienceLevel: "intermediate",
+    toolUsage: [],
+    responseMode: "analyze",
+    confidence: "high",
+    memoryRelevance: false,
+    reasoningDepth: "standard",
+    multiIntent: [],
+  };
+}
+
 function resolveToolPlanForQueryIntent(
   state: ChatGraphState,
   queryIntent: QueryIntentClassification,
@@ -210,6 +244,7 @@ function resolveToolPlanForQueryIntent(
   const hasImageAttachment = (state.attachments ?? []).some((a) =>
     a.kind === "image" || (a.mimeType ?? "").startsWith("image/"),
   );
+  const hasAnyAttachment = hasAnyActiveAttachment(state);
   // If intent does not need tools, still allow user-selected options to
   // force use of tools. We merge inferred tools with any selected options
   // provided by the client (UI chips).
@@ -264,7 +299,7 @@ function resolveToolPlanForQueryIntent(
   // Only add an imageSearch tool when we don't already have an uploaded image
   // to use as the primary visual context. Uploaded images should be used
   // directly rather than triggering a provider image search.
-  if (!hasImageAttachment && visualContextPattern.test(message)) {
+  if (!hasAnyAttachment && !hasImageAttachment && visualContextPattern.test(message)) {
     selectedTools.push("imageSearch");
   }
 
@@ -1213,6 +1248,16 @@ export async function classifyIntentNode(state: ChatGraphState) {
                   structuredIntent?.intent === "system design"
                 ? "explanation"
                 : "general";
+
+      if (shouldPreferAttachmentExtractionIntent(state)) {
+        structuredIntent = buildAttachmentExtractionStructuredIntent();
+        classifiedIntent = {
+          intent: "factual",
+          requiresFreshData: false,
+          confidence: "high",
+        };
+        taskCategory = "reasoning";
+      }
     } catch (classificationError) {
       warn("intent_classification_model_failed", { error: classificationError });
     }

@@ -216,6 +216,12 @@ test("router includes attachment-handling guidance for extracted text", () => {
   );
 });
 
+test("file-reader prompt is registered in PROMPTS", () => {
+  const source = readWorkspaceFile("ai/prompts/forge-file-reader.prompt.ts");
+  assert.match(source, /FORGE FILE READER INSTRUCTION/);
+  assert.ok(PROMPTS.fileReader && PROMPTS.fileReader.includes("FORGE FILE READER INSTRUCTION"));
+});
+
 test("formatter prompt includes attachment-handling guidance", () => {
   const source = readWorkspaceFile("ai/prompts/formatter.prompt.ts");
   assert.match(

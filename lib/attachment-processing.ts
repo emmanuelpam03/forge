@@ -187,6 +187,7 @@ export async function ensureAttachmentParsed(
 
   const fileName = attachment.originalName || attachment.name;
   const mimeType = attachment.mimeType ?? "application/octet-stream";
+  const isPdf = attachment.kind === "pdf" || mimeType === "application/pdf";
   const { buffer } = await fetchAttachmentBytesForParsing(storageUrl);
   const parsed = await parseAttachmentBuffer({
     chatId: attachment.chatId,
@@ -195,6 +196,16 @@ export async function ensureAttachmentParsed(
     sizeBytes: attachment.sizeBytes ?? buffer.byteLength,
     buffer,
   }, { forceOcr: Boolean(options?.forceOcr) });
+
+  if (isPdf && !(parsed.text ?? "").trim()) {
+    try {
+      console.warn("PDF parse produced empty text after OCR attempt", {
+        attachmentId: attachment.id,
+        chatId: attachment.chatId,
+        forceOcr: Boolean(options?.forceOcr),
+      });
+    } catch {}
+  }
 
   const prisma = (await import("./prisma.ts")).default;
   await prisma.attachment.update({
@@ -245,7 +256,7 @@ export async function parsePdf(
   },
 ): Promise<ParsedAttachment> {
   const extractOcrText =
-    options?.extractOcrText ?? ((input: Buffer) => extractPdfOcrText(input, { force: true }));
+    options?.extractOcrText ?? ((input: Buffer) => extractPdfOcrText(input, { force: Boolean(options?.forceOcr) }));
 
   try {
     const parser = options?.parse ?? (await loadPdfParser());
@@ -305,9 +316,8 @@ async function extractPdfOcrText(
   options?: { force?: boolean },
 ): Promise<string> {
   try {
-    if (!options?.force && !(await ocrIsDocumentAvailable())) {
-      return "";
-    }
+    const requireOcr = Boolean(options?.force);
+    const documentOcrAvailable = requireOcr ? true : await ocrIsDocumentAvailable();
 
     const pdfjsModule = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const { createCanvas } = await import("@napi-rs/canvas");
@@ -323,6 +333,17 @@ async function extractPdfOcrText(
     const pdfDocument = await documentTask.promise;
     const maxPages = Math.min(pdfDocument.numPages, getPdfOcrMaxPages());
     const recognizedText: string[] = [];
+    const debugPdfOcr = process.env.DEBUG_ATTACHMENT_OCR === "1";
+    if (debugPdfOcr) {
+      try {
+        console.info("PDF OCR started", {
+          totalPages: pdfDocument.numPages,
+          maxPages,
+          force: requireOcr,
+          documentOcrAvailable,
+        });
+      } catch {}
+    }
 
     for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
       const page = await pdfDocument.getPage(pageNumber);
@@ -335,18 +356,40 @@ async function extractPdfOcrText(
       const imgBuf = canvas.toBuffer("image/png");
       let text = "";
       try {
-        if (await ocrIsDocumentAvailable()) {
+        if (documentOcrAvailable) {
           text = await ocrExtractText(imgBuf, { lang: "eng", scope: "document" });
         }
-      } catch {
+      } catch (err) {
+        try {
+          console.warn("extractPdfOcrText page OCR failed:", (err as Error)?.message ?? String(err));
+        } catch {}
         text = "";
+      }
+      if (debugPdfOcr) {
+        try {
+          console.info("PDF OCR page processed", {
+            pageNumber,
+            pngBytes: imgBuf.byteLength,
+            hasText: text.trim().length > 0,
+          });
+        } catch {}
       }
       if (text) {
         recognizedText.push(text);
       }
     }
 
-    return recognizedText.join("\n\n").trim();
+    const combined = recognizedText.join("\n\n").trim();
+    if (debugPdfOcr) {
+      try {
+        console.info("PDF OCR finished", {
+          pagesProcessed: maxPages,
+          pagesWithText: recognizedText.length,
+          extractedLength: combined.length,
+        });
+      } catch {}
+    }
+    return combined;
   } catch (err) {
     try {
       console.warn(
