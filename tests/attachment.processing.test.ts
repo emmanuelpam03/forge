@@ -11,6 +11,7 @@ import {
 import {
   buildAttachmentMultimodalBlocks,
   formatAttachmentContext,
+  parsePdf,
   parseImageAttachment,
 } from "../lib/attachment-processing.ts";
 
@@ -47,6 +48,18 @@ test("parseImageAttachment uses OCR text when available", async () => {
 
   assert.equal(parsed.text, "Hello from OCR");
   assert.equal(parsed.summary, "Hello from OCR");
+});
+
+test("parsePdf falls back to OCR when pdf parsing fails", async () => {
+  const parsed = await parsePdf(Buffer.from("fake pdf", "utf8"), {
+    parse: async () => {
+      throw new Error("pdf parse failed");
+    },
+    extractOcrText: async () => "Recovered text from OCR",
+  });
+
+  assert.equal(parsed.text, "Recovered text from OCR");
+  assert.equal(parsed.summary, "Recovered text from OCR");
 });
 
 test("formatAttachmentContext ranks relevant attachments first", () => {

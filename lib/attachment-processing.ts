@@ -222,14 +222,33 @@ export async function ensureAttachmentParsed(
   });
 }
 
-async function parsePdf(
+type PdfParseResult = {
+  text?: string;
+  numpages?: number;
+};
+
+type PdfParser = (buffer: Buffer) => Promise<PdfParseResult>;
+
+type PdfOcrExtractor = (buffer: Buffer) => Promise<string>;
+
+async function loadPdfParser(): Promise<PdfParser> {
+  const parserModule = await import("pdf-parse");
+  return (parserModule as { default?: PdfParser }).default ?? (parserModule as unknown as PdfParser);
+}
+
+export async function parsePdf(
   buffer: Buffer,
-  options?: { forceOcr?: boolean },
+  options?: {
+    forceOcr?: boolean;
+    parse?: PdfParser;
+    extractOcrText?: PdfOcrExtractor;
+  },
 ): Promise<ParsedAttachment> {
+  const extractOcrText =
+    options?.extractOcrText ?? ((input: Buffer) => extractPdfOcrText(input, { force: true }));
+
   try {
-    const parserModule = await import("pdf-parse");
-    const parser = (parserModule as { default?: (input: Buffer) => Promise<{ text?: string; numpages?: number }> }).default ??
-      (parserModule as unknown as (input: Buffer) => Promise<{ text?: string; numpages?: number }>);
+    const parser = options?.parse ?? (await loadPdfParser());
     const result = await parser(buffer);
 
     const text = (result.text ?? "").trim();
@@ -241,7 +260,7 @@ async function parsePdf(
       };
     }
 
-    const ocrText = await extractPdfOcrText(buffer, { force: true });
+    const ocrText = await extractOcrText(buffer);
     if (ocrText) {
       return {
         text: ocrText,
@@ -256,6 +275,14 @@ async function parsePdf(
       pageCount: result.numpages ?? undefined,
     };
   } catch {
+    const ocrText = await extractOcrText(buffer);
+    if (ocrText) {
+      return {
+        text: ocrText,
+        summary: summarizeAttachmentText(ocrText, 320),
+      };
+    }
+
     return {
       text: "",
       summary: "PDF uploaded. Failed to extract text.",
