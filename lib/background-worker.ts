@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getRedisClient } from "@/lib/redis";
-import { completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type ProcessAttachmentJobData } from "@/lib/job-queue";
+import { completeJob, dequeueJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type ProcessAttachmentJobData } from "@/lib/job-queue";
 import { error as logError, info } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import { HumanMessage } from "@langchain/core/messages";
@@ -306,7 +306,7 @@ async function processAttachmentJob(job: Job<ProcessAttachmentJobData>): Promise
  * Call this once at server startup (or lazily on first use).
  * Safe to call multiple times - uses a module-level guard to prevent duplicate initialization.
  */
-const workersInitialized = false;
+let workersInitialized = false;
 let workersStopping = false;
 const workerLoopPromises: Promise<void>[] = [];
 
@@ -346,6 +346,34 @@ async function shutdownBackgroundWorkers(options?: { timeoutMs?: number }): Prom
   }
 }
 
+async function startWorkerForQueue<T>(
+  jobType: "saveMessages" | "generateTitle" | "processAttachment",
+  processor: (job: Job<T>) => Promise<void>,
+): Promise<void> {
+  while (!workersStopping) {
+    try {
+      const job = await dequeueJob(jobType, workersStopping ? 1 : 30);
+      if (!job) {
+        if (workersStopping) {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+
+      await processor(job as unknown as Job<T>);
+    } catch (err) {
+      if (workersStopping) {
+        break;
+      }
+
+      logError("worker_error", { jobType, error: err });
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+}
+
 export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHandle> {
   if (workersInitialized) {
     return {
@@ -353,7 +381,16 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
     };
   }
 
+  workersInitialized = true;
+  workersStopping = false;
+
   void getRedisClient();
+
+  workerLoopPromises.push(
+    startWorkerForQueue("saveMessages", processSaveMessagesJob),
+    startWorkerForQueue("generateTitle", processGenerateTitleJob),
+    startWorkerForQueue("processAttachment", processAttachmentJob),
+  );
 
   return {
     shutdown: shutdownBackgroundWorkers,
