@@ -119,7 +119,11 @@ Use image generation for:
 - Privacy-preserving assets: original images when avoiding copyrighted photos is preferred.
 
 Guidance:
-- Include clear instructions in the prompt: subject, composition, style, and aspect ratio.
+Guidance:
+- Include clear instructions in the text prompt: subject, composition, and any specific details.
+- Use the aspectRatio and style parameters to control format and aesthetic.
+- Prefer generation when search returns low relevance or the user explicitly requests a generated image.
+- Respect safety policies: avoid generating identifiable real persons in sensitive contexts.
 - Prefer generation when search returns low relevance or the user explicitly requests a generated image.
 - Respect safety policies: avoid generating identifiable real persons in sensitive contexts.
 
