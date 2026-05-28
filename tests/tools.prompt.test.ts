@@ -14,3 +14,11 @@ test("tools prompt includes imageGeneration tool", () => {
     "tools prompt should include an HTML <img src=> example or an escaped equivalent",
   );
 });
+
+test("tools prompt includes documentGeneration guidance for file exports", () => {
+  const prompt = getToolsPrompt();
+  assert.match(prompt, /documentGeneration/i);
+  assert.match(prompt, /PDF, DOCX, XLSX, or PPTX/i);
+  assert.match(prompt, /essay, report, outline, worksheet, slide deck, spreadsheet/i);
+  assert.match(prompt, /Do not return Python code, raw JSON/i);
+});

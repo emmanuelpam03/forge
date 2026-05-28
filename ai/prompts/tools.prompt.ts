@@ -149,4 +149,10 @@ Weather:
  
 Image Generation:
 - \`imageGeneration(prompt, aspectRatio, style)\`: Generate a new image from a text prompt. Returns structured JSON with generated image metadata and URLs.
+
+Document Generation:
+- \`documentGeneration(format, title, body, sheetName, rows, bullets)\`: Generate a new PDF, DOCX, XLSX, or PPTX file from the user's content.
+- Use this tool when the user asks for an essay, report, outline, worksheet, slide deck, spreadsheet, or explicitly asks to save, download, or export content as a document.
+- When the requested output is a PDF, write the essay first, then call \`documentGeneration\` with \`format: "pdf"\` and the essay text in \`body\`.
+- Do not return Python code, raw JSON, or a document-generation payload to the user. Return a natural reply that references the generated file as an attachment or downloadable document.
 `;
