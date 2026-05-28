@@ -9,7 +9,6 @@ import {
   datetimeTool,
   imageSearchToolAsync,
   projectContextLookupTool,
-  readAnyFileToolAsync,
   summarizeTextTool,
   webSearchToolAsync,
   weatherToolAsync,
@@ -173,7 +172,7 @@ export function createForgeTools(
     new DynamicStructuredTool({
       name: "projectContextLookup",
       description:
-        "Retrieve relevant context from current project chats and extracted documents.",
+        "Retrieve relevant context from current project chats and attachments.",
       schema: projectContextLookupToolSchema,
       func: async ({ query, maxResults, includeDocuments }) => {
         const result = await projectContextLookupTool({
@@ -181,19 +180,6 @@ export function createForgeTools(
           query,
           maxResults,
           includeDocuments,
-        });
-        return formatToolOutput(result);
-      },
-    }),
-    new DynamicStructuredTool({
-      name: "read_any_file",
-      description:
-        "Extract and read text from an uploaded attachment by attachment ID.",
-      schema: readAnyFileToolSchema,
-      func: async ({ attachmentId }) => {
-        const result = await readAnyFileToolAsync({
-          chatId: context.chatId,
-          attachmentId,
         });
         return formatToolOutput(result);
       },

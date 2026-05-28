@@ -8,8 +8,6 @@ import type { UploadedAttachment } from "@/lib/attachment-types";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
-/** Vision-capable model on OpenRouter (used when the user uploads images). */
-export const DEFAULT_VISION_MODEL = "google/gemini-2.0-flash-001";
 export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 8192;
 export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 32000;
 
@@ -58,30 +56,14 @@ export type ResolveChatModelOptions = {
 };
 
 /**
- * Pick the model for a chat turn. Uses a vision model when images are attached,
- * since DeepSeek v4 Flash is text-only and cannot read image_url blocks.
+ * Pick the model for a chat turn.
  */
 export function resolveChatModelConfig(
   override?: ModelOverride,
   options?: ResolveChatModelOptions,
 ): ChatModelConfig {
-  const base = getChatModelConfig(override);
-
-  if (!options?.hasImageAttachments) {
-    return base;
-  }
-
-  const visionModel =
-    process.env.OPENROUTER_VISION_MODEL?.trim() || DEFAULT_VISION_MODEL;
-
-  if (visionModel !== base.model) {
-    info("vision_model_routed", {
-      fromModel: base.model,
-      toModel: visionModel,
-    });
-  }
-
-  return { ...base, model: visionModel };
+  void options;
+  return getChatModelConfig(override);
 }
 
 // Validate OpenRouter config is present

@@ -2,7 +2,6 @@ import "server-only";
 
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import {
-  chatHasImageAttachments,
   createGeminiModel,
   resolveChatModelConfig,
   type ModelOverride,
@@ -204,56 +203,6 @@ function hasAnyActiveAttachment(state: ChatGraphState): boolean {
   return (state.attachments ?? []).some((attachment) => attachment.status !== "failed");
 }
 
-function shouldPreferAttachmentExtractionIntent(state: ChatGraphState): boolean {
-  if (!hasAnyActiveAttachment(state)) {
-    return false;
-  }
-  const message = (state.userMessage ?? "").toLowerCase();
-
-  const extractionPattern =
-    /\b(extract|read|text|summari[sz]e|analy[sz]e|review|what(?:'s| is)\s+in|content)\b/i;
-  const codingPattern =
-    /\b(code|typescript|javascript|python|java|c\+\+|c#|api|endpoint|function|class|compile|stack trace|debug|refactor)\b/i;
-
-  // Additional heuristics: look for file/attachment hints + question words
-  const fileHintPattern = /\b(file|attachment|document|pdf|docx|csv|spreadsheet|sheet)\b/i;
-  const questionWordPattern = /\b(what|who|when|where|how|why|does|do|is|are|list|show|summarize|summarise|describe|tell me|contents?)\b/i;
-
-  // If the message explicitly included attachment IDs with the user message and
-  // looks like a question, prefer extraction unless it's a coding request.
-  if ((state.messageAttachmentIds ?? []).length > 0 && questionWordPattern.test(message)) {
-    return !codingPattern.test(message);
-  }
-
-  // If explicit extraction keywords are present, prefer extraction (unless coding).
-  if (extractionPattern.test(message)) {
-    return !codingPattern.test(message);
-  }
-
-  // If message mentions a file/attachment and includes a question word, prefer extraction.
-  if (fileHintPattern.test(message) && questionWordPattern.test(message)) {
-    return !codingPattern.test(message);
-  }
-
-  return false;
-}
-
-
-function buildAttachmentExtractionStructuredIntent(): StructuredIntentClassification {
-  return {
-    intent: "research",
-    difficulty: "easy",
-    verbosity: "balanced",
-    audienceLevel: "intermediate",
-    toolUsage: ["read_any_file"],
-    responseMode: "analyze",
-    confidence: "high",
-    memoryRelevance: false,
-    reasoningDepth: "standard",
-    multiIntent: [],
-  };
-}
-
 function resolveToolPlanForQueryIntent(
   state: ChatGraphState,
   queryIntent: QueryIntentClassification,
@@ -365,8 +314,6 @@ function mapStructuredToolUsage(toolUsage: string[]): string[] {
         return "calculator";
       case "memory_lookup":
         return null;
-      case "read_any_file":
-        return "read_any_file";
       default:
         return null;
     }
@@ -584,9 +531,8 @@ export async function generateResponseNode(state: ChatGraphState) {
   const override: ModelOverride = {
     model: state.modelUsed || undefined,
   };
-  const hasImageAttachments = chatHasImageAttachments(state.attachments);
-  const modelConfig = resolveChatModelConfig(override, { hasImageAttachments });
-  const model = createGeminiModel(override, { hasImageAttachments });
+  const modelConfig = resolveChatModelConfig(override);
+  const model = createGeminiModel(override);
 
     try {
       const invoker = model as unknown as ModelInvoker;
@@ -905,8 +851,7 @@ export async function toolRouterNodeImpl(
   onEvent?: (event: StreamEvent) => void,
 ) {
   try {
-    // Debug log the incoming tool plan to help trace whether planner
-    // requested the read_any_file tool (or others) at runtime.
+    // Debug log the incoming tool plan to help trace planner behavior.
     debug("tool_router_invoked", {
       chatId: state.chatId,
       runId: state.runId,
@@ -965,43 +910,6 @@ export async function toolRouterNodeImpl(
           debug("tool_invoke_error", { chatId: state.chatId, runId: state.runId, tool: forcedName, error: err instanceof Error ? err.message : err });
           // fall through to normal processing (no forced output)
         }
-      }
-    }
-
-    // Fallback: if planner did not request tools but the user asked to
-    // extract/read an uploaded attachment, force invocation of the
-    // `read_any_file` tool for the first available attachment. This is a
-    // safety net to ensure attachment-reading requests are served even when
-    // the classifier/planner missed the structured tool_usage.
-    if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
-      try {
-        if (shouldPreferAttachmentExtractionIntent(state)) {
-          const firstAttachmentId = (state.messageAttachmentIds ?? [])[0] ?? (state.attachments ?? []).find((a) => a.status !== "failed")?.id;
-          if (firstAttachmentId) {
-            debug("tool_router_fallback_invoke", { chatId: state.chatId, runId: state.runId, attachmentId: firstAttachmentId });
-            const tools = createForgeTools({ chatId: state.chatId });
-            const toolByNameFallback = new Map(tools.map((tool) => [tool.name, tool]));
-            const readTool = toolByNameFallback.get("read_any_file");
-            if (readTool) {
-              emitStatus(onEvent, getToolStatusMessage("read_any_file"));
-              const rawResult = await readTool.invoke({ attachmentId: firstAttachmentId });
-              const toolResultText = typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult, null, 2);
-              return {
-                toolsUsed: ["read_any_file"],
-                evidenceBundles: [
-                  {
-                    tool: "read_any_file",
-                    content: toolResultText,
-                    timestamp: new Date().toISOString(),
-                  },
-                ],
-                toolContext: toolResultText,
-              };
-            }
-          }
-        }
-      } catch (err) {
-        logError("tool_router_fallback_failed", { error: err });
       }
     }
 
@@ -1323,15 +1231,6 @@ export async function classifyIntentNode(state: ChatGraphState) {
                 ? "explanation"
                 : "general";
 
-      if (shouldPreferAttachmentExtractionIntent(state)) {
-        structuredIntent = buildAttachmentExtractionStructuredIntent();
-        classifiedIntent = {
-          intent: "factual",
-          requiresFreshData: false,
-          confidence: "high",
-        } as ClassifiedIntent;
-        taskCategory = "reasoning";
-      }
     } catch (classificationError) {
       warn("intent_classification_model_failed", { error: classificationError });
     }

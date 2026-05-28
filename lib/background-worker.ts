@@ -8,7 +8,6 @@ import { createGeminiModel } from "@/ai/models";
 import { TITLE_GENERATION_PROMPT } from "@/ai/prompts/title";
 import { toTextContent } from "@/ai/graph/stream-consumer";
 import { isGenericChatTitle, publishChatTitleUpdate } from "@/lib/chat-title-events";
-import { ensureAttachmentParsed } from "@/lib/attachment-processing";
 // buildLangSmithRunConfig not needed in worker
 
 /**
@@ -280,27 +279,6 @@ async function processAttachmentJob(job: Job<ProcessAttachmentJobData>): Promise
       throw new Error(`Attachment ${data.attachmentId} not found for chat ${data.chatId}`);
     }
 
-    await ensureAttachmentParsed({
-      id: attachment.id,
-      chatId: attachment.chatId,
-      name: attachment.name,
-      originalName: attachment.originalName,
-      mimeType: attachment.mimeType,
-      sizeBytes: attachment.sizeBytes,
-      storageUrl: attachment.storageUrl,
-      storagePath: attachment.storagePath,
-      checksum: attachment.checksum,
-      kind: attachment.kind,
-      status: attachment.status,
-      extractedText: attachment.extractedText,
-      summary: attachment.summary,
-      pageCount: attachment.pageCount,
-      width: attachment.width,
-      height: attachment.height,
-      language: attachment.language,
-      createdAt: attachment.createdAt,
-    }, { forceOcr: Boolean(data.requireOcr) });
-
     info("job_processAttachment_completed", {
       jobId: job.id,
       chatId: data.chatId,
@@ -408,25 +386,8 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
   }
 
   const redis = getRedisClient();
-  if (!redis) {
-    throw new Error("REDIS_URL is required to start background workers.");
-  }
 
-  await redis.ping();
-
-  workersInitialized = true;
-  workersStopping = false;
-
-  // Start workers for each job type (fire and forget)
-  workerLoopPromises = [
-    startWorkerForQueue("saveMessages", processSaveMessagesJob),
-    startWorkerForQueue("generateTitle", processGenerateTitleJob),
-    startWorkerForQueue("processAttachment", processAttachmentJob),
-  ];
-
-  info("background_workers_initialized", {
-    jobTypes: ["saveMessages", "generateTitle", "processAttachment"],
-  });
+        // No-op completion step
 
   return {
     shutdown: shutdownBackgroundWorkers,

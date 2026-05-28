@@ -182,10 +182,10 @@ export default function HomePage() {
         if (uploadedAttachment.status === "failed") {
           showFeedback({
             type: "error",
-            title: "Upload completed, extraction failed",
+            title: "Upload completed",
             description:
               uploadedAttachment.summary?.trim() ||
-              `${uploadedAttachment.name || file.name} could not be processed.`,
+              `${uploadedAttachment.name || file.name} was uploaded, but it could not be processed.`,
           });
         } else if (uploadedAttachment.status === "processing") {
           showFeedback({

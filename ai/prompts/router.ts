@@ -16,7 +16,6 @@ import {
   getTaskPrompt,
   getToolsPrompt,
   getVisualContextToolPrompt,
-  getFileReaderPrompt,
 } from "@/ai/prompts/promptRegistry";
 // humanization routing removed from live prompt assembly
 import {
@@ -331,18 +330,7 @@ function buildRuntimeContext(state: ChatGraphState): string {
   function formatAttachmentHandlingGuidance(state: ChatGraphState): string {
     if (!state.attachments || state.attachments.length === 0) return "";
 
-    const hasExtractedContent = state.attachments.some((att) => {
-      try {
-        const text = (att.extractedText ?? att.summary ?? "") as string;
-        return typeof text === "string" && text.trim().length > 0;
-      } catch {
-        return false;
-      }
-    });
-
-    if (!hasExtractedContent) return "";
-
-    return "When attachments (PDFs, images, or other uploaded documents) are present and have extracted text or summaries, treat that extracted content as authoritative source material. Do not apologize or claim inability to read the attachment when extracted text or multimodal context exists—use the extracted text directly and cite it where relevant. Do NOT call external image-search or web-image lookup tools (for example `imageSearch`, SerpAPI, Pexels, or similar) to retrieve content from uploaded files; those tools are only for finding external images and must not be used to replace the file's extracted text.";
+    return "Uploaded attachments are available only as conversation metadata. Do not claim to have read a file's contents unless they were explicitly provided in the chat.";
   }
 
   const attachmentHandlingInstruction = formatAttachmentHandlingGuidance(state);
@@ -446,12 +434,6 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.formatting": controls.formatting,
         "response.persona": resolvedPersonaRole,
       },
-    },
-    {
-      id: "file-reader",
-      layer: "task",
-      priority: 84,
-      content: getFileReaderPrompt(),
     },
     {
       id: "visual-context-tool",

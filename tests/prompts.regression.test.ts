@@ -209,25 +209,15 @@ test("router supports auto persona for coding and explicit overrides", () => {
 test("router includes attachment-handling guidance for extracted text", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
 
-  assert.match(source, /authoritative source material/);
-
-  assert.match(
-    source,
-    /do not apologize or claim inability to read the attachment when extracted text or multimodal context exists/i,
-  );
-});
-
-test("file-reader prompt is registered in PROMPTS", () => {
-  const source = readWorkspaceFile("ai/prompts/forge-file-reader.prompt.ts");
-  assert.match(source, /FORGE FILE READER INSTRUCTION/);
-  assert.ok(PROMPTS.fileReader && PROMPTS.fileReader.includes("FORGE FILE READER INSTRUCTION"));
+  assert.match(source, /Uploaded attachments are available only as conversation metadata/);
+  assert.doesNotMatch(source, /extracted text or multimodal context exists/i);
 });
 
 test("formatter prompt includes attachment-handling guidance", () => {
   const source = readWorkspaceFile("ai/prompts/formatter.prompt.ts");
   assert.match(
     source,
-    /do not apologize or claim inability to read the attachment when extracted text or multimodal context exists/i,
+    /attachments are present, treat them as metadata-bearing conversation context/i,
   );
 });
 
@@ -235,7 +225,7 @@ test("senior-engineer prompt includes attachment-handling guidance", () => {
   const source = readWorkspaceFile("ai/prompts/senior-engineer.prompt.ts");
   assert.match(
     source,
-    /do not apologize or claim inability to read the attachment when extracted text or multimodal context exists/i,
+    /attachments are present, treat them as metadata-bearing context only/i,
   );
 });
 
@@ -288,10 +278,8 @@ test("chat API keeps strict attachment validation and preserves ApiError statuse
   const helperSource = readWorkspaceFile("lib/chat-attachment-resolution.ts");
 
   assert.match(helperSource, /Unknown attachment IDs:/);
-  assert.match(helperSource, /previously failed extraction/);
-  assert.match(helperSource, /could not be parsed:/);
   assert.match(helperSource, /new ApiError\([\s\S]*400/);
-  assert.match(helperSource, /new ApiError\([\s\S]*422/);
+  assert.doesNotMatch(helperSource, /could not be parsed:|previously failed extraction/);
   assert.match(routeSource, /selectAttachmentsForTurn/);
   assert.match(routeSource, /resolveAttachmentsForTurn/);
   assert.match(routeSource, /return toResponse\(error\);/);
@@ -318,7 +306,7 @@ test("classifier prompt recognizes explanation as a teaching category", () => {
   assert.match(source, /teaching, conceptual breakdowns, comparisons/);
 });
 
-test("classifier accepts read_any_file in tool_usage", () => {
+test("classifier rejects removed file-reading tool usage", () => {
   const json = JSON.stringify({
     intent: "research",
     difficulty: "medium",
@@ -333,6 +321,5 @@ test("classifier accepts read_any_file in tool_usage", () => {
   });
 
   const parsed = parseStructuredIntentClassification(json);
-  // Normalization should preserve known tool names including read_any_file
-  assert.deepEqual(parsed.toolUsage, ["read_any_file"]);
+  assert.deepEqual(parsed.toolUsage, []);
 });

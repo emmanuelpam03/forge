@@ -7,24 +7,23 @@ function readWorkspaceFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
 }
 
-test("generateResponseNode routes vision model when attachments include images", () => {
+test("generateResponseNode keeps text-model routing for image attachments", () => {
   const source = readWorkspaceFile("ai/graph/nodes.ts");
 
-  assert.match(source, /chatHasImageAttachments\(state\.attachments\)/);
-  assert.match(source, /resolveChatModelConfig\(override, \{ hasImageAttachments \}\)/);
+  assert.match(source, /resolveChatModelConfig\(override\)/);
+  assert.doesNotMatch(source, /hasImageAttachments/);
 });
 
-test("model routing uses DeepSeek by default and vision model for images", () => {
+test("model routing uses DeepSeek by default without a vision fallback", () => {
   const source = readWorkspaceFile("ai/models/index.ts");
 
   assert.match(source, /DEFAULT_MODEL\s*=\s*"deepseek\/deepseek-v4-flash"/);
-  assert.match(source, /DEFAULT_VISION_MODEL/);
   assert.match(source, /resolveChatModelConfig/);
-  assert.match(source, /chatHasImageAttachments/);
   assert.match(source, /provider:\s*"openrouter"/);
   assert.match(source, /DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS\s*=\s*8192/);
   assert.match(source, /MAX_OPENROUTER_MAX_COMPLETION_TOKENS\s*=\s*32000/);
   assert.match(source, /Math\.min\(parsedMaxTokens, MAX_OPENROUTER_MAX_COMPLETION_TOKENS\)/);
+  assert.doesNotMatch(source, /DEFAULT_VISION_MODEL|vision_model_routed|OPENROUTER_VISION_MODEL/);
   assert.doesNotMatch(source, /ollama|google-genai|llama/);
 });
 
@@ -79,7 +78,7 @@ test("environment config is DeepSeek-only", () => {
   assert.match(envExample, /OPENROUTER_API_KEY/);
   assert.match(envExample, /DeepSeek/);
   assert.doesNotMatch(envExample, /OLLAMA_|GOOGLE_API_KEY/);
-  assert.match(envExample, /OPENROUTER_VISION_MODEL/);
+  assert.doesNotMatch(envExample, /OPENROUTER_VISION_MODEL/);
   assert.match(envExample, /OPENROUTER_MAX_COMPLETION_TOKENS=8192/);
 
   // Verify README reflects DeepSeek-only
