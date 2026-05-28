@@ -602,7 +602,7 @@ export default function HomePage() {
 
             <div className="mt-2 flex items-center justify-between px-3 text-[11px] text-muted-foreground">
               <p>
-                {isDraggingFiles ? "Drop files to upload." : "Enter to send. Shift+Enter for a new line."}
+                {isDraggingFiles ? "Drop files to upload." : "Enter to send."}
               </p>
               {isUploading ? <p>Uploading files...</p> : null}
             </div>
