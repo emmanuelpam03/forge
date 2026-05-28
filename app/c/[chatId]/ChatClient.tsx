@@ -1745,7 +1745,26 @@ export function ChatClient({
                 Array.isArray(message.imageBlock.images) &&
                 message.imageBlock.images.length > 0 ? (
                   <div>
-                    {message.imageBlock.images.length >= 4 ? (
+                    {message.imageBlock.images.some((image) => image.sourcePage) ? (
+                      <div className="my-4 space-y-2 rounded-xl border border-border bg-card/60 p-4 text-sm text-foreground">
+                        {message.imageBlock.images.map((image) => (
+                          <a
+                            key={image.id}
+                            href={image.sourcePage || image.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background px-3 py-2 transition hover:border-primary/40 hover:bg-accent"
+                          >
+                            <span className="min-w-0 truncate font-medium">
+                              {image.title || "Open image source"}
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              View source
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : message.imageBlock.images.length >= 4 ? (
                       <ImageGrid images={message.imageBlock.images} />
                     ) : (
                       <ImageCarousel images={message.imageBlock.images} />

@@ -17,6 +17,20 @@ type PollinationsGeneratedImageResult = {
   images: ProviderImage[];
 };
 
+function getPollinationsDimensions(
+  aspectRatio?: PollinationsImageGenerationInput["aspectRatio"],
+): { width: number; height: number } {
+  switch (aspectRatio) {
+    case "portrait":
+      return { width: 512, height: 768 };
+    case "landscape":
+      return { width: 768, height: 512 };
+    case "square":
+    default:
+      return { width: 768, height: 768 };
+  }
+}
+
 function buildAspectPrompt(
   prompt: string,
   aspectRatio?: PollinationsImageGenerationInput["aspectRatio"],
@@ -64,7 +78,8 @@ export async function pollinationsGenerateImage(
   }
 
   const promptUsed = buildAspectPrompt(input.prompt, input.aspectRatio, input.style);
-  const imageUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(promptUsed)}?model=flux`;
+  const { width, height } = getPollinationsDimensions(input.aspectRatio);
+  const imageUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(promptUsed)}?model=flux&width=${width}&height=${height}`;
 
   const startedAt = Date.now();
   const response = await fetchWithTimeout(imageUrl, {
