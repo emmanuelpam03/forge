@@ -3,6 +3,7 @@ import "server-only";
 import prisma from "@/lib/prisma";
 import fetchWithTimeout from "@/lib/fetchWithTimeout";
 import type { ImageSearchInput, ImageSearchResult, ProviderImage } from "./image-types";
+import { pollinationsGenerateImage } from "./providers/pollinations";
 import { serpapiImageSearch } from "./providers/serpapi";
 import { pexelsSearch } from "./providers/pexels";
 import {
@@ -37,6 +38,12 @@ type RankedChunk = {
 type ReadAnyFileInput = {
   chatId: string;
   attachmentId: string;
+};
+
+type ImageGenerationInput = {
+  prompt: string;
+  aspectRatio?: "square" | "landscape" | "portrait";
+  style?: string;
 };
 
 function tokenize(value: string): string[] {
@@ -1221,6 +1228,41 @@ export async function readAnyFileToolAsync(
     result: "",
     error: "Attachment reading is no longer supported.",
   };
+}
+
+export async function pollinationsImageGenerationToolAsync(
+  input: ImageGenerationInput,
+): Promise<ToolResult> {
+  try {
+    const generated = await pollinationsGenerateImage(input);
+    return {
+      success: true,
+      result: JSON.stringify(
+        {
+          success: true,
+          provider: generated.provider,
+          promptUsed: generated.promptUsed,
+          images: generated.images,
+          totalFound: generated.images.length,
+          retrievalTimeMs: generated.retrievalTimeMs,
+        },
+        null,
+        2,
+      ),
+      metadata: {
+        provider: generated.provider,
+        promptUsed: generated.promptUsed,
+        imageCount: generated.images.length,
+        retrievalTimeMs: generated.retrievalTimeMs,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      result: "",
+      error: error instanceof Error ? error.message : "Image generation failed.",
+    };
+  }
 }
 
 /**

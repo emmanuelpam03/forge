@@ -27,7 +27,7 @@ import {
   type QueryIntentClassification,
 } from "@/ai/graph/classification.ts";
 import type { ClassifiedIntent } from "@/ai/graph/state";
-import { buildIntentClassificationMessage, buildFreshnessClassificationMessage } from "@/ai/prompts/intent.ts";
+import { buildIntentClassificationMessage, buildFreshnessClassificationMessage } from "@/ai/prompts/intent";
 // humanization and sanitizer removed from runtime path
 import { shouldPreserveLongFormDraft } from "@/ai/graph/response-shaping";
 import type { ChatGraphState } from "@/ai/graph/state";
@@ -47,15 +47,26 @@ function emitImageSearchEvent(
   state: ChatGraphState,
   onEvent?: (event: StreamEvent) => void,
 ) {
-  if (toolName !== "imageSearch") return;
+  if (toolName !== "imageSearch" && toolName !== "imageGeneration") return;
 
   try {
     const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
     const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+    const toolArgs = buildToolArgs(toolName, state) as Record<string, unknown>;
+    const toolQuery =
+      typeof parsed?.queryUsed === "string"
+        ? parsed.queryUsed
+        : typeof parsed?.promptUsed === "string"
+          ? parsed.promptUsed
+          : typeof toolArgs.query === "string"
+            ? toolArgs.query
+            : typeof toolArgs.prompt === "string"
+              ? toolArgs.prompt
+              : "";
 
     const payload = {
       type: "images" as const,
-      query: parsed?.queryUsed || buildToolArgs(toolName, state).query || "",
+      query: toolQuery,
       provider: parsed?.provider || "",
       images: images.map((im) => ({
         id: im.id,
@@ -119,6 +130,7 @@ function getToolStatusMessage(toolName: string): string {
   if (toolName === "currentDateTime") return "Checking time...";
   if (toolName === "summarizeText") return "Summarizing...";
   if (toolName === "projectContextLookup") return "Loading context...";
+  if (toolName === "imageGeneration") return "Generating image...";
   return "Working...";
 }
 
@@ -263,12 +275,17 @@ function resolveToolPlanForQueryIntent(
     // chat-history-only policy. Keep tools conservative.
   }
 
+  const imageGenerationPattern = /\b(generate|create|make|draw|paint|design)\b.*\b(image|picture|illustration|poster|graphic|logo|scene|art|wallpaper)\b/i;
+  if (!hasAnyAttachment && imageGenerationPattern.test(message)) {
+    selectedTools.push("imageGeneration");
+  }
+
   // Heuristic: If the message looks like it would benefit from visual context, add imageSearch.
   const visualContextPattern = /\b(explain|diagram|how does|how do|visualize|show|illustrate|architecture|structure|design|flow|process|system|bridge|map|picture|image|images|photo|photos|visual|draw|sketch|render|display|suspension bridge|circuit|layout|ui|interface|pattern|component|example|inspire|reference)\b/i;
   // Only add an imageSearch tool when we don't already have an uploaded image
   // to use as the primary visual context. Uploaded images should be used
   // directly rather than triggering a provider image search.
-  if (!hasAnyAttachment && !hasImageAttachment && visualContextPattern.test(message)) {
+  if (!hasAnyAttachment && !hasImageAttachment && !imageGenerationPattern.test(message) && visualContextPattern.test(message)) {
     selectedTools.push("imageSearch");
   }
 
@@ -311,6 +328,8 @@ function mapStructuredToolUsage(toolUsage: string[]): string[] {
       case "code_execution":
       case "calculator":
         return "calculator";
+      case "image_generation":
+        return "imageGeneration";
       case "memory_lookup":
         return null;
       default:
@@ -409,6 +428,23 @@ function buildToolArgs(
       placementHint: "gallery",
       freshness: "recent",
       avoidDuplicates: true,
+    };
+  }
+
+  if (toolName === "imageGeneration") {
+    const prompt = message
+      .replace(/^(generate|create|make|draw|paint|design)\s+(an?\s+)?(image|picture|illustration|poster|graphic|logo|scene|artwork|art)\s+(of|for|about)\s+/i, "")
+      .replace(/^(generate|create|make|draw|paint|design)\s+/i, "")
+      .trim();
+
+    return {
+      prompt: prompt || message,
+      aspectRatio: /\b(portrait|vertical)\b/i.test(message)
+        ? "portrait"
+        : /\b(square|squared)\b/i.test(message)
+          ? "square"
+          : "landscape",
+      style: undefined,
     };
   }
 
@@ -928,10 +964,10 @@ export async function toolRouterNodeImpl(
                 ? rawResult
                 : JSON.stringify(rawResult, null, 2);
 
-            // For imageSearch, emit structured images event and avoid
+            // For imageSearch and imageGeneration, emit structured images event and avoid
             // including the raw JSON/text in evidenceBundles so internal
             // orchestration isn't exposed to the assistant prompts.
-            if (toolName === "imageSearch") {
+            if (toolName === "imageSearch" || toolName === "imageGeneration") {
               // Parse structured image result and persist to state imageBlock
               try {
                 const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
@@ -1011,11 +1047,11 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
-          // If this is an imageSearch tool, emit a structured images event
+          // If this is an imageSearch or imageGeneration tool, emit a structured images event
           // for the UI and avoid storing its raw textual output in the
           // evidenceBundles or as toolContext. This keeps orchestration
           // internal and prevents tool JSON from leaking into prompts.
-          if (toolName === "imageSearch") {
+          if (toolName === "imageSearch" || toolName === "imageGeneration") {
             emitImageSearchEvent(toolName, rawResult, state, onEvent);
             toolsUsed.add(toolName);
             evidenceBundles.push({
@@ -1085,10 +1121,10 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
     emitStatus(undefined, "Analyzing results...");
 
     // Format evidence bundles into a clear, sentence-oriented context
-    // (exclude imageSearch output). Use explicit sentences so the
+    // (exclude imageSearch and imageGeneration output). Use explicit sentences so the
     // output sanitizer recognizes these as visible answer content.
     const contextLines = state.evidenceBundles
-      .filter((bundle) => bundle.tool !== "imageSearch")
+      .filter((bundle) => bundle.tool !== "imageSearch" && bundle.tool !== "imageGeneration")
       .map((bundle) => {
         const toolLabel =
           bundle.tool === "webSearch"

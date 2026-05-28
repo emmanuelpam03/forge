@@ -8,6 +8,7 @@ import {
   calculatorTool,
   datetimeTool,
   imageSearchToolAsync,
+  pollinationsImageGenerationToolAsync,
   projectContextLookupTool,
   summarizeTextTool,
   webSearchToolAsync,
@@ -80,6 +81,12 @@ export const imageSearchToolSchema = z.object({
   placementHint: z.enum(["inline", "gallery", "hero"]).optional(),
   freshness: z.enum(["latest", "recent", "any"]).optional(),
   avoidDuplicates: z.boolean().optional(),
+});
+
+export const imageGenerationToolSchema = z.object({
+  prompt: z.string().min(1),
+  aspectRatio: z.enum(["square", "landscape", "portrait"]).optional(),
+  style: z.string().optional(),
 });
 
 export const readAnyFileToolSchema = z.object({
@@ -191,6 +198,16 @@ export function createForgeTools(
       schema: imageSearchToolSchema,
       func: async (args: z.infer<typeof imageSearchToolSchema>) => {
         const result = await imageSearchToolAsync(args);
+        return formatToolOutput(result);
+      },
+    }),
+    new DynamicStructuredTool({
+      name: "imageGeneration",
+      description:
+        "Generate a new image from a text prompt using Pollinations and return a JSON image result.",
+      schema: imageGenerationToolSchema,
+      func: async (args: z.infer<typeof imageGenerationToolSchema>) => {
+        const result = await pollinationsImageGenerationToolAsync(args);
         return formatToolOutput(result);
       },
     }),
