@@ -294,20 +294,7 @@ function resolveToolPlanForQueryIntent(
     selectedTools.push("imageSearch");
   }
 
-  // Compatibility helpers expected by tests: lightweight stubs that can be
-  // referenced by other modules or tests which inspect source text. These do
-  // not change runtime behavior but keep the source shape stable for tooling.
-  function shouldPreferAttachmentExtractionIntent(state: ChatGraphState): boolean {
-    // Heuristic placeholder: prefer explicit attachment extraction when uploads
-    // exist and the message likely requests extraction.
-    return (state.attachments ?? []).length > 0;
-  }
 
-  function buildAttachmentExtractionStructuredIntent() {
-    // Return a minimal structured intent object used by tests to verify the
-    // classifier wiring. Intent set to factual by contract.
-    return { intent: "factual", toolUsage: ["projectContextLookup"] };
-  }
 
   // Combine inferred and selected tools, preserving order but removing duplicates
   const final = Array.from(

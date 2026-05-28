@@ -123,6 +123,12 @@ Guidance:
 - Prefer generation when search returns low relevance or the user explicitly requests a generated image.
 - Respect safety policies: avoid generating identifiable real persons in sensitive contexts.
 
+Presentation requirement:
+- After generation, present the images directly in the assistant's final reply by embedding image URLs so the UI can render them. Prefer HTML image tags for consistent rendering in the Forge UI. Example examples:
+  - HTML (escaped for TypeScript safety): &lt;img src="https://example.com/image.jpg" alt="students in classroom" /&gt;
+  - Markdown (acceptable fallback): \`![students in classroom](https://example.com/image.jpg)\`
+- Do NOT return raw JSON or tool payloads to the user; the assistant's reply must be a natural, user-facing message containing embedded images and brief contextual text.
+
 --------------------------------------------------
 TOOL COMMANDS
 --------------------------------------------------
