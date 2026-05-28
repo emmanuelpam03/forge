@@ -1960,11 +1960,11 @@ export function ChatClient({
             </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground px-3">
+              <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground px-3">
             <p>
               {isDraggingFiles
                 ? "Drop files to upload."
-                : "Enter to send. Shift+Enter for a new line. We extract text from uploaded PDFs and images and use it as source material for responses."}
+                : "Enter to send. Shift+Enter for a new line."}
             </p>
             {lastUserMessage && error && (
               <button
