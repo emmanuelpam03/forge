@@ -1819,7 +1819,7 @@ export function ChatClient({
                   aria-expanded={isModelMenuOpen}
                   title="Model"
                 >
-                  <Sparkles size={18} />
+                  <Plus size={18} />
                 </button>
 
                 <div
