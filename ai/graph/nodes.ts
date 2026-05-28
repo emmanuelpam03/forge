@@ -724,6 +724,7 @@ export async function saveMessagesNode(state: ChatGraphState) {
   const saveTimer = startTimer("saveMessagesNode", { chatId: state.chatId, runId: state.runId });
   try {
     const imageBlock = state.imageBlock;
+    const assistantMedia = state.assistantMedia;
     const messageAttachmentIds = state.messageAttachmentIds ?? [];
     const userMessageAttachments =
       messageAttachmentIds.length > 0
@@ -765,7 +766,8 @@ export async function saveMessagesNode(state: ChatGraphState) {
         userMessageAttachments.length > 0
           ? { attachments: userMessageAttachments }
           : undefined,
-      assistantMedia: imageBlock ? { imageBlock } : undefined,
+      assistantMedia:
+        assistantMedia ?? (imageBlock ? { imageBlock } : undefined),
     };
 
     const queuedJobId = await queueJob("saveMessages", jobData);
@@ -1146,6 +1148,31 @@ export async function toolRouterNodeImpl(
           // evidenceBundles or as toolContext. This keeps orchestration
           // internal and prevents tool JSON from leaking into prompts.
           if (toolName === "imageSearch" || toolName === "imageGeneration") {
+            try {
+              const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
+              const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+              intermediateImageBlock = {
+                images: images.map((im) => ({
+                  id: im.id,
+                  url: im.url,
+                  thumbnailUrl: im.thumbnailUrl,
+                  title: im.title,
+                  sourcePage: im.sourcePage,
+                  source: im.sourcePage || im.provider,
+                  width: im.width,
+                  height: im.height,
+                  provider: im.provider,
+                  relevanceScore: im.relevanceScore,
+                  safetyScore: im.safetyScore,
+                  metadata: im.metadata || {},
+                })),
+                totalFound: (parsed?.totalFound as number) ?? images.length,
+                retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+              };
+            } catch {
+              // ignore parse errors; still emit the event
+            }
+
             emitImageSearchEvent(toolName, rawResult, state, onEvent);
             toolsUsed.add(toolName);
             evidenceBundles.push({

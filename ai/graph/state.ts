@@ -141,6 +141,7 @@ export type ChatGraphState = {
         retrievalTimeMs?: number;
       }
     | undefined;
+  assistantMedia?: unknown;
   extractedMemory: string;
   generatedTitle: string;
   toolPlan: ToolPlan | null;
@@ -288,6 +289,10 @@ export const chatGraphState = Annotation.Root({
       }
     | undefined
   >({
+    default: () => undefined,
+    reducer: lastValue,
+  }),
+  assistantMedia: Annotation<unknown | undefined>({
     default: () => undefined,
     reducer: lastValue,
   }),
