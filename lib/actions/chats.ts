@@ -63,6 +63,55 @@ export async function deleteChat(id: string) {
   }
 }
 
+type RecentChatCursor = {
+  id: string;
+  lastMessageAt: Date;
+};
+
+export async function getRecentChatsPage(options?: {
+  limit?: number;
+  cursor?: RecentChatCursor;
+}) {
+  try {
+    const limit = options?.limit ?? 20;
+
+    const chats = await prisma.chat.findMany({
+      where: {
+        isArchived: false,
+        projectId: null,
+        ...(options?.cursor
+          ? {
+              OR: [
+                {
+                  lastMessageAt: {
+                    lt: options.cursor.lastMessageAt,
+                  },
+                },
+                {
+                  lastMessageAt: options.cursor.lastMessageAt,
+                  id: {
+                    lt: options.cursor.id,
+                  },
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    });
+
+    const hasMore = chats.length > limit;
+    return {
+      chats: hasMore ? chats.slice(0, limit) : chats,
+      hasMore,
+    };
+  } catch (error) {
+    logError("get_recent_chats_failed", { error });
+    return { chats: [], hasMore: false };
+  }
+}
+
 export async function getChatById(
   id: string,
   options?: { take?: number; skip?: number },
@@ -89,20 +138,8 @@ export async function getChatById(
 }
 
 export async function getRecentChats(limit: number = 5) {
-  try {
-    const chats = await prisma.chat.findMany({
-      where: {
-        isArchived: false,
-        projectId: null,
-      },
-      orderBy: { lastMessageAt: "desc" },
-      take: limit,
-    });
-    return chats;
-  } catch (error) {
-    logError("get_recent_chats_failed", { error });
-    return [];
-  }
+  const { chats } = await getRecentChatsPage({ limit });
+  return chats;
 }
 
 export async function getProjectChats(projectId: string) {

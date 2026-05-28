@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MouseEvent, useEffect, useState } from "react";
+import { MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   Search,
@@ -24,7 +24,7 @@ import {
   updateProject,
   deleteProject,
 } from "@/lib/actions/projects";
-import { deleteChat } from "@/lib/actions/chats";
+import { deleteChat, getRecentChatsPage } from "@/lib/actions/chats";
 
 export type ProjectItemData = {
   id: string;
@@ -34,7 +34,10 @@ export type ProjectItemData = {
 export type ChatItemData = {
   id: string;
   title: string;
+  lastMessageAt: string;
 };
+
+const RECENT_CHAT_PAGE_SIZE = 20;
 
 // ─── Shared style tokens ──────────────────────────────────────────────────────
 
@@ -444,6 +447,10 @@ export function SidebarClient({
   const { showFeedback } = useFeedback();
   const pathname = usePathname();
   const router = useRouter();
+  const recentsScrollRef = useRef<HTMLDivElement | null>(null);
+  const recentsPopoverScrollRef = useRef<HTMLDivElement | null>(null);
+  const recentsLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const recentsPopoverLoadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
@@ -451,19 +458,140 @@ export function SidebarClient({
   const [recentsOpen, setRecentsOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [recentChats, setRecentChats] = useState(initialChats);
+  const [hasMoreRecentChats, setHasMoreRecentChats] = useState(
+    initialChats.length === RECENT_CHAT_PAGE_SIZE,
+  );
+  const [isLoadingMoreChats, setIsLoadingMoreChats] = useState(false);
+
+  const loadMoreRecentChats = useCallback(async () => {
+    if (isLoadingMoreChats || !hasMoreRecentChats) {
+      return;
+    }
+
+    const lastChat = recentChats[recentChats.length - 1];
+    if (!lastChat) {
+      setHasMoreRecentChats(false);
+      return;
+    }
+
+    setIsLoadingMoreChats(true);
+    try {
+      const result = await getRecentChatsPage({
+        limit: RECENT_CHAT_PAGE_SIZE,
+        cursor: {
+          id: lastChat.id,
+          lastMessageAt: new Date(lastChat.lastMessageAt),
+        },
+      });
+
+      setRecentChats((prev) => {
+        const seenIds = new Set(prev.map((chat) => chat.id));
+        const nextChats = result.chats.filter((chat) => !seenIds.has(chat.id));
+
+        return [
+          ...prev,
+          ...nextChats.map((chat) => ({
+            id: chat.id,
+            title: chat.title,
+            lastMessageAt: chat.lastMessageAt.toISOString(),
+          })),
+        ];
+      });
+      setHasMoreRecentChats(result.hasMore);
+    } finally {
+      setIsLoadingMoreChats(false);
+    }
+  }, [hasMoreRecentChats, isLoadingMoreChats, recentChats]);
+
+  useEffect(() => {
+    if (!chatsOpen || collapsed) {
+      return;
+    }
+
+    const root = recentsScrollRef.current;
+    const target = recentsLoadMoreRef.current;
+    if (!root || !target || !hasMoreRecentChats || isLoadingMoreChats) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (!entry?.isIntersecting) {
+          return;
+        }
+        void loadMoreRecentChats();
+      },
+      {
+        root,
+        rootMargin: "160px 0px",
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [
+    chatsOpen,
+    collapsed,
+    hasMoreRecentChats,
+    isLoadingMoreChats,
+    loadMoreRecentChats,
+  ]);
+
+  useEffect(() => {
+    if (!collapsed || !recentsOpen) {
+      return;
+    }
+
+    const root = recentsPopoverScrollRef.current;
+    const target = recentsPopoverLoadMoreRef.current;
+    if (!root || !target || !hasMoreRecentChats || isLoadingMoreChats) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (!entry?.isIntersecting) {
+          return;
+        }
+
+        void loadMoreRecentChats();
+      },
+      {
+        root,
+        rootMargin: "160px 0px",
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [
+    collapsed,
+    recentsOpen,
+    hasMoreRecentChats,
+    isLoadingMoreChats,
+    loadMoreRecentChats,
+  ]);
 
   // Optimistic chat creation: listen for chat:created and chat:confirmed events
   useEffect(() => {
     function handleChatCreated(e: CustomEvent) {
       const { id, title } = e.detail;
-      setRecentChats((prev) => [{ id, title }, ...prev]);
+      setRecentChats((prev) => [
+        { id, title, lastMessageAt: new Date().toISOString() },
+        ...prev.filter((chat) => chat.id !== id),
+      ]);
     }
     function handleChatConfirmed(e: CustomEvent) {
       const { tempId, id, title } = e.detail;
       setRecentChats((prev) => {
         // Replace temp chat with real chat
         const filtered = prev.filter((c) => c.id !== tempId);
-        return [{ id, title }, ...filtered];
+        return [
+          { id, title, lastMessageAt: new Date().toISOString() },
+          ...filtered.filter((chat) => chat.id !== id),
+        ];
       });
     }
     function handleTitleUpdated(e: CustomEvent) {
@@ -519,8 +647,6 @@ export function SidebarClient({
       router.push("/search");
     }, 0);
   };
-
-  const collapsedRecentChats = recentChats.slice(0, 6);
 
   const sectionLabel = {
     fontSize: "11px",
@@ -700,30 +826,54 @@ export function SidebarClient({
                   <p className="px-2 py-1.5" style={sectionLabel}>
                     Recent Chats
                   </p>
-                  <div className="mt-1 space-y-0.5">
-                    {collapsedRecentChats.length > 0 ? (
-                      collapsedRecentChats.map((chat) => (
-                        <Link
-                          key={chat.id}
-                          href={`/c/${chat.id}`}
-                          className="block rounded-2xl px-2.5 py-2 transition-[background-color,border-color,transform] duration-150 ease-out"
-                          style={
-                            pathname === `/c/${chat.id}`
-                              ? {
-                                  background: "var(--sidebar-accent)",
-                                  border: "1px solid var(--sidebar-primary)",
-                                }
-                              : {}
-                          }
-                        >
-                          <p
-                            className="truncate text-sm font-semibold"
-                            style={{ color: "var(--sidebar-foreground)" }}
+                  <div
+                    ref={recentsPopoverScrollRef}
+                    className="mt-1 max-h-72 space-y-0.5 overflow-y-auto pr-1"
+                  >
+                    {recentChats.length > 0 ? (
+                      <>
+                        {recentChats.map((chat) => (
+                          <Link
+                            key={chat.id}
+                            href={`/c/${chat.id}`}
+                            className="block rounded-2xl px-2.5 py-2 transition-[background-color,border-color,transform] duration-150 ease-out"
+                            style={
+                              pathname === `/c/${chat.id}`
+                                ? {
+                                    background: "var(--sidebar-accent)",
+                                    border: "1px solid var(--sidebar-primary)",
+                                  }
+                                : {}
+                            }
                           >
-                            {chat.title}
-                          </p>
-                        </Link>
-                      ))
+                            <p
+                              className="truncate text-sm font-semibold"
+                              style={{ color: "var(--sidebar-foreground)" }}
+                            >
+                              {chat.title}
+                            </p>
+                          </Link>
+                        ))}
+                        {hasMoreRecentChats && (
+                          <div
+                            ref={recentsPopoverLoadMoreRef}
+                            className="px-2.5 py-2"
+                          >
+                            <div className="h-8 rounded-2xl" />
+                          </div>
+                        )}
+                        {isLoadingMoreChats && (
+                          <div
+                            className="rounded-xl px-2.5 py-2.5 text-[12px]"
+                            style={{
+                              color: "var(--sidebar-foreground)",
+                              opacity: 0.5,
+                            }}
+                          >
+                            Loading more chats...
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div
                         className="rounded-xl px-2.5 py-2.5 text-[12px]"
@@ -838,7 +988,7 @@ export function SidebarClient({
           />
 
           {/* ── Recents section ── */}
-          <div className="flex-1 overflow-y-auto px-3">
+          <div ref={recentsScrollRef} className="flex-1 overflow-y-auto px-3">
             <button
               onClick={() => setChatsOpen((v) => !v)}
               className="mb-2 flex w-full items-center justify-between px-1"
@@ -854,7 +1004,7 @@ export function SidebarClient({
             {chatsOpen && (
               <div className="space-y-0.5">
                 {isBooting ? (
-                  Array.from({ length: recentChats.length || 5 }).map(
+                  Array.from({ length: recentChats.length || RECENT_CHAT_PAGE_SIZE }).map(
                     (_, i) => (
                       <div
                         key={`chat-skeleton-${i}`}
@@ -864,18 +1014,36 @@ export function SidebarClient({
                     ),
                   )
                 ) : recentChats.length > 0 ? (
-                  recentChats.map((chat) => (
-                    <ChatItem
-                      key={chat.id}
-                      chat={chat}
-                      active={pathname === `/c/${chat.id}`}
-                      onDelete={(chatId) =>
-                        setRecentChats((current) =>
-                          current.filter((item) => item.id !== chatId),
-                        )
-                      }
-                    />
-                  ))
+                  <>
+                    {recentChats.map((chat) => (
+                      <ChatItem
+                        key={chat.id}
+                        chat={chat}
+                        active={pathname === `/c/${chat.id}`}
+                        onDelete={(chatId) =>
+                          setRecentChats((current) =>
+                            current.filter((item) => item.id !== chatId),
+                          )
+                        }
+                      />
+                    ))}
+                    {hasMoreRecentChats && (
+                      <div ref={recentsLoadMoreRef} className="px-2.5 py-2">
+                        <div className="h-8 rounded-2xl" />
+                      </div>
+                    )}
+                    {isLoadingMoreChats && (
+                      <div
+                        className="rounded-2xl px-2.5 py-2 text-[12px]"
+                        style={{
+                          color: "var(--sidebar-foreground)",
+                          opacity: 0.48,
+                        }}
+                      >
+                        Loading more chats...
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div
                     className="rounded-2xl px-2.5 py-2 text-[12px]"

@@ -1656,12 +1656,14 @@ export function ChatClient({
     }
 
     hasAutoSentRef.current = true;
+    window.history.replaceState(null, "", `/c/${chatId}`);
     void sendMessage(initialMessage, {
       sendAttachments:
         pendingInitialAttachments.length > 0 ? pendingInitialAttachments : undefined,
     });
   }, [
     initialMessage,
+    chatId,
     hasMessages,
     isSending,
     pendingInitialAttachments,
