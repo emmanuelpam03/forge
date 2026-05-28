@@ -1232,9 +1232,10 @@ export async function readAnyFileToolAsync(
 
 export async function pollinationsImageGenerationToolAsync(
   input: ImageGenerationInput,
+  chatId: string,
 ): Promise<ToolResult> {
   try {
-    const generated = await pollinationsGenerateImage(input);
+    const generated = await pollinationsGenerateImage(input, chatId);
     return {
       success: true,
       result: JSON.stringify(
@@ -1254,6 +1255,7 @@ export async function pollinationsImageGenerationToolAsync(
         promptUsed: generated.promptUsed,
         imageCount: generated.images.length,
         retrievalTimeMs: generated.retrievalTimeMs,
+        chatId,
       },
     };
   } catch (error) {

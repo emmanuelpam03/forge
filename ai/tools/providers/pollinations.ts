@@ -56,6 +56,7 @@ function extensionForMimeType(mimeType: string): string {
 
 export async function pollinationsGenerateImage(
   input: PollinationsImageGenerationInput,
+  chatId: string,
 ): Promise<PollinationsGeneratedImageResult> {
   const apiKey = process.env.POLLINATIONS_API_KEY?.trim();
   if (!apiKey) {
@@ -80,7 +81,7 @@ export async function pollinationsGenerateImage(
   const buffer = Buffer.from(await response.arrayBuffer());
   const uploadId = randomUUID();
   const uploadResult = await uploadAttachmentToCloudinary({
-    chatId: "pollinations-generated",
+    chatId,
     attachmentId: uploadId,
     buffer,
     fileName: `pollinations-${uploadId}${extensionForMimeType(mimeType)}`,

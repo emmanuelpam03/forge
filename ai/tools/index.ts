@@ -207,7 +207,10 @@ export function createForgeTools(
         "Generate a new image from a text prompt using Pollinations and return a JSON image result.",
       schema: imageGenerationToolSchema,
       func: async (args: z.infer<typeof imageGenerationToolSchema>) => {
-        const result = await pollinationsImageGenerationToolAsync(args);
+        const result = await pollinationsImageGenerationToolAsync(
+          args,
+          context.chatId,
+        );
         return formatToolOutput(result);
       },
     }),
