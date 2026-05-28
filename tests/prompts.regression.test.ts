@@ -104,6 +104,16 @@ test("intent prompt keeps low-token structured routing scope", () => {
   assert.match(message, /memory_relevance/);
 });
 
+test("intent prompt includes document generation for essay exports", () => {
+  const message = buildIntentClassificationMessage(
+    "Write an essay about flowers and give it to me in a PDF",
+  );
+
+  assert.match(message, /document_generation/);
+  assert.match(message, /essay about flowers/i);
+  assert.match(message, /"response_mode":"chat"/);
+});
+
 test("router keeps backward-compatible freshness export contract", () => {
   const source = readWorkspaceFile("ai/prompts/router.ts");
 
