@@ -280,6 +280,11 @@ function resolveToolPlanForQueryIntent(
     selectedTools.push("imageGeneration");
   }
 
+  const documentGenerationPattern = /\b(export|save|download|generate|create|produce)\b.*\b(pdf|docx|doc|powerpoint|pptx|ppt|excel|xlsx|spreadsheet|word)\b/i;
+  if (documentGenerationPattern.test(message)) {
+    selectedTools.push("documentGeneration");
+  }
+
   // Heuristic: If the message looks like it would benefit from visual context, add imageSearch.
   const visualContextPattern = /\b(explain|diagram|how does|how do|visualize|show|illustrate|architecture|structure|design|flow|process|system|bridge|map|picture|image|images|photo|photos|visual|draw|sketch|render|display|suspension bridge|circuit|layout|ui|interface|pattern|component|example|inspire|reference)\b/i;
   // Only add an imageSearch tool when we don't already have an uploaded image
@@ -330,6 +335,8 @@ function mapStructuredToolUsage(toolUsage: string[]): string[] {
         return "calculator";
       case "image_generation":
         return "imageGeneration";
+      case "document_generation":
+        return "documentGeneration";
       case "memory_lookup":
         return null;
       default:
@@ -431,6 +438,24 @@ function buildToolArgs(
     };
   }
 
+  if (toolName === "documentGeneration") {
+    // Infer format and basic args from the user message.
+    const fmtMatch = message.match(/\b(pdf|docx|doc|pptx|ppt|powerpoint|xlsx|excel|spreadsheet|word)\b/i);
+    const format = fmtMatch ? fmtMatch[1].toLowerCase().replace(/^ppt$/, "pptx").replace(/^doc$/, "docx").replace(/^excel$/, "xlsx").replace(/^word$/, "docx") : "pdf";
+    if (format === "xlsx") {
+      // Split lines into rows and commas into cells
+      const rows = message.split(/\r?\n/).map((r) => r.split(/,|\t/).map((c) => c.trim())).filter((r) => r.length > 0);
+      return { format: "xlsx", sheetName: "Sheet1", rows };
+    }
+
+    if (format === "pptx") {
+      const bullets = message.split(/[\.\n]/).map((s) => s.trim()).filter(Boolean);
+      return { format: "pptx", title: undefined, bullets };
+    }
+
+    // Default to document/text formats
+    return { format: format as "pdf" | "docx", title: undefined, body: message };
+  }
   if (toolName === "imageGeneration") {
     const prompt = message
       .replace(/^(generate|create|make|draw|paint|design)\s+(an?\s+)?(image|picture|illustration|poster|graphic|logo|scene|artwork|art)\s+(of|for|about)\s+/i, "")
@@ -910,6 +935,7 @@ export async function toolRouterNodeImpl(
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
     let intermediateImageBlock: ChatImageBlock | undefined = undefined;
+    let intermediateAssistantMedia: unknown | undefined = undefined;
 
     if (state.forceTool) {
       const forcedName = state.forceTool;
@@ -925,33 +951,43 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
-          if (forcedName === "imageSearch" || forcedName === "imageGeneration") {
+          if (forcedName === "imageSearch" || forcedName === "imageGeneration" || forcedName === "documentGeneration") {
             try {
               const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
-              const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
-              intermediateImageBlock = {
-                images: images.map((im) => ({
-                  id: im.id,
-                  url: im.url,
-                  thumbnailUrl: im.thumbnailUrl,
-                  title: im.title,
-                  sourcePage: im.sourcePage,
-                  source: im.sourcePage || im.provider,
-                  width: im.width,
-                  height: im.height,
-                  provider: im.provider,
-                  relevanceScore: im.relevanceScore,
-                  safetyScore: im.safetyScore,
-                  metadata: im.metadata || {},
-                })),
-                totalFound: (parsed?.totalFound as number) ?? images.length,
-                retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
-              };
+              if (forcedName === "imageSearch" || forcedName === "imageGeneration") {
+                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+                intermediateImageBlock = {
+                  images: images.map((im) => ({
+                    id: im.id,
+                    url: im.url,
+                    thumbnailUrl: im.thumbnailUrl,
+                    title: im.title,
+                    sourcePage: im.sourcePage,
+                    source: im.sourcePage || im.provider,
+                    width: im.width,
+                    height: im.height,
+                    provider: im.provider,
+                    relevanceScore: im.relevanceScore,
+                    safetyScore: im.safetyScore,
+                    metadata: im.metadata || {},
+                  })),
+                  totalFound: (parsed?.totalFound as number) ?? images.length,
+                  retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+                };
+              } else if (forcedName === "documentGeneration") {
+                // Document generation returns an `attachment` in the tool result.
+                const att = parsed?.attachment;
+                if (att) {
+                  intermediateAssistantMedia = { attachments: [att] };
+                }
+              }
             } catch {
               // ignore parse errors; still emit images event
             }
 
-            emitImageSearchEvent(forcedName, rawResult, state, onEvent);
+            if (forcedName === "imageSearch" || forcedName === "imageGeneration") {
+              emitImageSearchEvent(forcedName, rawResult, state, onEvent);
+            }
 
             toolsUsed.add(forcedName);
             evidenceBundles.push({
@@ -965,6 +1001,7 @@ export async function toolRouterNodeImpl(
               evidenceBundles,
               toolContext: intermediateContext,
               imageBlock: intermediateImageBlock,
+              assistantMedia: intermediateAssistantMedia,
             };
           }
 
@@ -1007,36 +1044,50 @@ export async function toolRouterNodeImpl(
                 ? rawResult
                 : JSON.stringify(rawResult, null, 2);
 
-            // For imageSearch and imageGeneration, emit structured images event and avoid
-            // including the raw JSON/text in evidenceBundles so internal
-            // orchestration isn't exposed to the assistant prompts.
-            if (toolName === "imageSearch" || toolName === "imageGeneration") {
-              // Parse structured image result and persist to state imageBlock
+            // For imageSearch, imageGeneration, and documentGeneration, emit structured
+            // events / set assistant media and avoid including raw JSON/text in evidenceBundles
+            // so internal orchestration isn't exposed to the assistant prompts.
+            if (
+              toolName === "imageSearch" ||
+              toolName === "imageGeneration" ||
+              toolName === "documentGeneration"
+            ) {
               try {
                 const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
-                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
-                intermediateImageBlock = {
-                  images: images.map((im) => ({
-                    id: im.id,
-                    url: im.url,
-                    thumbnailUrl: im.thumbnailUrl,
-                    title: im.title,
-                    sourcePage: im.sourcePage,
-                    source: im.sourcePage || im.provider,
-                    width: im.width,
-                    height: im.height,
-                    provider: im.provider,
-                    relevanceScore: im.relevanceScore,
-                    safetyScore: im.safetyScore,
-                    metadata: im.metadata || {},
-                  })),
-                  totalFound: (parsed?.totalFound as number) ?? images.length,
-                  retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
-                };
+                if (toolName === "imageSearch" || toolName === "imageGeneration") {
+                  const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+                  intermediateImageBlock = {
+                    images: images.map((im) => ({
+                      id: im.id,
+                      url: im.url,
+                      thumbnailUrl: im.thumbnailUrl,
+                      title: im.title,
+                      sourcePage: im.sourcePage,
+                      source: im.sourcePage || im.provider,
+                      width: im.width,
+                      height: im.height,
+                      provider: im.provider,
+                      relevanceScore: im.relevanceScore,
+                      safetyScore: im.safetyScore,
+                      metadata: im.metadata || {},
+                    })),
+                    totalFound: (parsed?.totalFound as number) ?? images.length,
+                    retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+                  };
+                }
+
+                if (toolName === "documentGeneration") {
+                  const att = parsed?.attachment;
+                  if (att) intermediateAssistantMedia = { attachments: [att] };
+                }
               } catch {
-                // ignore parse errors; still emit images event
+                // ignore parse errors
               }
-              emitImageSearchEvent(toolName, rawResult, state, onEvent);
+
+              if (toolName === "imageSearch" || toolName === "imageGeneration") {
+                emitImageSearchEvent(toolName, rawResult, state, onEvent);
+              }
+
               return {
                 tool: toolName,
                 content: "",
@@ -1124,6 +1175,8 @@ export async function toolRouterNodeImpl(
         toolsUsed: Array.from(toolsUsed),
         evidenceBundles,
         toolContext: intermediateContext,
+        imageBlock: intermediateImageBlock,
+        assistantMedia: intermediateAssistantMedia,
       };
     }
 

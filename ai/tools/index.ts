@@ -9,6 +9,10 @@ import {
   datetimeTool,
   imageSearchToolAsync,
   pollinationsImageGenerationToolAsync,
+  generatePdfToolAsync,
+  generateDocxToolAsync,
+  generateXlsxToolAsync,
+  generatePptxToolAsync,
   projectContextLookupTool,
   summarizeTextTool,
   webSearchToolAsync,
@@ -87,6 +91,15 @@ export const imageGenerationToolSchema = z.object({
   prompt: z.string().min(1),
   aspectRatio: z.enum(["square", "landscape", "portrait"]).optional(),
   style: z.string().optional(),
+});
+
+export const documentGenerationToolSchema = z.object({
+  format: z.enum(["pdf", "docx", "xlsx", "pptx"]),
+  title: z.string().optional(),
+  body: z.string().optional(),
+  sheetName: z.string().optional(),
+  rows: z.array(z.array(z.string())).optional(),
+  bullets: z.array(z.string()).optional(),
 });
 
 export const readAnyFileToolSchema = z.object({
@@ -212,6 +225,27 @@ export function createForgeTools(
           context.chatId,
         );
         return formatToolOutput(result);
+      },
+    }),
+    new DynamicStructuredTool({
+      name: "documentGeneration",
+      description: "Generate a document in PDF, DOCX, XLSX, or PPTX format and return a JSON attachment result.",
+      schema: documentGenerationToolSchema,
+      func: async (args: z.infer<typeof documentGenerationToolSchema>) => {
+        if (args.format === "pdf") {
+          return formatToolOutput(await generatePdfToolAsync({ chatId: context.chatId, title: args.title, body: args.body ?? "" }));
+        }
+        if (args.format === "docx") {
+          return formatToolOutput(await generateDocxToolAsync({ chatId: context.chatId, title: args.title, body: args.body ?? "" }));
+        }
+        if (args.format === "xlsx") {
+          return formatToolOutput(await generateXlsxToolAsync({ chatId: context.chatId, sheetName: args.sheetName, rows: args.rows ?? [] }));
+        }
+        if (args.format === "pptx") {
+          return formatToolOutput(await generatePptxToolAsync({ chatId: context.chatId, title: args.title, bullets: args.bullets ?? [] }));
+        }
+
+        return "Tool failed: unsupported format";
       },
     }),
   ];
