@@ -925,6 +925,49 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
+          if (forcedName === "imageSearch" || forcedName === "imageGeneration") {
+            try {
+              const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
+              const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+              intermediateImageBlock = {
+                images: images.map((im) => ({
+                  id: im.id,
+                  url: im.url,
+                  thumbnailUrl: im.thumbnailUrl,
+                  title: im.title,
+                  sourcePage: im.sourcePage,
+                  source: im.sourcePage || im.provider,
+                  width: im.width,
+                  height: im.height,
+                  provider: im.provider,
+                  relevanceScore: im.relevanceScore,
+                  safetyScore: im.safetyScore,
+                  metadata: im.metadata || {},
+                })),
+                totalFound: (parsed?.totalFound as number) ?? images.length,
+                retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+              };
+            } catch {
+              // ignore parse errors; still emit images event
+            }
+
+            emitImageSearchEvent(forcedName, rawResult, state, onEvent);
+
+            toolsUsed.add(forcedName);
+            evidenceBundles.push({
+              tool: forcedName,
+              content: "",
+              timestamp: new Date().toISOString(),
+            });
+
+            return {
+              toolsUsed: Array.from(toolsUsed),
+              evidenceBundles,
+              toolContext: intermediateContext,
+              imageBlock: intermediateImageBlock,
+            };
+          }
+
           toolsUsed.add(forcedName);
           evidenceBundles.push({
             tool: forcedName,

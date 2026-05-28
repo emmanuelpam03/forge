@@ -97,6 +97,7 @@ type ChatClientProps = {
 
 type SendMessageOptions = {
   sendAttachments?: UploadedAttachment[];
+  forceTool?: "imageGeneration";
 };
 
 type ModelOption = {
@@ -1415,6 +1416,7 @@ export function ChatClient({
             model: requestModel.id,
             provider: requestModel.provider,
             selectedOptions: selectedOptionIds,
+            forceTool: options?.forceTool,
             // send only stable attachment IDs; server will resolve them
             attachments: attachmentsSnapshot.map((a) => a.id),
             promptBehavior: isForceSeniorEngineeringMode
@@ -1918,6 +1920,18 @@ export function ChatClient({
               <div className="col-start-3 row-start-1 flex items-center gap-2 self-center">
                 <button className="rounded-full p-2 text-muted-foreground transition hover:text-foreground">
                   <Mic size={18} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void sendMessage(undefined, { forceTool: "imageGeneration" })}
+                  disabled={!draft.trim() || isSending}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-2 text-[12px] font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Generate image"
+                  aria-label="Generate image"
+                >
+                  <Sparkles size={14} />
+                  <span>Generate image</span>
                 </button>
 
                 <input

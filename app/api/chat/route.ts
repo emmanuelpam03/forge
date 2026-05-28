@@ -19,6 +19,7 @@ const chatRequestSchema = z.object({
   message: z.string().min(1),
   model: z.string().optional(),
   provider: z.enum(["openrouter"]).optional(),
+  forceTool: z.string().optional(),
   promptBehavior: z
     .object({
       persona: z.enum(["auto", "none", "senior-engineer"]),
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
                 userMessage: parsedBody.data.message,
                 runId,
                 assistantMessageId,
-                forceTool: null,
+                forceTool: parsedBody.data.forceTool ?? null,
                 classifiedIntent: null,
                 model: parsedBody.data.model,
                 provider: parsedBody.data.provider,
