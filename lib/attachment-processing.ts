@@ -200,33 +200,6 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
   };
 }
 
-function chunkText(text: string, size: number = 700): AttachmentContextChunk[] {
-  const normalized = text.trim().replace(/\r\n/g, "\n");
-  if (!normalized) {
-    return [];
-  }
-
-  const chunks: AttachmentContextChunk[] = [];
-  const paragraphs = normalized.split(/\n{2,}/);
-
-  for (const paragraph of paragraphs) {
-    const lines = paragraph.split("\n");
-    const joined = lines.join(" ").trim();
-    if (!joined) {
-      continue;
-    }
-
-    for (let index = 0; index < joined.length; index += size) {
-      const content = joined.slice(index, index + size).trim();
-      if (content) {
-        chunks.push({ label: `chunk-${chunks.length + 1}`, content });
-      }
-    }
-  }
-
-  return chunks;
-}
-
 function normalizeAttachmentText(input: string): string {
   return input.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }

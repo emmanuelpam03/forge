@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: { chatId?:
     };
 
     return NextResponse.json(resolved);
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to load metadata" }, { status: 500 });
   }
 }

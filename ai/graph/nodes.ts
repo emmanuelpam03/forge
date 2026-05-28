@@ -25,7 +25,6 @@ import {
   deriveStructuredFromLegacy,
   shouldForceWebSearchFromClassification,
   type QueryIntentClassification,
-  type StructuredIntentClassification,
 } from "@/ai/graph/classification.ts";
 import type { ClassifiedIntent } from "@/ai/graph/state";
 import { buildIntentClassificationMessage, buildFreshnessClassificationMessage } from "@/ai/prompts/intent.ts";

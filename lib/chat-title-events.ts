@@ -41,7 +41,7 @@ export async function publishChatTitleUpdate(event: ChatTitleUpdateEvent) {
         channel: CHAT_TITLE_UPDATES_CHANNEL,
         event,
       });
-    } catch (logErr) {
+    } catch {
       // ignore logging failures
     }
   }

@@ -57,7 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: { chatId?:
     headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox");
 
     return new Response(remoteResponse.body, { status: 200, headers });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to serve attachment." }, { status: 500 });
   }
 }

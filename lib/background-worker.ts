@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getRedisClient } from "@/lib/redis";
-import { dequeueJob, completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type ProcessAttachmentJobData } from "@/lib/job-queue";
+import { completeJob, requeueJobWithBackoff, type Job, type SaveMessagesJobData, type GenerateTitleJobData, type ProcessAttachmentJobData } from "@/lib/job-queue";
 import { error as logError, info } from "@/lib/logger";
 import { startTimer, endTimer } from "@/lib/metrics";
 import { HumanMessage } from "@langchain/core/messages";
@@ -302,45 +302,13 @@ async function processAttachmentJob(job: Job<ProcessAttachmentJobData>): Promise
 // Enrich/extract background handlers removed; those jobs are no longer queued.
 
 /**
- * Main worker loop: Continuously process jobs from the queue.
- * Each job type is processed by its own worker.
- */
-async function startWorkerForQueue<T>(
-  jobType: "saveMessages" | "generateTitle" | "processAttachment",
-  processor: (job: Job<T>) => Promise<void>,
-): Promise<void> {
-  while (!workersStopping) {
-    try {
-      const job = await dequeueJob(jobType, workersStopping ? 1 : 30);
-      if (!job) {
-        if (workersStopping) {
-          break;
-        }
-        // Queue empty, wait and retry
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        continue;
-      }
-
-      await processor(job as unknown as Job<T>);
-    } catch (err) {
-      if (workersStopping) {
-        break;
-      }
-      logError("worker_error", { jobType, error: err });
-      // Continue processing despite errors
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
-}
-
-/**
  * Initialize background workers for all job types.
  * Call this once at server startup (or lazily on first use).
  * Safe to call multiple times - uses a module-level guard to prevent duplicate initialization.
  */
-let workersInitialized = false;
+const workersInitialized = false;
 let workersStopping = false;
-let workerLoopPromises: Promise<void>[] = [];
+const workerLoopPromises: Promise<void>[] = [];
 
 export type BackgroundWorkerHandle = {
   shutdown: (options?: { timeoutMs?: number }) => Promise<void>;
@@ -385,9 +353,7 @@ export async function initializeBackgroundWorkers(): Promise<BackgroundWorkerHan
     };
   }
 
-  const redis = getRedisClient();
-
-        // No-op completion step
+  void getRedisClient();
 
   return {
     shutdown: shutdownBackgroundWorkers,

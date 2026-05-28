@@ -673,7 +673,7 @@ export function ChatClient({
         if (uploadedAttachment.status === "failed") {
           showFeedback({
             type: "error",
-            title: "Upload completed",
+            title: "Processing failed",
             description:
               uploadedAttachment.summary?.trim() ||
               `${uploadedAttachment.name || file.name} was uploaded, but it could not be processed.`,

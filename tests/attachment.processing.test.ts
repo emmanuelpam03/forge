@@ -13,6 +13,7 @@ import {
   formatAttachmentContext,
   getCleanedAttachmentText,
 } from "../lib/attachment-processing.ts";
+import type { UploadedAttachment } from "../lib/attachment-types.ts";
 
 test("getAttachmentExtension and inferAttachmentKind", () => {
   assert.equal(getAttachmentExtension("file.txt"), ".txt");
@@ -121,7 +122,7 @@ test("getCleanedAttachmentText returns an empty string", async () => {
     storagePath: "path-c",
     uploadedAt: "2026-05-23T00:00:00.000Z",
     extractedText: "Contract Title\nPage 1\nThis is the first page."
-  } as any;
+  } as unknown as UploadedAttachment;
 
   const out = await getCleanedAttachmentText(attachment);
   assert.equal(out, "");

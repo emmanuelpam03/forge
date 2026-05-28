@@ -32,6 +32,5 @@ export function selectAttachmentsForTurn(
 export async function resolveAttachmentsForTurn(
   attachmentsForTurn: AttachmentRecordLike[],
 ): Promise<UploadedAttachment[]> {
-  void attachmentsForTurn;
   return attachmentsForTurn.map((attachment) => normalizeAttachmentRecord(attachment));
 }
