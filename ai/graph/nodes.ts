@@ -208,15 +208,36 @@ function shouldPreferAttachmentExtractionIntent(state: ChatGraphState): boolean 
   if (!hasAnyActiveAttachment(state)) {
     return false;
   }
+  const message = (state.userMessage ?? "").toLowerCase();
 
-  const message = state.userMessage.toLowerCase();
   const extractionPattern =
     /\b(extract|read|text|summari[sz]e|analy[sz]e|review|what(?:'s| is)\s+in|content)\b/i;
   const codingPattern =
     /\b(code|typescript|javascript|python|java|c\+\+|c#|api|endpoint|function|class|compile|stack trace|debug|refactor)\b/i;
 
-  return extractionPattern.test(message) && !codingPattern.test(message);
+  // Additional heuristics: look for file/attachment hints + question words
+  const fileHintPattern = /\b(file|attachment|document|pdf|docx|csv|spreadsheet|sheet)\b/i;
+  const questionWordPattern = /\b(what|who|when|where|how|why|does|do|is|are|list|show|summarize|summarise|describe|tell me|contents?)\b/i;
+
+  // If the message explicitly included attachment IDs with the user message and
+  // looks like a question, prefer extraction unless it's a coding request.
+  if ((state.messageAttachmentIds ?? []).length > 0 && questionWordPattern.test(message)) {
+    return !codingPattern.test(message);
+  }
+
+  // If explicit extraction keywords are present, prefer extraction (unless coding).
+  if (extractionPattern.test(message)) {
+    return !codingPattern.test(message);
+  }
+
+  // If message mentions a file/attachment and includes a question word, prefer extraction.
+  if (fileHintPattern.test(message) && questionWordPattern.test(message)) {
+    return !codingPattern.test(message);
+  }
+
+  return false;
 }
+
 
 function buildAttachmentExtractionStructuredIntent(): StructuredIntentClassification {
   return {
@@ -224,7 +245,7 @@ function buildAttachmentExtractionStructuredIntent(): StructuredIntentClassifica
     difficulty: "easy",
     verbosity: "balanced",
     audienceLevel: "intermediate",
-    toolUsage: [],
+    toolUsage: ["read_any_file"],
     responseMode: "analyze",
     confidence: "high",
     memoryRelevance: false,
@@ -344,6 +365,8 @@ function mapStructuredToolUsage(toolUsage: string[]): string[] {
         return "calculator";
       case "memory_lookup":
         return null;
+      case "read_any_file":
+        return "read_any_file";
       default:
         return null;
     }
@@ -882,6 +905,14 @@ export async function toolRouterNodeImpl(
   onEvent?: (event: StreamEvent) => void,
 ) {
   try {
+    // Debug log the incoming tool plan to help trace whether planner
+    // requested the read_any_file tool (or others) at runtime.
+    debug("tool_router_invoked", {
+      chatId: state.chatId,
+      runId: state.runId,
+      toolPlan: state.toolPlan,
+      toolsNeeded: state.toolPlan?.toolsNeeded ?? [],
+    });
     if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
       return {
         toolsUsed: [],
@@ -905,10 +936,10 @@ export async function toolRouterNodeImpl(
       const forcedTool = toolByName.get(forcedName);
       if (forcedTool) {
         try {
+          debug("tool_invoke_attempt", { chatId: state.chatId, runId: state.runId, tool: forcedName, forced: true });
           emitStatus(onEvent, getToolStatusMessage(forcedName));
-          const rawResult = await forcedTool.invoke(
-            buildToolArgs(forcedName, state),
-          );
+          const rawResult = await forcedTool.invoke(buildToolArgs(forcedName, state));
+          debug("tool_invoke_success", { chatId: state.chatId, runId: state.runId, tool: forcedName });
           const toolResultText =
             typeof rawResult === "string"
               ? rawResult
@@ -931,8 +962,46 @@ export async function toolRouterNodeImpl(
           };
         } catch (err) {
           logError("forced_tool_failed", { tool: forcedName, error: err });
+          debug("tool_invoke_error", { chatId: state.chatId, runId: state.runId, tool: forcedName, error: err instanceof Error ? err.message : err });
           // fall through to normal processing (no forced output)
         }
+      }
+    }
+
+    // Fallback: if planner did not request tools but the user asked to
+    // extract/read an uploaded attachment, force invocation of the
+    // `read_any_file` tool for the first available attachment. This is a
+    // safety net to ensure attachment-reading requests are served even when
+    // the classifier/planner missed the structured tool_usage.
+    if (!state.toolPlan || state.toolPlan.toolsNeeded.length === 0) {
+      try {
+        if (shouldPreferAttachmentExtractionIntent(state)) {
+          const firstAttachmentId = (state.messageAttachmentIds ?? [])[0] ?? (state.attachments ?? []).find((a) => a.status !== "failed")?.id;
+          if (firstAttachmentId) {
+            debug("tool_router_fallback_invoke", { chatId: state.chatId, runId: state.runId, attachmentId: firstAttachmentId });
+            const tools = createForgeTools({ chatId: state.chatId });
+            const toolByNameFallback = new Map(tools.map((tool) => [tool.name, tool]));
+            const readTool = toolByNameFallback.get("read_any_file");
+            if (readTool) {
+              emitStatus(onEvent, getToolStatusMessage("read_any_file"));
+              const rawResult = await readTool.invoke({ attachmentId: firstAttachmentId });
+              const toolResultText = typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult, null, 2);
+              return {
+                toolsUsed: ["read_any_file"],
+                evidenceBundles: [
+                  {
+                    tool: "read_any_file",
+                    content: toolResultText,
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+                toolContext: toolResultText,
+              };
+            }
+          }
+        }
+      } catch (err) {
+        logError("tool_router_fallback_failed", { error: err });
       }
     }
 
@@ -943,8 +1012,10 @@ export async function toolRouterNodeImpl(
           if (!tool) return null;
 
           try {
+            debug("tool_invoke_attempt", { chatId: state.chatId, runId: state.runId, tool: toolName, parallel: true });
             emitStatus(onEvent, getToolStatusMessage(toolName));
             const rawResult = await tool.invoke(buildToolArgs(toolName, state));
+            debug("tool_invoke_success", { chatId: state.chatId, runId: state.runId, tool: toolName, parallel: true });
             const toolResultText =
               typeof rawResult === "string"
                 ? rawResult
@@ -994,6 +1065,7 @@ export async function toolRouterNodeImpl(
             };
           } catch (err) {
             logError("tool_execution_failed", { tool: toolName, error: err });
+            debug("tool_invoke_error", { chatId: state.chatId, runId: state.runId, tool: toolName, error: err instanceof Error ? err.message : err });
             return null;
           }
         }),
@@ -1023,8 +1095,10 @@ export async function toolRouterNodeImpl(
         if (!tool) continue;
 
         try {
+          debug("tool_invoke_attempt", { chatId: state.chatId, runId: state.runId, tool: toolName });
           emitStatus(onEvent, getToolStatusMessage(toolName));
           const rawResult = await tool.invoke(buildToolArgs(toolName, state));
+          debug("tool_invoke_success", { chatId: state.chatId, runId: state.runId, tool: toolName });
           const toolResultText =
             typeof rawResult === "string"
               ? rawResult
@@ -1219,7 +1293,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
           classifiedIntent = {
             ...(classifiedIntent ?? { intent: "factual", requiresFreshData: true, confidence: "low" }),
             requiresFreshData: true,
-          };
+          } as ClassifiedIntent;
           if (!structuredIntent) {
             structuredIntent = deriveStructuredFromLegacy(classifiedIntent as ClassifiedIntent);
           }
@@ -1255,7 +1329,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
           intent: "factual",
           requiresFreshData: false,
           confidence: "high",
-        };
+        } as ClassifiedIntent;
         taskCategory = "reasoning";
       }
     } catch (classificationError) {

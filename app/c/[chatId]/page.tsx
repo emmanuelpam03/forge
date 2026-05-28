@@ -243,7 +243,7 @@ export default async function ChatPage({
   );
 
   function resolveUserAttachmentBlock(
-    userMessage: (typeof chat.messages)[number],
+    userMessage: NonNullable<typeof chat>["messages"][number],
   ): ChatMessage["attachmentBlock"] {
     const fromMedia = extractAttachmentBlockFromMedia(userMessage.media, chatId);
     if (fromMedia) {

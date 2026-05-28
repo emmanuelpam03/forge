@@ -1,16 +1,18 @@
 import "server-only";
 
-import { z } from "zod";
 import { DynamicStructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
+
+import { debug } from "@/lib/logger";
 import {
   calculatorTool,
   datetimeTool,
+  imageSearchToolAsync,
   projectContextLookupTool,
   readAnyFileToolAsync,
   summarizeTextTool,
   webSearchToolAsync,
   weatherToolAsync,
-  imageSearchToolAsync,
 } from "@/ai/tools/implementations";
 
 export const calculatorToolSchema = z.object({
@@ -104,7 +106,7 @@ function formatToolOutput(result: {
 export function createForgeTools(
   context: ForgeToolContext,
 ): DynamicStructuredTool[] {
-  return [
+  const tools: DynamicStructuredTool[] = [
     new DynamicStructuredTool({
       name: "calculator",
       description:
@@ -207,4 +209,13 @@ export function createForgeTools(
       },
     }),
   ];
+
+  try {
+    debug("create_forge_tools", {
+      chatId: context.chatId,
+      toolNames: tools.map((tool) => tool.name),
+    });
+  } catch {}
+
+  return tools;
 }

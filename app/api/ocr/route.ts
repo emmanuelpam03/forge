@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { error as logError } from "@/lib/logger";
-import { ensureAttachmentParsed, normalizeAttachmentRecord } from "@/lib/attachment-processing";
+import { ensureAttachmentParsed } from "@/lib/attachment-processing";
 
 export const runtime = "nodejs";
 

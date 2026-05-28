@@ -5,7 +5,7 @@ import { info, error as logError, debug } from "@/lib/logger";
 import { initializeBackgroundWorkers } from "@/lib/background-worker";
 import { DEFAULT_PROMPT_BEHAVIOR_CONTROLS } from "@/ai/prompts/control.types";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
-import { toResponse, ApiError } from "@/lib/error-response";
+import { toResponse } from "@/lib/error-response";
 import prisma from "@/lib/prisma";
 import {
   resolveAttachmentsForTurn,

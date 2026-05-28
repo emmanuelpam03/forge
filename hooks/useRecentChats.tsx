@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 export type ChatItemData = {
   id: string;
@@ -40,9 +40,6 @@ export default function useRecentChats(initialChats: ChatItemData[]) {
       window.removeEventListener("chat:title-updated", handleTitleUpdated as EventListener);
     };
   }, []);
-
-  // Stream removed: title-updates EventSource disabled by request
-  const chatIdsKey = useMemo(() => recentChats.map((c) => c.id).join(","), [recentChats]);
 
   return { recentChats, setRecentChats } as const;
 }

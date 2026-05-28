@@ -1,6 +1,7 @@
 "use client";
 
 import { Children, isValidElement, useMemo } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
 import Image from "next/image";
@@ -275,7 +276,7 @@ export function MessageRenderer({
           {children}
         </a>
       ),
-      code: ({ children, ...restProps }: { children: React.ReactNode } & Record<string, unknown>) => (
+      code: ({ children, ...restProps }: ComponentPropsWithoutRef<"code">) => (
         <code
           {...restProps}
           className="rounded-md px-1.5 py-0.5 font-mono text-[0.875em]"

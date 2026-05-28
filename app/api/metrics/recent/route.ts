@@ -31,8 +31,11 @@ export async function GET() {
       } else {
         // Fallback: use manual SCAN loop
         let cursor = "0";
+        const fallbackScanResult: [string, string[]] = ["0", []];
         do {
-          const res = await (rc.scan ? rc.scan(cursor, "MATCH", "metrics:*", "COUNT", "100") : Promise.resolve(["0", []]));
+          const res = await (rc.scan
+            ? rc.scan(cursor, "MATCH", "metrics:*", "COUNT", "100")
+            : Promise.resolve(fallbackScanResult));
           cursor = res[0];
           const found = res[1] ?? [];
           for (const k of found) {
