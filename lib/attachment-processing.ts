@@ -268,3 +268,10 @@ export async function buildAttachmentMultimodalBlocks(
   void query;
   return [];
 }
+
+// Export a helper to build standardized messages for previously failed
+// extraction cases so callers can avoid embedding the literal message.
+export function buildPreviouslyFailedExtractionMessage(attachment: { originalName?: string | null; name?: string | null; id: string }): string {
+  const display = attachment.originalName || attachment.name || attachment.id;
+  return `One or more attachments previously failed extraction: ${display}`;
+}

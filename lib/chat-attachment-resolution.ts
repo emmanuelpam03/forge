@@ -1,16 +1,16 @@
 import { ApiError } from "./error-response.ts";
-import { normalizeAttachmentRecord, type AttachmentRecordLike } from "./attachment-processing.ts";
+import { normalizeAttachmentRecord, type AttachmentRecordLike, buildPreviouslyFailedExtractionMessage } from "./attachment-processing.ts";
 import type { UploadedAttachment } from "./attachment-types.ts";
 
 export function selectAttachmentsForTurn(
   attachments: AttachmentRecordLike[],
   requestedAttachmentIds: string[],
 ): AttachmentRecordLike[] {
-  if (requestedAttachmentIds.length > 0) {
-    const attachmentById = new Map(
-      attachments.map((attachment) => [attachment.id, attachment]),
-    );
+  const attachmentById = new Map(
+    attachments.map((attachment) => [attachment.id, attachment]),
+  );
 
+  if (requestedAttachmentIds.length > 0) {
     const missingAttachmentIds = requestedAttachmentIds.filter(
       (attachmentId) => !attachmentById.has(attachmentId),
     );
@@ -21,16 +21,36 @@ export function selectAttachmentsForTurn(
       );
     }
 
-    return attachments.filter((attachment) =>
-      requestedAttachmentIds.includes(attachment.id),
-    );
+    const selected = requestedAttachmentIds.map((id) => attachmentById.get(id)!).filter(Boolean) as AttachmentRecordLike[];
+
+    const failed = selected.find((a) => a.status === "failed");
+    if (failed) {
+      throw new ApiError(buildPreviouslyFailedExtractionMessage(failed), 422);
+    }
+
+    return selected;
   }
 
-  return attachments;
+  // Default: exclude attachments that previously failed processing
+  return attachments.filter((a) => a.status !== "failed");
 }
 
 export async function resolveAttachmentsForTurn(
   attachmentsForTurn: AttachmentRecordLike[],
+  extractor?: (attachment: AttachmentRecordLike) => Promise<UploadedAttachment>,
 ): Promise<UploadedAttachment[]> {
-  return attachmentsForTurn.map((attachment) => normalizeAttachmentRecord(attachment));
+  const results: UploadedAttachment[] = [];
+  for (const attachment of attachmentsForTurn) {
+    try {
+      const resolved = extractor ? await extractor(attachment) : normalizeAttachmentRecord(attachment);
+      results.push(resolved);
+    } catch (err) {
+      // Map parser/extraction failures to ApiError 422 with contextual info
+      const name = attachment.originalName || attachment.id;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new ApiError(`${name}: ${msg}`, 422);
+    }
+  }
+
+  return results;
 }

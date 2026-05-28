@@ -108,6 +108,22 @@ The tool follows strict guidelines:
 - Filters for high-quality references suitable for decision-making
 
 --------------------------------------------------
+IMAGE GENERATION
+--------------------------------------------------
+
+When search results are insufficient or the user requests an original asset, use the image generation tool.
+
+Use image generation for:
+- Custom visuals: specific characters, unique scenes, or novel compositions not found via search.
+- Illustrations and diagrams: bespoke diagrams or annotated visuals that would not appear in stock images.
+- Privacy-preserving assets: original images when avoiding copyrighted photos is preferred.
+
+Guidance:
+- Include clear instructions in the prompt: subject, composition, style, and aspect ratio.
+- Prefer generation when search returns low relevance or the user explicitly requests a generated image.
+- Respect safety policies: avoid generating identifiable real persons in sensitive contexts.
+
+--------------------------------------------------
 TOOL COMMANDS
 --------------------------------------------------
 
@@ -120,4 +136,7 @@ Image Search:
 
 Weather:
 - \`weather(location)\`: Get current weather conditions for a location
+ 
+Image Generation:
+- \`imageGeneration(prompt, aspectRatio, style)\`: Generate a new image from a text prompt. Returns structured JSON with generated image metadata and URLs.
 `;

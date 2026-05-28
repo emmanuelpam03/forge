@@ -196,7 +196,7 @@ export default function HomePage() {
         } else {
           showFeedback({
             type: "success",
-            title: "File uploaded",
+            title: "Upload completed",
             description: uploadedAttachment.name,
           });
         }

@@ -687,7 +687,7 @@ export function ChatClient({
         } else {
           showFeedback({
             type: "success",
-            title: "File uploaded",
+            title: "Upload completed",
             description: uploadedAttachment.name,
           });
         }
