@@ -9,7 +9,6 @@ import {
   MessageSquare,
   MoreHorizontal,
   RotateCcw,
-  Sparkles,
   Square,
   Mic,
   Plus,
@@ -97,7 +96,7 @@ type ChatClientProps = {
 
 type SendMessageOptions = {
   sendAttachments?: UploadedAttachment[];
-  forceTool?: "imageGeneration";
+  forceTool?: string;
 };
 
 type ModelOption = {
@@ -1692,7 +1691,7 @@ export function ChatClient({
           </div>
 
           <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
-            <Sparkles size={12} className="text-primary" />
+            <Plus size={12} className="text-primary" />
             Forge Preview
           </span>
         </div>
@@ -1922,17 +1921,7 @@ export function ChatClient({
                   <Mic size={18} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => void sendMessage(undefined, { forceTool: "imageGeneration" })}
-                  disabled={!draft.trim() || isSending}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-2 text-[12px] font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Generate image"
-                  aria-label="Generate image"
-                >
-                  <Sparkles size={14} />
-                  <span>Generate image</span>
-                </button>
+                {/* Image generation is triggered by the model intent, not a UI button. */}
 
                 <input
                   id={uploadInputId}
