@@ -34,12 +34,24 @@ import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { RetrievedImage } from "@/ai/tools/image-types";
 import { groundImageSearchQuery } from "@/ai/services/image-ranking";
+import type { UploadedAttachment } from "@/lib/attachment-types";
 
 type ChatImageBlock = {
   images: RetrievedImage[];
   totalFound?: number;
   retrievalTimeMs?: number;
 };
+
+function isUploadedAttachment(value: unknown): value is UploadedAttachment {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as UploadedAttachment).id === "string" &&
+    typeof (value as UploadedAttachment).chatId === "string" &&
+    typeof (value as UploadedAttachment).name === "string" &&
+    typeof (value as UploadedAttachment).mimeType === "string"
+  );
+}
 
 function emitImageSearchEvent(
   toolName: string,
@@ -638,26 +650,26 @@ export async function generateResponseNode(state: ChatGraphState) {
                 const docTool = tools.find((t) => t.name === "documentGeneration");
                 if (docTool) {
                   // invoke the tool with the parsed payload (zod will validate)
-                  const rawResult = await (docTool as any).invoke(parsed);
+                  const rawResult = await docTool.invoke(parsed);
                   const resultText = typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult);
                   try {
                     const parsedResult = JSON.parse(resultText);
                     const att = parsedResult?.attachment;
-                    if (att) {
+                    if (isUploadedAttachment(att)) {
                       // attach to assistant media for persistence
-                      state.assistantMedia = { attachments: [att] } as unknown as typeof state.assistantMedia;
+                      state.assistantMedia = { attachments: [att] };
                       // emit attachments event so the client can render immediately
                       graphStreamEventEmitter?.({ type: "attachments", attachments: [att] });
                     }
-                  } catch (err) {
+                  } catch {
                     // ignore parse errors from tool output
                   }
                 }
-              } catch (err) {
+              } catch {
                 // fail silently; do not surface tool execution errors to user stream
               }
             }
-          } catch (err) {
+          } catch {
             // ignore JSON parse errors and continue streaming
           }
         },

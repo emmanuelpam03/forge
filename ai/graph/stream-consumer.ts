@@ -66,6 +66,132 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   );
 }
 
+function findNextFenceStart(text: string, fromIndex = 0): number {
+  const jsonFenceIndex = text.indexOf("```json", fromIndex);
+  const plainFenceIndex = text.indexOf("```", fromIndex);
+
+  if (jsonFenceIndex === -1) {
+    return plainFenceIndex;
+  }
+
+  if (plainFenceIndex === -1) {
+    return jsonFenceIndex;
+  }
+
+  return Math.min(jsonFenceIndex, plainFenceIndex);
+}
+
+function scanBalancedJson(text: string, jsonStartIndex: number): number | null {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = jsonStartIndex; index < text.length; index++) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index + 1;
+      }
+
+      if (depth < 0) {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findClosingFenceStart(text: string, fromIndex: number): number | null {
+  let index = fromIndex;
+
+  while (index < text.length && /\s/.test(text[index])) {
+    index += 1;
+  }
+
+  return text.startsWith("```", index) ? index : null;
+}
+
+function extractFencedJsonBlock(text: string):
+  | {
+      before: string;
+      jsonText: string;
+      after: string;
+    }
+  | null {
+  const fenceStart = findNextFenceStart(text);
+
+  if (fenceStart === -1) {
+    return null;
+  }
+
+  const fenceMarker = text.startsWith("```json", fenceStart) ? "```json" : "```";
+  const jsonStart = text.indexOf("{", fenceStart + fenceMarker.length);
+
+  if (jsonStart === -1) {
+    return null;
+  }
+
+  const jsonEnd = scanBalancedJson(text, jsonStart);
+
+  if (jsonEnd === null) {
+    return null;
+  }
+
+  const closingFenceStart = findClosingFenceStart(text, jsonEnd);
+
+  if (closingFenceStart === null) {
+    return null;
+  }
+
+  return {
+    before: text.slice(0, fenceStart),
+    jsonText: text.slice(jsonStart, jsonEnd),
+    after: text.slice(closingFenceStart + 3),
+  };
+}
+
+function hasPendingFence(text: string): boolean {
+  let searchIndex = 0;
+  let openFenceCount = 0;
+
+  while (searchIndex < text.length) {
+    const fenceStart = findNextFenceStart(text, searchIndex);
+
+    if (fenceStart === -1) {
+      break;
+    }
+
+    openFenceCount = openFenceCount === 0 ? 1 : 0;
+    searchIndex = fenceStart + 3;
+  }
+
+  return openFenceCount === 1;
+}
+
 export async function consumeModelStream(
   tokenStreamOrPromise: unknown,
   onChunk: (chunkText: string) => void,
@@ -90,18 +216,9 @@ export async function consumeModelStream(
 
     carryover += chunkText;
 
-    // Look for fenced JSON blocks: ```json { ... } ``` or ``` { ... } ```
-    // Use a global loop to catch multiple blocks inside the buffer.
-    // Capture the inner JSON object as group 1.
-    const fencedRegex = /```(?:json)?\s*({[\s\S]*?})\s*```/;
-
-    let match = carryover.match(fencedRegex);
-    while (match) {
-      const idx = match.index ?? 0;
-      const fullMatch = match[0];
-      const before = carryover.slice(0, idx);
-      const jsonText = match[1];
-      const after = carryover.slice(idx + fullMatch.length);
+    let fencedBlock = extractFencedJsonBlock(carryover);
+    while (fencedBlock) {
+      const { before, jsonText, after } = fencedBlock;
 
       // Emit visible text before the fenced block
       if (before && before.trim()) {
@@ -124,7 +241,7 @@ export async function consumeModelStream(
 
       // Continue scanning the remainder
       carryover = after;
-      match = carryover.match(fencedRegex);
+      fencedBlock = extractFencedJsonBlock(carryover);
     }
 
     // To avoid unbounded buffer growth, flush stable prefix that cannot
@@ -132,6 +249,10 @@ export async function consumeModelStream(
     // split across tokens (e.g., "```js\n{")
     const maxSuffix = 512;
     if (carryover.length > maxSuffix) {
+      if (hasPendingFence(carryover)) {
+        continue;
+      }
+
       const flushIndex = carryover.length - maxSuffix;
       const toFlush = carryover.slice(0, flushIndex);
       if (toFlush && toFlush.trim()) onChunk(toFlush);
