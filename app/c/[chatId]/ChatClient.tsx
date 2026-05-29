@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   RotateCcw,
   Square,
+  Brain,
   Mic,
   Plus,
 } from "lucide-react";
@@ -1854,7 +1855,7 @@ export function ChatClient({
                   aria-expanded={isModelMenuOpen}
                   title="Model"
                 >
-                  <Plus size={18} />
+                  <Brain size={18} />
                 </button>
 
                 <div

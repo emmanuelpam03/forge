@@ -3,6 +3,7 @@ import type {
   ClassificationConfidence,
   ClassificationIntent,
 } from "@/ai/graph/state";
+import type { UploadedAttachment } from "@/lib/attachment-types";
 
 export type QueryIntentType =
   | "knowledge"
@@ -319,6 +320,27 @@ export function parseStructuredIntentClassification(
   }
 }
 
+/**
+ * Build a conservative structured intent that indicates the assistant should
+ * extract information from attachments and local project context.
+ * This is used as a heuristic when uploads suggest the user expects extraction.
+ */
+export function buildAttachmentExtractionStructuredIntent(): StructuredIntentClassification {
+  return {
+    intent: "research",
+    difficulty: "medium",
+    verbosity: "balanced",
+    audienceLevel: "intermediate",
+    // Ask the planner to consider project context lookup for attachment extraction
+    toolUsage: ["project_context"],
+    responseMode: "analyze",
+    confidence: "low",
+    memoryRelevance: true,
+    reasoningDepth: "standard",
+    multiIntent: [],
+  };
+}
+
 export function parseClassificationText(
   text: string,
 ): ClassifiedIntent & { structured?: StructuredIntentClassification } {
@@ -400,4 +422,26 @@ export function shouldForceWebSearchFromClassification(
     classification.intent === "factual" &&
     (classification.requiresFreshData || classification.confidence !== "high")
   );
+}
+
+/**
+ * Heuristic: prefer an attachment-extraction structured intent when the
+ * incoming state contains non-image attachments (documents, PDFs, text,
+ * spreadsheets) which likely need extraction.
+ */
+export function shouldPreferAttachmentExtractionIntent(state: { attachments?: UploadedAttachment[] } | null | undefined): boolean {
+  if (!state) return false;
+  const attachments = state.attachments ?? [];
+  if (!Array.isArray(attachments) || attachments.length === 0) return false;
+
+  // If any attachment is not an image, prefer extraction intent.
+  for (const a of attachments) {
+    const mime = (a?.mimeType ?? "").toLowerCase();
+    const kind = (a?.kind ?? "").toLowerCase();
+    if (kind !== "image" && !mime.startsWith("image/")) {
+      return true;
+    }
+  }
+
+  return false;
 }

@@ -23,6 +23,8 @@ import {
   parseClassificationText,
   deriveLegacyIntentFromStructured,
   deriveStructuredFromLegacy,
+  buildAttachmentExtractionStructuredIntent,
+  shouldPreferAttachmentExtractionIntent,
   shouldForceWebSearchFromClassification,
   type QueryIntentClassification,
 } from "@/ai/graph/classification.ts";
