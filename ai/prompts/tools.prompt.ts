@@ -1,3 +1,5 @@
+import { IMAGE_GENERATION_PROMPT } from "./image-generation.prompt.ts";
+
 export const TOOLS_PROMPT = `
 TOOLS & WHEN TO USE THEM
 
@@ -149,6 +151,8 @@ Weather:
  
 Image Generation:
 - \`imageGeneration(prompt, aspectRatio, style)\`: Generate a new image from a text prompt. Returns structured JSON with generated image metadata and URLs.
+- Before calling \`imageGeneration\`, follow this contract:
+${IMAGE_GENERATION_PROMPT}
 
 Document Generation:
 - \`documentGeneration(format, title, body, sheetName, rows, bullets)\`: Generate a new PDF, DOCX, XLSX, or PPTX file from the user's content.

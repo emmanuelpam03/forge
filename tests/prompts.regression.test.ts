@@ -29,6 +29,7 @@ test("layered prompts remain available at top level", () => {
   assert.ok(PROMPTS.formatter.trim().length > 0);
   assert.ok(PROMPTS.humanization.trim().length > 0);
   assert.ok(PROMPTS.classifier.trim().length > 0);
+  assert.ok(PROMPTS.imageGeneration.trim().length > 0);
   assert.ok(PROMPTS.coding.trim().length > 0);
   assert.ok(PROMPTS.reasoning.trim().length > 0);
   assert.ok(PROMPTS.planning.trim().length > 0);
@@ -43,6 +44,9 @@ test("layered prompts remain available at top level", () => {
   assert.match(PROMPTS.humanization, /Do not apply globally/);
   assert.match(PROMPTS.safety, /SAFETY BOUNDARY/);
   assert.match(PROMPTS.safety, /TRUTHFULNESS/);
+  assert.match(PROMPTS.imageGeneration, /IMAGE GENERATION CONTRACT/);
+  assert.match(PROMPTS.imageGeneration, /negative or avoid list/i);
+  assert.match(PROMPTS.imageGeneration, /Do not generate identifiable real people/i);
 });
 
 test("coding prompt enforces senior-engineer instructions", () => {
