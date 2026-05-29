@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
         // restrict to your Cloudinary cloud (replace `daegir3wd` if different)
         // pathname: "/daegir3wd/**",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
   },
 };

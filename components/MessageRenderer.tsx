@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, isValidElement, useMemo } from "react";
+import { Children, isValidElement, useMemo, useState, useEffect } from "react";
 import type { ComponentPropsWithoutRef } from "react";
 import CodeBlock from "./CodeBlock";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -44,10 +44,57 @@ export function MessageRenderer({
   isStreaming,
   images,
 }: MessageRendererProps) {
+  // Initialize to the raw content so server and initial client render match.
+  const [cleanedContent, setCleanedContent] = useState<string>(content || "");
+  const [extractedHtmlImages, setExtractedHtmlImages] = useState<MessageRendererProps['images']>([]);
+
+  useEffect(() => {
+    if (!content) {
+      setCleanedContent("");
+      setExtractedHtmlImages([]);
+      return;
+    }
+
+    try {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = content;
+      const imgs = Array.from(wrapper.querySelectorAll("img"));
+      const extracted = imgs
+        .map((img) => {
+          const src = img.getAttribute("src") ?? "";
+          const alt = img.getAttribute("alt") ?? "";
+          const title = img.getAttribute("title") ?? "";
+          if (/^https?:\/\//i.test(src)) {
+            return { id: src, url: src, thumbnailUrl: src, title: title || alt } as MessageRendererProps['images'][0];
+          }
+          return null;
+        })
+        .filter(Boolean) as MessageRendererProps['images'];
+
+      imgs.forEach((img) => img.remove());
+      const cleaned = wrapper.innerHTML;
+
+      // Update state only after mount to avoid hydration mismatches.
+      if (cleaned !== cleanedContent || extracted.length > 0) {
+        setCleanedContent(cleaned);
+        setExtractedHtmlImages(extracted);
+      }
+    } catch {
+      // If parsing fails, keep the original content and no extracted images.
+      setCleanedContent(content);
+      setExtractedHtmlImages([]);
+    }
+  }, [content]);
+
   const { markdown, trailingText } = useMemo(
-    () => splitStreamingMarkdown(content || "", isStreaming),
-    [content, isStreaming],
+    () => splitStreamingMarkdown(cleanedContent || "", isStreaming),
+    [cleanedContent, isStreaming],
   );
+
+  const combinedImages = useMemo(() => {
+    const fromProps = images ?? [];
+    return [...fromProps, ...(extractedHtmlImages ?? [])];
+  }, [images, extractedHtmlImages]);
 
   const components = useMemo<Components>(
     () => ({
@@ -276,6 +323,20 @@ export function MessageRenderer({
           {children}
         </a>
       ),
+      img: ({ src, alt, title }) => (
+        src ? (
+          <div className="relative w-full h-64 mb-4 overflow-hidden rounded-md">
+            <Image
+              src={String(src)}
+              alt={String(alt ?? title ?? "image")}
+              fill
+              sizes="(max-width: 640px) 100vw, 33vw"
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+        ) : null
+      ),
       code: ({ children, ...restProps }: ComponentPropsWithoutRef<"code">) => (
         <code
           {...restProps}
@@ -340,11 +401,11 @@ export function MessageRenderer({
         </p>
       ) : null}
 
-      {images && images.length > 0 ? (
+      {combinedImages && combinedImages.length > 0 ? (
         <div className="my-4">
-          {images.length >= 4 ? (
+          {combinedImages.length >= 4 ? (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              {images.map((im) => (
+              {combinedImages.map((im) => (
                 <div
                   key={im.id}
                   className="relative h-40 overflow-hidden rounded-md bg-gray-100"
@@ -364,7 +425,7 @@ export function MessageRenderer({
             </div>
           ) : (
             <div className="flex space-x-3 overflow-x-auto py-2">
-              {images.map((im) => (
+              {combinedImages.map((im) => (
                 <div
                   key={im.id}
                   className="relative h-36 w-56 flex-none overflow-hidden rounded-md bg-muted"
