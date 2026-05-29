@@ -289,8 +289,10 @@ function resolveToolPlanForQueryIntent(
     // chat-history-only policy. Keep tools conservative.
   }
 
-  const imageGenerationPattern = /\b(generate|create|make|draw|paint|design)\b.*\b(image|picture|illustration|poster|graphic|logo|scene|art|wallpaper)\b/i;
-  if (!hasAnyAttachment && imageGenerationPattern.test(message)) {
+  const imageGenerationPattern = /\b(generate|create|make|draw|paint|design|show|give|produce)\b.*\b(image|images|picture|pictures|illustration|illustrations|poster|posters|graphic|graphics|logo|logos|scene|scenes|art|artwork|wallpaper|wallpapers)\b/i;
+  const explicitImageRequestPattern = /\bimages?\s+of\b/i;
+  const imageGenerationRequested = imageGenerationPattern.test(message) || explicitImageRequestPattern.test(message);
+  if (!hasAnyAttachment && imageGenerationRequested) {
     selectedTools.push("imageGeneration");
   }
 
@@ -304,7 +306,7 @@ function resolveToolPlanForQueryIntent(
   // Only add an imageSearch tool when we don't already have an uploaded image
   // to use as the primary visual context. Uploaded images should be used
   // directly rather than triggering a provider image search.
-  if (!hasAnyAttachment && !hasImageAttachment && visualContextPattern.test(message)) {
+  if (!hasAnyAttachment && !hasImageAttachment && !imageGenerationRequested && visualContextPattern.test(message)) {
     selectedTools.push("imageSearch");
   }
 
@@ -393,6 +395,44 @@ function buildToolArgs(
 ): Record<string, unknown> {
   const message = state.userMessage;
 
+  function extractRequestedImageCount(input: string): number {
+    const normalized = input.toLowerCase();
+
+    const explicitCountMatch = normalized.match(
+      /\b(?:generate|create|make|draw|paint|design|show|give|return|produce)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+images?\b/,
+    );
+    if (explicitCountMatch?.[1]) {
+      const token = explicitCountMatch[1];
+      if (/^\d+$/.test(token)) {
+        return Math.max(1, Math.min(20, Number.parseInt(token, 10)));
+      }
+
+      const wordToNumber: Record<string, number> = {
+        one: 1,
+        two: 2,
+        three: 3,
+        four: 4,
+        five: 5,
+        six: 6,
+        seven: 7,
+        eight: 8,
+        nine: 9,
+        ten: 10,
+      };
+      return wordToNumber[token] ?? 3;
+    }
+
+    if (/\ban image\b|\bone image\b|\b1 image\b/i.test(input)) {
+      return 1;
+    }
+
+    if (/\bimages\b/i.test(input)) {
+      return 3;
+    }
+
+    return 1;
+  }
+
   if (toolName === "calculator") {
     return { expression: extractCalculatorExpression(message) };
   }
@@ -480,6 +520,7 @@ function buildToolArgs(
 
     return {
       prompt: prompt || message,
+      count: extractRequestedImageCount(message),
       aspectRatio: /\b(portrait|vertical)\b/i.test(message)
         ? "portrait"
         : /\b(square|squared)\b/i.test(message)
@@ -775,6 +816,14 @@ export function testResolveToolPlan(
   const queryIntent: QueryIntentClassification = { needsTools: true, type: "real_time" };
 
   return resolveToolPlanForQueryIntent(state, queryIntent);
+}
+
+export function testBuildToolArgs(toolName: string, userMessage: string) {
+  const state = {
+    userMessage,
+  } as unknown as ChatGraphState;
+
+  return buildToolArgs(toolName, state);
 }
 
 export async function saveMessagesNode(state: ChatGraphState) {

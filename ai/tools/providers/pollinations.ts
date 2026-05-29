@@ -6,6 +6,7 @@ import type { ProviderImage } from "../image-types";
 
 type PollinationsImageGenerationInput = {
   prompt: string;
+  count?: number;
   aspectRatio?: "square" | "landscape" | "portrait";
   style?: string;
 };

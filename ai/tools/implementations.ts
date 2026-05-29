@@ -42,6 +42,7 @@ type ReadAnyFileInput = {
 
 type ImageGenerationInput = {
   prompt: string;
+  count?: number;
   aspectRatio?: "square" | "landscape" | "portrait";
   style?: string;
 };
@@ -1235,26 +1236,36 @@ export async function pollinationsImageGenerationToolAsync(
   chatId: string,
 ): Promise<ToolResult> {
   try {
-    const generated = await pollinationsGenerateImage(input, chatId);
+    const startedAt = Date.now();
+    const count = Math.max(1, Math.min(input.count ?? 1, 20));
+    const images = [] as Awaited<ReturnType<typeof pollinationsGenerateImage>>["images"];
+
+    for (let index = 0; index < count; index += 1) {
+      const variant = count > 1 ? `${input.prompt.trim()} (variation ${index + 1})` : input.prompt;
+      const generated = await pollinationsGenerateImage({ prompt: variant, aspectRatio: input.aspectRatio, style: input.style }, chatId);
+      images.push(...generated.images);
+    }
+
+    const retrievalTimeMs = Date.now() - startedAt;
     return {
       success: true,
       result: JSON.stringify(
         {
           success: true,
-          provider: generated.provider,
-          promptUsed: generated.promptUsed,
-          images: generated.images,
-          totalFound: generated.images.length,
-          retrievalTimeMs: generated.retrievalTimeMs,
+          provider: "pollinations",
+          promptUsed: input.prompt,
+          images,
+          totalFound: images.length,
+          retrievalTimeMs,
         },
         null,
         2,
       ),
       metadata: {
-        provider: generated.provider,
-        promptUsed: generated.promptUsed,
-        imageCount: generated.images.length,
-        retrievalTimeMs: generated.retrievalTimeMs,
+        provider: "pollinations",
+        promptUsed: input.prompt,
+        imageCount: images.length,
+        retrievalTimeMs,
         chatId,
       },
     };

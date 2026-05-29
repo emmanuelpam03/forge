@@ -20,6 +20,7 @@ import {
   generateTitleNode,
   setGraphStreamEventEmitter,
 } from "@/ai/graph/nodes";
+import { createForgeTools } from "@/ai/tools";
 import type { StreamEvent } from "./stream";
 export type { StreamEvent } from "./stream";
 
@@ -169,6 +170,49 @@ export async function runChatGraphStream(
     assistantMessage = generatedResponse.assistantMessage;
     inputTokens = generatedResponse.inputTokens;
     outputTokens = generatedResponse.outputTokens;
+
+    // If the model text indicates it *will* generate a document (PDF/DOCX/XLSX/PPTX)
+    // but no assistantMedia was produced by pre-response tool routing, run the
+    // document generator automatically so the user actually receives the file.
+    try {
+      const alreadyHasAttachment = !!(state.assistantMedia && (state.assistantMedia as any).attachments && (state.assistantMedia as any).attachments.length > 0);
+      const docPattern = /\b(pdf|docx|doc|pptx|ppt|powerpoint|xlsx|excel|spreadsheet|word)\b/i;
+      const promisesToGenerate = [] as Array<() => Promise<void>>;
+
+      if (!alreadyHasAttachment && docPattern.test(assistantMessage || "")) {
+        // Choose format from userMessage if available, otherwise fall back to pdf
+        const fmtMatch = (state.userMessage || "").match(/\b(pdf|docx|doc|pptx|ppt|powerpoint|xlsx|excel|spreadsheet|word)\b/i);
+        const format = fmtMatch ? fmtMatch[1].toLowerCase().replace(/^ppt$/, "pptx").replace(/^doc$/, "docx").replace(/^excel$/, "xlsx").replace(/^word$/, "docx") : "pdf";
+
+        const tools = createForgeTools({ chatId: input.chatId });
+        const docTool = tools.find((t) => t.name === "documentGeneration");
+        if (docTool) {
+          promisesToGenerate.push(async () => {
+            try {
+              const args: Record<string, unknown> = { format, title: undefined, body: assistantMessage };
+              const raw = await (docTool as any).invoke(args);
+              const resultText = typeof raw === "string" ? raw : JSON.stringify(raw);
+              try {
+                const parsed = JSON.parse(resultText);
+                const att = parsed?.attachment;
+                if (att) {
+                  state.assistantMedia = { attachments: [att] } as unknown as typeof state.assistantMedia;
+                  onEvent?.({ type: "attachments", attachments: [att] } as any);
+                }
+              } catch {}
+            } catch (err) {
+              // do not fail the whole request if generation fails
+            }
+          });
+        }
+      }
+
+      if (promisesToGenerate.length > 0) {
+        await Promise.all(promisesToGenerate.map((fn) => fn()));
+      }
+    } catch (err) {
+      // ignore generation failures here
+    }
 
     if (!assistantMessage.trim()) {
       assistantMessage =

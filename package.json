@@ -10,9 +10,7 @@
     "start-worker": "tsx scripts/background-worker.ts",
     "lint": "eslint",
     "prisma:seed": "prisma db seed",
-    "test": "node --test tests/**/*.ts"
-  },
-  "scripts": {
+    "test": "node --test tests/**/*.ts",
     "test:integration": "node --test --loader ts-node/esm -r ./tests/setup.js tests/runChatGraphStream.integration.test.ts"
   },
   "dependencies": {

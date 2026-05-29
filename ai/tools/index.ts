@@ -89,6 +89,7 @@ export const imageSearchToolSchema = z.object({
 
 export const imageGenerationToolSchema = z.object({
   prompt: z.string().min(1),
+  count: z.number().int().min(1).max(20).optional(),
   aspectRatio: z.enum(["square", "landscape", "portrait"]).optional(),
   style: z.string().optional(),
 });

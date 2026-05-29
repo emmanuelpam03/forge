@@ -13,7 +13,11 @@ test("tool planner does not infer imageSearch when any attachment exists", () =>
   assert.match(source, /const hasAnyAttachment = hasAnyActiveAttachment\(state\)/);
   assert.match(
     source,
-    /if \(!hasAnyAttachment && !hasImageAttachment && visualContextPattern\.test\(message\)\)/,
+    /const imageGenerationRequested = imageGenerationPattern\.test\(message\) \|\| explicitImageRequestPattern\.test\(message\);/,
+  );
+  assert.match(
+    source,
+    /if \(!hasAnyAttachment && !hasImageAttachment && !imageGenerationRequested && visualContextPattern\.test\(message\)\)/,
   );
 });
 
