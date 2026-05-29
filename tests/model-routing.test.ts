@@ -20,8 +20,8 @@ test("model routing uses DeepSeek by default without a vision fallback", () => {
   assert.match(source, /DEFAULT_MODEL\s*=\s*"deepseek\/deepseek-v4-flash"/);
   assert.match(source, /resolveChatModelConfig/);
   assert.match(source, /provider:\s*"openrouter"/);
-  assert.match(source, /DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS\s*=\s*8192/);
-  assert.match(source, /MAX_OPENROUTER_MAX_COMPLETION_TOKENS\s*=\s*32000/);
+  assert.match(source, /DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS\s*=\s*4096/);
+  assert.match(source, /MAX_OPENROUTER_MAX_COMPLETION_TOKENS\s*=\s*4096/);
   assert.match(source, /Math\.min\(parsedMaxTokens, MAX_OPENROUTER_MAX_COMPLETION_TOKENS\)/);
   assert.doesNotMatch(source, /DEFAULT_VISION_MODEL|vision_model_routed|OPENROUTER_VISION_MODEL/);
   assert.doesNotMatch(source, /ollama|google-genai|llama/);
@@ -79,7 +79,7 @@ test("environment config is DeepSeek-only", () => {
   assert.match(envExample, /DeepSeek/);
   assert.doesNotMatch(envExample, /OLLAMA_|GOOGLE_API_KEY/);
   assert.doesNotMatch(envExample, /OPENROUTER_VISION_MODEL/);
-  assert.match(envExample, /OPENROUTER_MAX_COMPLETION_TOKENS=8192/);
+  assert.match(envExample, /OPENROUTER_MAX_COMPLETION_TOKENS=4096/);
 
   // Verify README reflects DeepSeek-only
   assert.match(readme, /deepseek|DeepSeek/);

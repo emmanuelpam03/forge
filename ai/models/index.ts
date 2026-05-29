@@ -8,8 +8,8 @@ import type { UploadedAttachment } from "@/lib/attachment-types";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
-export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 8192;
-export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 32000;
+export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 4096;
+export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 4096;
 
 export type ChatModelProvider = "openrouter";
 
