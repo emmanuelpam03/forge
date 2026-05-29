@@ -1533,6 +1533,22 @@ export function ChatClient({
             try {
               const event = JSON.parse(line) as StreamEvent;
 
+            if (event.type === "attachments") {
+              const uploadedAttachment = event.attachments?.[0];
+              if (uploadedAttachment) {
+                setMessages((currentMessages) =>
+                  currentMessages.map((m) =>
+                    m.id === activeAssistantMessageId
+                      ? {
+                          ...m,
+                          attachmentBlock: { attachments: [uploadedAttachment] },
+                        }
+                      : m,
+                  ),
+                );
+              }
+            }
+
             if (event.type === "status") {
               // Suppress generic "Loading context..." for new chats with no history
               if (event.message === "Loading context..." && !hasMessages) {

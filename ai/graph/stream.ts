@@ -1,3 +1,5 @@
+import type { UploadedAttachment } from "@/lib/attachment-types";
+
 export type StreamEvent =
   | { type: "status"; message: string }
   | { type: "reasoning"; content: string }
@@ -23,6 +25,7 @@ export type StreamEvent =
       totalFound: number;
       retrievalTimeMs: number;
     }
+  | { type: "attachments"; attachments: UploadedAttachment[] }
   | {
       type: "placeholder";
       messageId: string;

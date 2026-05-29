@@ -603,24 +603,65 @@ export async function generateResponseNode(state: ChatGraphState) {
       }
 
       let firstTokenAt: number | null = null;
-      await consumeModelStream(invoker.stream(messages as BaseMessage[]), (chunkText) => {
-        if (firstTokenAt === null) {
-          firstTokenAt = Date.now();
-          info("first_token_sent_generate", {
-            chatId: state.chatId,
-            runId: state.runId,
-            ttftMs: firstTokenAt - startedAt,
-          });
-        }
+      await consumeModelStream(
+        invoker.stream(messages as BaseMessage[]),
+        (chunkText) => {
+          if (firstTokenAt === null) {
+            firstTokenAt = Date.now();
+            info("first_token_sent_generate", {
+              chatId: state.chatId,
+              runId: state.runId,
+              ttftMs: firstTokenAt - startedAt,
+            });
+          }
 
-        const visibleChunk = sanitizeVisibleAssistantText(chunkText);
-        if (!visibleChunk) {
-          return;
-        }
+          const visibleChunk = sanitizeVisibleAssistantText(chunkText);
+          if (!visibleChunk) {
+            return;
+          }
 
-        assistantMessage += visibleChunk;
-        graphStreamEventEmitter?.({ type: "token", content: visibleChunk });
-      });
+          assistantMessage += visibleChunk;
+          graphStreamEventEmitter?.({ type: "token", content: visibleChunk });
+        },
+        async (jsonText) => {
+          // Attempt to parse fenced JSON and route to document generator
+          try {
+            const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+
+            // If parsed payload looks like a document generation request,
+            // invoke the documentGeneration tool and emit attachments.
+            const maybeFormat = parsed?.format ?? parsed?.type ?? null;
+            if (maybeFormat && typeof maybeFormat === "string") {
+              try {
+                graphStreamEventEmitter?.({ type: "status", message: "Generating document..." });
+                const tools = createForgeTools({ chatId: state.chatId });
+                const docTool = tools.find((t) => t.name === "documentGeneration");
+                if (docTool) {
+                  // invoke the tool with the parsed payload (zod will validate)
+                  const rawResult = await (docTool as any).invoke(parsed);
+                  const resultText = typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult);
+                  try {
+                    const parsedResult = JSON.parse(resultText);
+                    const att = parsedResult?.attachment;
+                    if (att) {
+                      // attach to assistant media for persistence
+                      state.assistantMedia = { attachments: [att] } as unknown as typeof state.assistantMedia;
+                      // emit attachments event so the client can render immediately
+                      graphStreamEventEmitter?.({ type: "attachments", attachments: [att] });
+                    }
+                  } catch (err) {
+                    // ignore parse errors from tool output
+                  }
+                }
+              } catch (err) {
+                // fail silently; do not surface tool execution errors to user stream
+              }
+            }
+          } catch (err) {
+            // ignore JSON parse errors and continue streaming
+          }
+        },
+      );
 
       const endedAt = Date.now();
       info("stream_closed_generate", {
