@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Mail, Shield, UserCircle2 } from "lucide-react";
+import { ArrowLeft, UserCircle2 } from "lucide-react";
 import SettingsShell from "../../../components/SettingsShell";
 
 const ACCOUNT_DETAILS = [
@@ -71,50 +71,7 @@ export default function AccountSettingsPage() {
             ))}
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-[22px] border border-border bg-card/90 p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
-                  <Mail size={18} />
-                </span>
-                <div>
-                  <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
-                    Contact
-                  </h2>
-                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Email sign-in and password recovery live here later.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 rounded-2xl border border-border bg-muted p-4 text-[14px] leading-6 text-foreground">
-                Primary email stays visible for login and workspace updates.
-              </div>
-            </div>
-
-            <div className="rounded-[22px] border border-border bg-card/90 p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
-                  <Shield size={18} />
-                </span>
-                <div>
-                  <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
-                    Security
-                  </h2>
-                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Authentication and recovery options.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                <div className="rounded-2xl border border-border bg-muted p-4 text-[14px] text-foreground">
-                  Password login enabled
-                </div>
-                <div className="rounded-2xl border border-border bg-muted p-4 text-[14px] text-foreground">
-                  Future Google sign-in ready
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Contact and Security cards removed per request */}
         </section>
       </div>
     </SettingsShell>
