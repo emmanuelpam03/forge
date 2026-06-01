@@ -1714,7 +1714,7 @@ export function ChatClient({
         </div>
       </div>
 
-      <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-40">
+      <div className="relative z-10 flex-1 overflow-y-auto px-6 py-5 pb-[calc(18rem+env(safe-area-inset-bottom))]">
         <div className="mx-auto w-full max-w-208 space-y-4">
           {!hasMessages ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
@@ -1813,7 +1813,7 @@ export function ChatClient({
         onClose={() => setPreviewAttachment(null)}
       />
 
-      <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
+      <div className="absolute inset-x-0 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-208 px-6 pointer-events-auto">
           <div
             ref={composerRef}

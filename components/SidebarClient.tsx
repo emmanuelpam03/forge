@@ -474,7 +474,7 @@ export function SidebarClient({
   const [recentsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
-  const [projects, setProjects] = useState(initialProjects);
+  const [projects] = useState(initialProjects);
   const [recentChats, setRecentChats] = useState(initialChats);
   const [hasMoreRecentChats, setHasMoreRecentChats] = useState(
     initialChats.length === RECENT_CHAT_PAGE_SIZE,
@@ -682,18 +682,6 @@ export function SidebarClient({
       // ignore
     }
   }, [collapsed]);
-
-  useEffect(() => {
-    setProjects(initialProjects);
-  }, [initialProjects]);
-
-  useEffect(() => {
-    if (user) {
-      setRecentChats(initialChats);
-      return;
-    }
-    setRecentChats([]);
-  }, [initialChats, user]);
 
   const handleCreateProject = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();

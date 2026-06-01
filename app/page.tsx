@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowUp, Bookmark, Globe, Layers, Mic, Plus } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
@@ -357,7 +357,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-background">
+    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-background pb-[calc(6rem+env(safe-area-inset-bottom))]">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -484,7 +484,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="absolute inset-x-0 bottom-6 z-50 pointer-events-none">
+      <div className="absolute inset-x-0 bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-50 pointer-events-none">
         <div className="mx-auto w-full max-w-4xl px-6 pointer-events-auto">
           <div
             className={`relative rounded-[28px] border bg-card/90 px-4 py-3 shadow-lg backdrop-blur transition ${isDraggingFiles ? "border-primary ring-2 ring-primary/30" : "border-border"}`}

@@ -17,10 +17,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Sidebar />
       </Suspense>
-      <main className="flex-1 overflow-hidden">
+      <main className="flex flex-1 min-h-0 flex-col overflow-hidden">
         <LoggedOutNavbar />
         <ErrorBoundary>
-          {children}
+          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         </ErrorBoundary>
       </main>
       </div>
