@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { FeedbackProvider } from "@/components/feedback-provider";
 import { AppShell } from "@/components/app-shell";
+import AuthProvider from "@/components/auth-provider";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -86,7 +87,9 @@ export default function RootLayout({
         >
           <FeedbackProvider>
             <KeyboardShortcuts />
-            <AppShell>{children}</AppShell>
+            <AuthProvider>
+              <AppShell>{children}</AppShell>
+            </AuthProvider>
           </FeedbackProvider>
         </ThemeProvider>
       </body>

@@ -1481,6 +1481,7 @@ export const ProjectScalarFieldEnum = {
   description: 'description',
   color: 'color',
   isPinned: 'isPinned',
+  userId: 'userId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1490,6 +1491,7 @@ export type ProjectScalarFieldEnum = (typeof ProjectScalarFieldEnum)[keyof typeo
 
 export const ChatScalarFieldEnum = {
   id: 'id',
+  userId: 'userId',
   projectId: 'projectId',
   title: 'title',
   summary: 'summary',

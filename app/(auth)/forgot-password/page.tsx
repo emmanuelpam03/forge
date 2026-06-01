@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const emailInputId = "email";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +34,11 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm">Email</label>
-            <input
+            <Label htmlFor={emailInputId} className="block text-sm">
+              Email
+            </Label>
+            <Input
+              id={emailInputId}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -40,9 +48,9 @@ export default function ForgotPasswordPage() {
           </div>
 
           <div>
-            <button type="submit" className="rounded-md bg-primary px-4 py-2 text-white">
+            <Button type="submit" className="rounded-md bg-primary px-4 py-2 text-white">
               Send reset link
-            </button>
+            </Button>
           </div>
         </form>
       )}

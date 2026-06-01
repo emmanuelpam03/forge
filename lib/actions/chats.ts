@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { error as logError } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/app/generated/prisma/client";
+import { getServerSessionFromRequest } from "@/lib/server-auth";
 
 type ChatWithMessages = Prisma.ChatGetPayload<{
   include: { messages: true; attachments: true };
@@ -11,10 +12,15 @@ type ChatWithMessages = Prisma.ChatGetPayload<{
 
 export async function createChat(projectId?: string) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
     const chat = await prisma.chat.create({
       data: {
         title: "New Chat",
         projectId: projectId || null,
+        userId,
       },
     });
 
@@ -36,10 +42,14 @@ export async function updateChat(
   },
 ) {
   try {
-    const chat = await prisma.chat.update({
-      where: { id },
-      data,
-    });
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    const existing = await prisma.chat.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing || existing.userId !== userId) return { success: false, error: "Not found" };
+
+    const chat = await prisma.chat.update({ where: { id }, data });
 
     revalidatePath("/", "layout");
     return { success: true, chat };
@@ -51,9 +61,14 @@ export async function updateChat(
 
 export async function deleteChat(id: string) {
   try {
-    await prisma.chat.delete({
-      where: { id },
-    });
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    const existing = await prisma.chat.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing || existing.userId !== userId) return { success: false, error: "Not found" };
+
+    await prisma.chat.delete({ where: { id } });
 
     revalidatePath("/", "layout");
     return { success: true };
@@ -74,11 +89,15 @@ export async function getRecentChatsPage(options?: {
 }) {
   try {
     const limit = options?.limit ?? 20;
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { chats: [], hasMore: false };
 
     const chats = await prisma.chat.findMany({
       where: {
         isArchived: false,
         projectId: null,
+        userId,
         ...(options?.cursor
           ? {
               OR: [
@@ -117,6 +136,10 @@ export async function getChatById(
   options?: { take?: number; skip?: number },
 ): Promise<ChatWithMessages | null> {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return null;
+
     const chat = await prisma.chat.findUnique({
       where: { id },
       include: {
@@ -130,6 +153,8 @@ export async function getChatById(
         },
       },
     });
+
+    if (!chat || chat.userId !== userId) return null;
     return chat as ChatWithMessages | null;
   } catch (error) {
     logError("get_chat_failed", { id, error });
@@ -144,10 +169,19 @@ export async function getRecentChats(limit: number = 5) {
 
 export async function getProjectChats(projectId: string) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return [];
+
+    // verify project ownership
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { userId: true } });
+    if (!project || project.userId !== userId) return [];
+
     const chats = await prisma.chat.findMany({
       where: {
         projectId,
         isArchived: false,
+        userId,
       },
       orderBy: { lastMessageAt: "desc" },
     });
@@ -163,10 +197,20 @@ export async function createChatWithMessage(
   projectId?: string,
 ) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    if (projectId) {
+      const project = await prisma.project.findUnique({ where: { id: projectId }, select: { userId: true } });
+      if (!project || project.userId !== userId) return { success: false, error: "Not found" };
+    }
+
     const chat = await prisma.chat.create({
       data: {
         title: "New Chat",
         projectId: projectId || null,
+        userId,
       },
     });
 

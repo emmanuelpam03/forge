@@ -1,15 +1,24 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { getServerSessionFromRequest } from "@/lib/server-auth";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { error as logError } from "@/lib/logger";
 
 export async function createProject(name: string = "New Project") {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
     const project = await prisma.project.create({
       data: {
         name,
         description: null,
+        userId,
       },
     });
 
@@ -26,6 +35,14 @@ export async function updateProject(
   data: { name?: string; description?: string; color?: string },
 ) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    // enforce ownership
+    const existing = await prisma.project.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing || existing.userId !== userId) return { success: false, error: "Not found" };
+
     const project = await prisma.project.update({
       where: { id },
       data,
@@ -41,9 +58,14 @@ export async function updateProject(
 
 export async function deleteProject(id: string) {
   try {
-    await prisma.project.delete({
-      where: { id },
-    });
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    const existing = await prisma.project.findUnique({ where: { id }, select: { userId: true } });
+    if (!existing || existing.userId !== userId) return { success: false, error: "Not found" };
+
+    await prisma.project.delete({ where: { id } });
 
     revalidatePath("/", "layout");
     return { success: true };
@@ -55,7 +77,12 @@ export async function deleteProject(id: string) {
 
 export async function getProjects() {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return [];
+
     const projects = await prisma.project.findMany({
+      where: { userId },
       orderBy: { updatedAt: "desc" },
     });
     return projects;
@@ -67,9 +94,12 @@ export async function getProjects() {
 
 export async function getProjectById(id: string) {
   try {
-    const project = await prisma.project.findUnique({
-      where: { id },
-    });
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return null;
+
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project || project.userId !== userId) return null;
     return project;
   } catch (error) {
     logError("get_project_failed", { id, error });

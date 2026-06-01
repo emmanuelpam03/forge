@@ -4,7 +4,10 @@ import {
   createTask,
   listTasksByProject,
   updateTaskStatus,
+  getTaskById,
 } from "@/lib/task-service";
+import { requireServerUser } from "@/lib/server-auth";
+import prisma from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -41,6 +44,19 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "projectId is required." }, { status: 400 });
   }
 
+  // Require authenticated user and verify project ownership
+  let user: any;
+  try {
+    user = await requireServerUser(request as unknown as Request);
+  } catch (err) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: projectId }, select: { userId: true } });
+  if (!project || project.userId !== user.id) {
+    return Response.json({ error: "Project not found or access denied." }, { status: 404 });
+  }
+
   const tasks = await listTasksByProject(projectId);
   return Response.json({ tasks });
 }
@@ -51,6 +67,19 @@ export async function POST(request: NextRequest) {
 
   if (!parsed.success) {
     return Response.json({ error: "Invalid task payload." }, { status: 400 });
+  }
+
+  // Require authenticated user and verify project ownership
+  let user: any;
+  try {
+    user = await requireServerUser(request as unknown as Request);
+  } catch (err) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: parsed.data.projectId }, select: { userId: true } });
+  if (!project || project.userId !== user.id) {
+    return Response.json({ error: "Project not found or access denied." }, { status: 404 });
   }
 
   const task = await createTask({
@@ -77,6 +106,23 @@ export async function PATCH(request: NextRequest) {
       { error: "Invalid task update payload." },
       { status: 400 },
     );
+  }
+  // Require authenticated user and verify ownership of the task via project
+  let user: any;
+  try {
+    user = await requireServerUser(request as unknown as Request);
+  } catch (err) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const taskRecord = await getTaskById(parsed.data.taskId);
+  if (!taskRecord) {
+    return Response.json({ error: "Task not found." }, { status: 404 });
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: taskRecord.projectId }, select: { userId: true } });
+  if (!project || project.userId !== user.id) {
+    return Response.json({ error: "Access denied." }, { status: 403 });
   }
 
   const task = await updateTaskStatus(parsed.data.taskId, parsed.data.status);

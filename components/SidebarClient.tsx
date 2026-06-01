@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import ForgeLogo from "./ForgeLogo";
 import { useFeedback } from "./feedback-provider";
+import { useAuth } from "./auth-provider";
+import { UserCircle2 } from "lucide-react";
 import { ModeToggle } from "./mode-toggle";
 import {
   createProject,
@@ -451,6 +453,7 @@ export function SidebarClient({
   const recentsPopoverScrollRef = useRef<HTMLDivElement | null>(null);
   const recentsLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const recentsPopoverLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const { user, signOut } = useAuth();
 
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
@@ -728,18 +731,41 @@ export function SidebarClient({
                 <Search size={14} />
               </button>
 
-              {/* Sign-in shortcut (will become session-aware later) */}
-              <a
-                href="/(auth)/login"
-                className="h-10 ml-2 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border)",
-                  color: "var(--sidebar-foreground)",
-                }}
-              >
-                Sign in
-              </a>
+              {/* Session-aware account/menu */}
+              {user ? (
+                <div className="h-10 ml-2 relative">
+                  <button
+                    onClick={() => void (async () => {
+                      await signOut();
+                      router.push('/');
+                    })()}
+                    className="h-10 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
+                    style={{
+                      background: "transparent",
+                      border: "1px solid var(--border)",
+                      color: "var(--sidebar-foreground)",
+                    }}
+                    title="Sign out"
+                  >
+                    <UserCircle2 size={16} className="mr-2" />
+                    <span className="truncate" style={{ maxWidth: 96 }}>
+                      {(user.name || user.email || 'Account')}
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="h-10 ml-2 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--border)",
+                    color: "var(--sidebar-foreground)",
+                  }}
+                >
+                  Sign in
+                </Link>
+              )}
             </div>
           </div>
         )}

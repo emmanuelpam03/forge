@@ -5,6 +5,7 @@ import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import { info as logInfo, warn as logWarn, error as logError } from "@/lib/logger";
 import { selectedOptionIdSchema } from "@/ai/selected-options";
+import { requireServerUser } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
 
     const target = await prisma.message.findUnique({
       where: { id: assistantMessageId },
+      include: { chat: { select: { userId: true } } },
     });
     if (!target) {
       return new Response(JSON.stringify({ error: "Message not found." }), {
@@ -48,6 +50,24 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Require authenticated user and enforce ownership
+    let user: any;
+    try {
+      user = await requireServerUser(request as unknown as Request);
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (target.chat?.userId !== user.id) {
+      return new Response(JSON.stringify({ error: "Access denied." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (target.role !== "assistant") {

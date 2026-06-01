@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { requireServerUser } from "@/lib/server-auth";
 
 function validatePathSegment(value: string, label: string): string {
   const normalized = String(value ?? "").trim();
@@ -17,11 +18,20 @@ export async function GET(request: NextRequest, { params }: { params: { chatId?:
     const chatId = validatePathSegment(params.chatId ?? "", "chatId");
     const attachmentId = validatePathSegment(params.attachmentId ?? "", "attachmentId");
 
+    // Require auth and ownership
+    let user: any;
+    try {
+      user = await requireServerUser(request as unknown as Request);
+    } catch (err) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const attachment = await prisma.attachment.findFirst({
       where: { chatId, id: attachmentId },
+      include: { chat: { select: { userId: true } } },
     });
 
-    if (!attachment || !attachment.storageUrl) {
+    if (!attachment || attachment.chat?.userId !== user.id || !attachment.storageUrl) {
       return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
     }
 

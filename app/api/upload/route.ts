@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { error as logError } from "@/lib/logger";
 import prisma from "@/lib/prisma";
+import { requireServerUser } from "@/lib/server-auth";
 import {
   buildUploadedAttachment,
   validateAttachmentCandidate,
@@ -17,12 +18,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "chatId is required." }, { status: 400 });
     }
 
+    // Require auth and ownership
+    let user: any;
+    try {
+      user = await requireServerUser(request as unknown as Request);
+    } catch (err) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const chat = await prisma.chat.findUnique({
       where: { id: chatId },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
 
-    if (!chat) {
+    if (!chat || chat.userId !== user.id) {
       return NextResponse.json({ error: "Chat not found." }, { status: 404 });
     }
 

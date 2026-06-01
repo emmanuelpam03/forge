@@ -150,6 +150,20 @@ export async function buildUploadedAttachment(input: AttachmentInput & { attachm
 
   // Persist metadata to the database (best-effort) using the typed Prisma client.
   try {
+    // Verify chat ownership before persisting attachment metadata
+    try {
+      const { getServerSessionFromRequest } = await import("./server-auth");
+      const session = await getServerSessionFromRequest(undefined);
+      const userId = session?.user?.id ?? null;
+      if (!userId) throw new Error("unauthorized");
+
+      const chat = await prisma.chat.findUnique({ where: { id: input.chatId }, select: { userId: true } });
+      if (!chat || chat.userId !== userId) throw new Error("unauthorized");
+    } catch (err) {
+      // If ownership can't be verified, skip persisting metadata but continue upload.
+      throw err;
+    }
+
     await prisma.attachment.create({
       data: {
         id: input.attachmentId,

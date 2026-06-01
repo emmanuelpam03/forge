@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { requireServerUser } from "@/lib/server-auth";
 import { runChatGraphStream, type StreamEvent } from "@/ai/graph";
 import { hashIdentifierForLogging } from "@/lib/logging";
 import { error as logError } from "@/lib/logger";
@@ -29,11 +30,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
+
     const { chatId, messageId, newContent } = parsed.data;
+
+    // Ensure authenticated and owns the chat
+    let user: any;
+    try {
+      user = await requireServerUser(request as unknown as Request);
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Validate target message exists and is a user message
     const target = await prisma.message.findUnique({
       where: { id: messageId },
+      include: { chat: { select: { userId: true } } },
     });
 
     if (!target) {
@@ -51,6 +65,14 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Enforce chat ownership
+    if (target.chat?.userId !== user.id) {
+      return new Response(JSON.stringify({ error: "Access denied." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (target.role !== "user") {

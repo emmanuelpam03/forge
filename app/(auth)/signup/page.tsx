@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { signUp } from "@/lib/auth-client";
 
 export default function SignupPage() {
@@ -11,6 +14,9 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nameInputId = "name";
+  const emailInputId = "email";
+  const passwordInputId = "password";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +31,7 @@ export default function SignupPage() {
         return;
       }
       router.push("/");
-    } catch (err) {
+    } catch {
       setError("Network error");
     } finally {
       setLoading(false);
@@ -37,17 +43,24 @@ export default function SignupPage() {
       <h1 className="text-2xl font-semibold mb-4">Create account</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm">Name</label>
-          <input
+          <Label htmlFor={nameInputId} className="block text-sm">
+            Name
+          </Label>
+          <Input
+            id={nameInputId}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-md border px-3 py-2"
+            required
           />
         </div>
 
         <div>
-          <label className="block text-sm">Email</label>
-          <input
+          <Label htmlFor={emailInputId} className="block text-sm">
+            Email
+          </Label>
+          <Input
+            id={emailInputId}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -57,8 +70,11 @@ export default function SignupPage() {
         </div>
 
         <div>
-          <label className="block text-sm">Password</label>
-          <input
+          <Label htmlFor={passwordInputId} className="block text-sm">
+            Password
+          </Label>
+          <Input
+            id={passwordInputId}
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -67,16 +83,23 @@ export default function SignupPage() {
           />
         </div>
 
-        {error && <div className="text-sm text-destructive">{error}</div>}
+        {error && (
+          <div
+            className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {error}
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
-          <button
+          <Button
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-white"
             disabled={loading}
           >
             {loading ? "Creating…" : "Create account"}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

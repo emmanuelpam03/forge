@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { MessageRole } from "@/app/generated/prisma/enums";
 import { revalidatePath } from "next/cache";
 import { error as logError } from "@/lib/logger";
+import { getServerSessionFromRequest } from "@/lib/server-auth";
 
 export async function createMessage(
   chatId: string,
@@ -12,6 +13,13 @@ export async function createMessage(
   opts?: { parentId?: string | null; branchId?: string | null },
 ) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return { success: false, error: "Unauthorized" };
+
+    const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { userId: true } });
+    if (!chat || chat.userId !== userId) return { success: false, error: "Not found" };
+
     const message = await prisma.message.create({
       data: {
         chatId,
@@ -38,6 +46,13 @@ export async function createMessage(
 
 export async function getMessagesByChat(chatId: string) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return [];
+
+    const chat = await prisma.chat.findUnique({ where: { id: chatId }, select: { userId: true } });
+    if (!chat || chat.userId !== userId) return [];
+
     const messages = await prisma.message.findMany({
       where: { chatId },
       orderBy: { createdAt: "asc" },
@@ -51,6 +66,16 @@ export async function getMessagesByChat(chatId: string) {
 
 export async function getBranchesForParent(parentMessageId: string) {
   try {
+    const session = await getServerSessionFromRequest(undefined);
+    const userId = session?.user?.id ?? null;
+    if (!userId) return [];
+
+    const parent = await prisma.message.findUnique({ where: { id: parentMessageId }, select: { chatId: true } });
+    if (!parent) return [];
+
+    const chat = await prisma.chat.findUnique({ where: { id: parent.chatId }, select: { userId: true } });
+    if (!chat || chat.userId !== userId) return [];
+
     const branches = await prisma.message.findMany({
       where: { parentId: parentMessageId, role: "assistant" },
       orderBy: { createdAt: "asc" },

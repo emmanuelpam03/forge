@@ -11,6 +11,7 @@ import {
   resolveAttachmentsForTurn,
   selectAttachmentsForTurn,
 } from "@/lib/chat-attachment-resolution";
+import { requireServerUser } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,29 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Ensure the requester is authenticated and owns the chat
+    let user: any;
+    try {
+      user = await requireServerUser(request as unknown as Request);
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const chatExists = await prisma.chat.findUnique({
+      where: { id: parsedBody.data.chatId, userId: user.id },
+      select: { id: true },
+    });
+
+    if (!chatExists) {
+      return new Response(JSON.stringify({ error: "Chat not found or access denied" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const attachments = await prisma.attachment.findMany({
