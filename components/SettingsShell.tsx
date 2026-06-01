@@ -1,23 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   ChevronRight,
   CreditCard,
-  MoonStar,
   Sparkles,
   UserCircle2,
   Settings2,
+  X,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { label: "General", href: "/settings", icon: Settings2, exact: true },
   { label: "Account", href: "/settings/account", icon: UserCircle2 },
-  { label: "Appearance", href: "/settings/appearance", icon: MoonStar },
   { label: "Memory", href: "/settings/memory", icon: Sparkles },
   { label: "Billing", href: "/settings/billing", icon: CreditCard },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
@@ -25,6 +24,7 @@ const NAV_ITEMS = [
 
 export default function SettingsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -40,28 +40,39 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 sm:px-6"
+      className="fixed inset-0 z-50"
+      onClick={() => router.push("/")}
       style={{
         background: isDarkMode
           ? "rgba(0, 0, 0, 0.78)"
           : "rgba(24, 24, 24, 0.56)",
       }}
     >
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            isDarkMode
-              ? "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.06) 0%, transparent 65%)"
-              : "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.04) 0%, transparent 65%)",
-        }}
-      />
+      <div className="relative flex h-full w-full items-center justify-center px-4 py-6 sm:px-6">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              isDarkMode
+                ? "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.06) 0%, transparent 65%)"
+                : "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.04) 0%, transparent 65%)",
+          }}
+        />
 
-      <div
-        className="relative z-10 flex h-[min(760px,calc(100vh-3rem))] w-full max-w-230 overflow-hidden rounded-[24px] border border-border bg-card text-foreground shadow-[0_24px_100px_rgba(0,0,0,0.45)]"
-        style={{ background: "var(--card)" }}
-      >
-        <aside className="hidden w-62.5 shrink-0 border-r border-border/80 bg-muted/40 p-3 lg:block">
+        <Link
+          href="/"
+          aria-label="Close settings"
+          className="absolute right-6 top-6 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/90 text-foreground/70 shadow-sm backdrop-blur-sm transition hover:bg-card hover:text-foreground"
+        >
+          <X size={15} />
+        </Link>
+
+        <div
+          className="relative z-10 flex h-[min(760px,calc(100vh-3rem))] w-full max-w-230 overflow-hidden rounded-[24px] border border-border bg-card text-foreground shadow-[0_24px_100px_rgba(0,0,0,0.45)]"
+          style={{ background: "var(--card)" }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <aside className="hidden w-62.5 shrink-0 border-r border-border/80 bg-muted/40 p-3 lg:block">
           <div
             className="h-full rounded-[18px] border border-border/70 bg-background/50 p-3"
             style={{
@@ -148,7 +159,10 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">{children}</main>
+          <main className="min-w-0 flex-1 overflow-y-auto p-5 sm:p-6 lg:p-8">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );
