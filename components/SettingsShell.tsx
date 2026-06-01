@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   ChevronRight,
@@ -11,7 +13,6 @@ import {
   UserCircle2,
   Settings2,
 } from "lucide-react";
-import type { ReactNode } from "react";
 
 const NAV_ITEMS = [
   { label: "Overview", href: "/settings", icon: Settings2, exact: true },
@@ -24,52 +25,54 @@ const NAV_ITEMS = [
 
 export default function SettingsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  const isDarkMode = resolvedTheme !== "light";
 
   return (
     <div
-      className="relative h-full overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
-      style={{ background: "var(--background)" }}
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 sm:px-6"
+      style={{
+        background: isDarkMode
+          ? "rgba(0, 0, 0, 0.78)"
+          : "rgba(24, 24, 24, 0.56)",
+      }}
     >
-      {/* Ambient glow */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.04) 0%, transparent 65%)",
+            isDarkMode
+              ? "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.06) 0%, transparent 65%)"
+              : "radial-gradient(ellipse 55% 35% at 60% 10%, rgba(22,163,74,0.04) 0%, transparent 65%)",
         }}
       />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl gap-6">
-        {/* Sidebar nav */}
-        <aside className="hidden w-56 shrink-0 lg:block">
+      <div
+        className="relative z-10 flex h-[min(760px,calc(100vh-3rem))] w-full max-w-230 overflow-hidden rounded-[24px] border border-border bg-card text-foreground shadow-[0_24px_100px_rgba(0,0,0,0.45)]"
+        style={{ background: "var(--card)" }}
+      >
+        <aside className="hidden w-62.5 shrink-0 border-r border-border/80 bg-muted/40 p-3 lg:block">
           <div
-            className="sticky top-4"
+            className="h-full rounded-[18px] border border-border/70 bg-background/50 p-3"
             style={{
-              border: "1px solid var(--border)",
-              borderRadius: "18px",
-              background: "var(--card)",
-              padding: "12px",
+              backdropFilter: "blur(16px)",
             }}
           >
             <div className="px-2 pb-3 pt-1">
-              <p
-                className="text-[10px] font-semibold uppercase"
-                style={{
-                  letterSpacing: "0.16em",
-                  color: "var(--foreground)",
-                  opacity: 0.4,
-                }}
-              >
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/40">
                 Settings
               </p>
-              <h2
-                className="mt-1 text-[17px] font-semibold"
-                style={{
-                  letterSpacing: "-0.03em",
-                  color: "var(--foreground)",
-                  fontFamily: "var(--font-manrope), sans-serif",
-                }}
-              >
+              <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.03em] text-foreground">
                 Preferences
               </h2>
             </div>
@@ -85,11 +88,11 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                   <Link
                     key={item.label}
                     href={item.href}
-                    className="flex items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-150"
+                    className="flex items-center justify-between rounded-2xl px-3 py-2.5 transition-all duration-150"
                     style={
                       isActive
                         ? {
-                            background: "rgba(22,163,74,0.08)",
+                            background: "rgba(22,163,74,0.1)",
                             border: "1px solid rgba(22,163,74,0.18)",
                             color: "var(--foreground)",
                           }
@@ -97,21 +100,21 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
                             background: "transparent",
                             border: "1px solid transparent",
                             color: "var(--foreground)",
-                            opacity: 0.5,
+                            opacity: 0.62,
                           }
                     }
                     onMouseEnter={(e) => {
                       if (!isActive) {
                         (e.currentTarget as HTMLElement).style.background =
                           "var(--accent)";
-                        (e.currentTarget as HTMLElement).style.opacity = "0.8";
+                        (e.currentTarget as HTMLElement).style.opacity = "0.86";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive) {
                         (e.currentTarget as HTMLElement).style.background =
                           "transparent";
-                        (e.currentTarget as HTMLElement).style.opacity = "0.5";
+                        (e.currentTarget as HTMLElement).style.opacity = "0.62";
                       }
                     }}
                   >

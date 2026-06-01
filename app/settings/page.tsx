@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import {
+  ArrowRight,
   Bell,
   CreditCard,
   MoonStar,
   Sparkles,
   UserCircle2,
   Settings2,
-  Shield,
 } from "lucide-react";
 import SettingsShell from "@/components/SettingsShell";
 
@@ -43,12 +43,6 @@ const SETTINGS_SECTIONS = [
     href: "/settings/notifications",
     icon: Bell,
   },
-  {
-    title: "Security",
-    description: "Login and access-related settings.",
-    href: "/settings/account",
-    icon: Shield,
-  },
 ] as const;
 
 export default function SettingsPage() {
@@ -78,78 +72,88 @@ export default function SettingsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {SETTINGS_SECTIONS.map((section) => {
-            const Icon = section.icon;
-
-            return (
-              <Link
-                key={section.title}
-                href={section.href}
-                className="group rounded-3xl border border-border bg-card/90 p-5 transition-colors hover:border-border/80 hover:bg-card"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-primary/15 text-primary transition-colors group-hover:bg-primary/20">
-                    <Icon size={18} />
-                  </span>
-                  <div className="min-w-0">
-                    <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
-                      {section.title}
-                    </h2>
-                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                      {section.description}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </section>
-
         <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="rounded-3xl border border-border bg-card/90 p-5">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Quick access
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Link
-                href="/settings/appearance"
-                className="rounded-2xl border border-border bg-muted p-4 transition-colors hover:bg-accent"
-              >
-                <p className="text-[14px] font-medium text-foreground">
-                  Theme and contrast
-                </p>
-                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                  Tune the visual style of the workspace.
-                </p>
-              </Link>
+          <div className="overflow-hidden rounded-[22px] border border-border bg-card/90">
+            {SETTINGS_SECTIONS.map((section, index) => {
+              const Icon = section.icon;
 
-              <Link
-                href="/settings/billing"
-                className="rounded-2xl border border-border bg-muted p-4 transition-colors hover:bg-accent"
-              >
-                <p className="text-[14px] font-medium text-foreground">
-                  Billing and usage
-                </p>
-                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                  Review plan status and current usage.
-                </p>
-              </Link>
-            </div>
+              return (
+                <Link
+                  key={section.title}
+                  href={section.href}
+                  className={`flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-accent ${
+                    index > 0 ? "border-t border-border" : ""
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-primary/15 text-primary">
+                      <Icon size={18} />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="text-[15px] font-medium tracking-[-0.02em] text-foreground">
+                        {section.title}
+                      </h2>
+                      <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                        {section.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <ArrowRight size={16} className="shrink-0 text-muted-foreground" />
+                </Link>
+              );
+            })}
           </div>
 
-          <div className="rounded-3xl border border-border bg-card/90 p-5">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              App consistency
-            </p>
-            <p className="mt-4 text-[14px] leading-6 text-foreground">
-              Forge settings now follow the same modular layout as the rest of
-              the app: shared shell, focused sections, and lightweight cards.
-            </p>
-            <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
-              That keeps the UI readable without copying the ChatGPT settings
-              screen wholesale.
-            </p>
+          <div className="space-y-4">
+            <div className="rounded-[22px] border border-border bg-card/90 p-5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                Quick access
+              </p>
+              <div className="mt-4 space-y-3">
+                <Link
+                  href="/settings/appearance"
+                  className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted px-4 py-3 transition-colors hover:bg-accent"
+                >
+                  <div>
+                    <p className="text-[14px] font-medium text-foreground">
+                      Theme and contrast
+                    </p>
+                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                      Tune the visual style of the workspace.
+                    </p>
+                  </div>
+                  <ArrowRight size={16} className="shrink-0 text-muted-foreground" />
+                </Link>
+
+                <Link
+                  href="/settings/billing"
+                  className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted px-4 py-3 transition-colors hover:bg-accent"
+                >
+                  <div>
+                    <p className="text-[14px] font-medium text-foreground">
+                      Billing and usage
+                    </p>
+                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                      Review plan status and current usage.
+                    </p>
+                  </div>
+                  <ArrowRight size={16} className="shrink-0 text-muted-foreground" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-[22px] border border-border bg-card/90 p-5">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                App consistency
+              </p>
+              <p className="mt-4 text-[14px] leading-6 text-foreground">
+                Forge settings now follow the same shell, spacing, and card language as the rest of the app.
+              </p>
+              <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
+                The pages stay readable and aligned without cloning the reference UI wholesale.
+              </p>
+            </div>
           </div>
         </section>
       </div>

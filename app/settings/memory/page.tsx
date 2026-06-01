@@ -62,49 +62,71 @@ export default function MemorySettingsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-border bg-card/90 p-5 shadow-[0_18px_50px_-34px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
-                <BrainCircuit size={18} />
-              </span>
-              <div>
-                <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
-                  What Forge remembers
-                </h2>
-                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                  Keep memory simple, useful, and easy to trust.
-                </p>
-              </div>
-            </div>
+        <section className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[22px] border border-border bg-card/90">
+              <div className="flex items-center justify-between gap-6 px-5 py-4">
+                <div className="max-w-104">
+                  <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
+                    What Forge remembers
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                    Keep memory simple, useful, and easy to trust.
+                  </p>
+                </div>
 
-            <div className="mt-5 space-y-3">
-              {MEMORY_ITEMS.map((item) => (
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-primary/15 text-primary">
+                  <BrainCircuit size={18} />
+                </span>
+              </div>
+
+              {MEMORY_ITEMS.map((item, index) => (
                 <div
                   key={item}
-                  className="rounded-2xl border border-border bg-muted px-4 py-3 text-[14px] leading-6 text-foreground"
+                  className={`px-5 py-4 ${index > 0 ? "border-t border-border" : "border-t border-border"}`}
                 >
-                  {item}
+                  <p className="text-[14px] font-medium text-foreground">
+                    {item}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                    Memory is used to improve consistency and reduce repeated setup.
+                  </p>
                 </div>
               ))}
+
+              <div className="border-t border-border px-5 py-4">
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-muted px-4 py-3">
+                  <div>
+                    <p className="text-[14px] font-medium text-foreground">
+                      Show memory details
+                    </p>
+                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                      Review exactly what is stored before it is used.
+                    </p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-primary">
+                    <Eye size={16} />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between rounded-2xl border border-border bg-muted px-4 py-3">
-              <div>
-                <p className="text-[14px] font-medium text-foreground">
-                  Show memory details
-                </p>
-                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                  Review exactly what is stored before it is used.
-                </p>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-primary">
-                <Eye size={16} />
+            <div className="rounded-[22px] border border-border bg-card/90 p-5">
+              <div className="flex items-center gap-3">
+                <SearchCheck size={18} className="text-primary" />
+                <div>
+                  <p className="text-[14px] font-medium text-foreground">
+                    Retrieval first
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                    Use memory when it improves answers, not as clutter.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border bg-card/90 p-5 shadow-[0_18px_50px_-34px_rgba(0,0,0,0.45)]">
+          <div className="rounded-[22px] border border-border bg-card/90 p-5">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
                 <Database size={18} />
@@ -114,13 +136,12 @@ export default function MemorySettingsPage() {
                   Memory scope
                 </h2>
                 <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                  Designed to grow with long-term preferences and recurring
-                  work.
+                  Designed to grow with long-term preferences and recurring work.
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 space-y-3">
               {MEMORY_OPTIONS.map((item) => (
                 <div
                   key={item.title}
@@ -144,20 +165,6 @@ export default function MemorySettingsPage() {
             </div>
 
             <div className="mt-4 rounded-2xl border border-border bg-muted p-4">
-              <div className="flex items-center gap-3">
-                <SearchCheck size={18} className="text-primary" />
-                <div>
-                  <p className="text-[14px] font-medium text-foreground">
-                    Retrieval first
-                  </p>
-                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Use memory when it improves answers, not as clutter.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-border bg-muted p-4">
               <div className="flex items-center gap-3">
                 <Sparkles size={18} className="text-primary" />
                 <div>

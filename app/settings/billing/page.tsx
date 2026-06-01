@@ -20,7 +20,7 @@ export default function BillingSettingsPage() {
   return (
     <SettingsShell>
       <div className="flex w-full flex-col gap-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Settings
@@ -28,6 +28,9 @@ export default function BillingSettingsPage() {
             <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.03em] text-foreground">
               Billing
             </h1>
+            <p className="mt-2 max-w-2xl text-[14px] leading-6 text-muted-foreground">
+              Review your current plan and usage without leaving the settings area.
+            </p>
           </div>
 
           <Link
@@ -39,48 +42,64 @@ export default function BillingSettingsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-          <div className="rounded-3xl border border-border bg-card/90 p-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
-                <CreditCard size={18} />
-              </span>
-              <div>
-                <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
-                  Current plan
-                </h2>
-                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                  Simple, clean billing for the current frontend stage.
+        <section className="grid gap-4 lg:grid-cols-[1fr_0.92fr]">
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[22px] border border-border bg-card/90">
+              <div className="flex items-center justify-between gap-6 px-5 py-4">
+                <div className="max-w-104">
+                  <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
+                    Current plan
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                    Simple billing for the current frontend stage.
+                  </p>
+                </div>
+
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-primary/15 text-primary">
+                  <CreditCard size={18} />
+                </span>
+              </div>
+
+              <div className="border-t border-border px-5 py-4">
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-primary bg-primary/10 px-4 py-3">
+                  <div>
+                    <p className="text-[14px] font-semibold text-foreground">
+                      Free
+                    </p>
+                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                      Great for trying Forge while the product is still evolving.
+                    </p>
+                  </div>
+                  <Sparkles size={18} className="text-primary" />
+                </div>
+              </div>
+
+              <div className="border-t border-border px-5 py-4">
+                <p className="text-[13px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Upgrade path
+                </p>
+                <p className="mt-2 text-[14px] leading-6 text-foreground">
+                  Pro will later unlock more models, deeper memory, and advanced tools.
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-primary bg-primary/10 p-4">
-              <div className="flex items-center justify-between gap-3">
+            <div className="rounded-[22px] border border-border bg-card/90 p-5">
+              <div className="flex items-center gap-3">
+                <Gauge size={18} className="text-primary" />
                 <div>
-                  <p className="text-[14px] font-semibold text-foreground">
-                    Free
+                  <p className="text-[14px] font-medium text-foreground">
+                    Growth ready
                   </p>
                   <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Great for trying Forge while the product is still evolving.
+                    Billing can scale later without changing the current design.
                   </p>
                 </div>
-                <Sparkles size={18} className="text-primary" />
               </div>
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-border bg-muted p-4">
-              <p className="text-[13px] uppercase tracking-[0.18em] text-muted-foreground">
-                Upgrade path
-              </p>
-              <p className="mt-2 text-[14px] leading-6 text-foreground">
-                Pro will later unlock more models, deeper memory, and advanced
-                tools.
-              </p>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border bg-card/90 p-5">
+          <div className="rounded-[22px] border border-border bg-card/90 p-5">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
                 <ReceiptText size={18} />
@@ -109,20 +128,6 @@ export default function BillingSettingsPage() {
                   </span>
                 </div>
               ))}
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-border bg-muted p-4">
-              <div className="flex items-center gap-3">
-                <Gauge size={18} className="text-primary" />
-                <div>
-                  <p className="text-[14px] font-medium text-foreground">
-                    Growth ready
-                  </p>
-                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Billing can scale later without changing the current design.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </section>
