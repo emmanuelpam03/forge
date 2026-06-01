@@ -17,7 +17,7 @@ async function generatePdf(outDir: string) {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([612, 792]); // standard letter px
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const { width, height } = page.getSize();
+  const { height } = page.getSize();
   const title = 'Students in the Classroom — Generated PDF';
   page.drawText(title, {
     x: 50,
@@ -81,7 +81,7 @@ async function generatePptx(outDir: string) {
   slide.addText('Students in the Classroom — Generated PPTX', { x: 0.5, y: 0.5, fontSize: 24, bold: true });
   slide.addText('Example slide: Groups collaborating on STEM activities. Faces are non-identifiable.', { x: 0.5, y: 1.4, fontSize: 14, color: '363636' });
 
-  const outBuffer = await pres.write('nodebuffer');
+  const outBuffer = await pres.write('nodebuffer' as any);
   const outPath = path.join(outDir, 'students-classroom.pptx');
   await writeFile(outPath, outBuffer as Buffer);
   return outPath;

@@ -11,8 +11,10 @@ import { splitStreamingMarkdown } from "./markdown-stream";
 type MessageRendererProps = {
   content: string;
   isStreaming?: boolean;
-  images?: { id: string; url: string; thumbnailUrl?: string; title?: string }[] | null;
+  images?: ImageItem[] | null;
 };
+
+type ImageItem = { id: string; url: string; thumbnailUrl?: string; title?: string };
 
 function containsBlockLevelChild(children: React.ReactNode) {
   return Children.toArray(children).some((child) => {
@@ -65,11 +67,11 @@ export function MessageRenderer({
           const alt = img.getAttribute("alt") ?? "";
           const title = img.getAttribute("title") ?? "";
           if (/^https?:\/\//i.test(src)) {
-            return { id: src, url: src, thumbnailUrl: src, title: title || alt } as MessageRendererProps['images'][0];
+            return { id: src, url: src, thumbnailUrl: src, title: title || alt } as ImageItem;
           }
           return null;
         })
-        .filter(Boolean) as MessageRendererProps['images'];
+        .filter(Boolean) as ImageItem[];
 
       imgs.forEach((img) => img.remove());
       const cleaned = wrapper.innerHTML;

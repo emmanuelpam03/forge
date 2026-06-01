@@ -2,7 +2,6 @@
 
 import prisma from "@/lib/prisma";
 import { getServerSessionFromRequest } from "@/lib/server-auth";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { error as logError } from "@/lib/logger";
 
