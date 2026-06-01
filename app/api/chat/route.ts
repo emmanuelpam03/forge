@@ -11,7 +11,8 @@ import {
   resolveAttachmentsForTurn,
   selectAttachmentsForTurn,
 } from "@/lib/chat-attachment-resolution";
-import { requireServerUser } from "@/lib/server-auth";
+import { getServerSessionFromRequest } from "@/lib/server-auth";
+import { isGuestChatId } from "@/lib/guest-chat";
 
 export const runtime = "nodejs";
 
@@ -51,35 +52,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure the requester is authenticated and owns the chat
-    let user: any;
-    try {
-      user = await requireServerUser(request as unknown as Request);
-    } catch (err) {
+    const isGuestChat = isGuestChatId(parsedBody.data.chatId);
+    const session = await getServerSessionFromRequest(request as unknown as Request);
+    const user = session?.user ?? null;
+
+    if (!user && !isGuestChat) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const chatExists = await prisma.chat.findUnique({
-      where: { id: parsedBody.data.chatId, userId: user.id },
-      select: { id: true },
-    });
-
-    if (!chatExists) {
-      return new Response(JSON.stringify({ error: "Chat not found or access denied" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
+    if (user) {
+      const chatExists = await prisma.chat.findUnique({
+        where: { id: parsedBody.data.chatId, userId: user.id },
+        select: { id: true },
       });
+
+      if (!chatExists) {
+        return new Response(JSON.stringify({ error: "Chat not found or access denied" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
 
-    const attachments = await prisma.attachment.findMany({
-      where: {
-        chatId: parsedBody.data.chatId,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const attachments = isGuestChat
+      ? []
+      : await prisma.attachment.findMany({
+          where: {
+            chatId: parsedBody.data.chatId,
+          },
+          orderBy: { createdAt: "asc" },
+        });
 
     const requestedAttachmentIds = parsedBody.data.attachments ?? [];
     const attachmentsForTurn = selectAttachmentsForTurn(
@@ -152,6 +157,7 @@ export async function POST(request: NextRequest) {
                 selectedOptions: parsedBody.data.selectedOptions ?? [],
                 attachments: resolvedAttachments,
                 messageAttachmentIds: requestedAttachmentIds,
+                skipPersistence: isGuestChat,
                 promptBehavior: parsedBody.data.promptBehavior
                   ? {
                       ...DEFAULT_PROMPT_BEHAVIOR_CONTROLS,

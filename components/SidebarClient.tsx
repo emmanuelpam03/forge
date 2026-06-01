@@ -30,6 +30,7 @@ import {
   deleteProject,
 } from "@/lib/actions/projects";
 import { deleteChat, getRecentChatsPage } from "@/lib/actions/chats";
+import { isGuestChatId } from "@/lib/guest-chat";
 
 export type ProjectItemData = {
   id: string;
@@ -276,6 +277,15 @@ function ChatItem({
   };
 
   const handleDelete = async () => {
+    if (isGuestChatId(chat.id)) {
+      onDelete?.(chat.id);
+      setMenuOpen(false);
+      if (active) {
+        await router.push("/");
+      }
+      return;
+    }
+
     const result = await deleteChat(chat.id);
     if (result.success) {
       showFeedback({
@@ -464,6 +474,7 @@ export function SidebarClient({
   const [recentsOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
+  const [projects, setProjects] = useState(initialProjects);
   const [recentChats, setRecentChats] = useState(initialChats);
   const [hasMoreRecentChats, setHasMoreRecentChats] = useState(
     initialChats.length === RECENT_CHAT_PAGE_SIZE,
@@ -471,7 +482,7 @@ export function SidebarClient({
   const [isLoadingMoreChats, setIsLoadingMoreChats] = useState(false);
 
   const loadMoreRecentChats = useCallback(async () => {
-    if (isLoadingMoreChats || !hasMoreRecentChats) {
+    if (!user || isLoadingMoreChats || !hasMoreRecentChats) {
       return;
     }
 
@@ -508,7 +519,7 @@ export function SidebarClient({
     } finally {
       setIsLoadingMoreChats(false);
     }
-  }, [hasMoreRecentChats, isLoadingMoreChats, recentChats]);
+  }, [user, hasMoreRecentChats, isLoadingMoreChats, recentChats]);
 
   useEffect(() => {
     if (!chatsOpen || collapsed) {
@@ -668,9 +679,30 @@ export function SidebarClient({
     }
   }, [collapsed]);
 
+  useEffect(() => {
+    setProjects(initialProjects);
+  }, [initialProjects]);
+
+  useEffect(() => {
+    if (user) {
+      setRecentChats(initialChats);
+      return;
+    }
+    setRecentChats((prev) => prev.filter((chat) => isGuestChatId(chat.id)));
+  }, [initialChats, user]);
+
   const handleCreateProject = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
+    if (!user) {
+      showFeedback({
+        type: "info",
+        title: "Log in to create projects",
+        description: "Projects are saved to your account after you sign in.",
+      });
+      router.push("/login");
+      return;
+    }
     const result = await createProject();
     if (result.success) {
       showFeedback({
@@ -760,165 +792,52 @@ export function SidebarClient({
               </button>
             </div>
 
-            {user ? (
-              <div className="flex w-full gap-2">
-                <button
-                  onClick={handleCreateChat}
-                  className="flex-1 rounded-2xl px-3 py-2 flex items-center justify-center"
-                  style={{
-                    background: "var(--primary)",
-                    color: "var(--primary-foreground)",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                  }}
-                >
-                  <Plus size={14} className="mr-1.5" />
-                  New chat
-                </button>
-                <button
-                  onClick={handleOpenSearch}
-                  className="h-10 w-10 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: "var(--accent)",
-                    border: "1px solid var(--border)",
-                    color: "var(--sidebar-foreground)",
-                  }}
-                >
-                  <Search size={14} />
-                </button>
+            <div className="ml-2 space-y-1.5 px-1">
+              <button
+                onClick={handleCreateChat}
+                className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium"
+                style={{
+                  background: "var(--accent)",
+                  border: "1px solid var(--border)",
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.96,
+                }}
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-md border border-border bg-background/80">
+                  <Plus size={13} />
+                </span>
+                <span>New chat</span>
+              </button>
 
-                <div className="h-10 ml-2 relative">
-                  <button
-                    onClick={() =>
-                      void (async () => {
-                        await signOut();
-                        router.push("/");
-                      })()
-                    }
-                    className="h-10 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
-                    style={{
-                      background: "transparent",
-                      border: "1px solid var(--border)",
-                      color: "var(--sidebar-foreground)",
-                    }}
-                    title="Sign out"
-                  >
-                    <UserCircle2 size={16} className="mr-2" />
-                    <span className="truncate" style={{ maxWidth: 96 }}>
-                      {(user.name || user.email || 'Account')}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="ml-2 flex min-h-[calc(100vh-7.5rem)] w-full flex-col justify-between px-1 pt-1 pb-2">
-                <div className="space-y-1.5">
-                  <button
-                    onClick={handleCreateChat}
-                    className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium"
-                    style={{
-                      background: "var(--accent)",
-                      border: "1px solid var(--border)",
-                      color: "var(--sidebar-foreground)",
-                      opacity: 0.96,
-                    }}
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md border border-border bg-background/80">
-                      <Plus size={13} />
-                    </span>
-                    <span>New chat</span>
-                  </button>
+              <Link
+                href="/search"
+                className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors"
+                style={{
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.88,
+                }}
+              >
+                <Search size={14} className="shrink-0" />
+                <span>Search chats</span>
+              </Link>
 
-                  <Link
-                    href="/search"
-                    className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors"
-                    style={{
-                      color: "var(--sidebar-foreground)",
-                      opacity: 0.88,
-                    }}
-                  >
-                    <Search size={14} className="shrink-0" />
-                    <span>Search chats</span>
-                  </Link>
-
-                  <Link
-                    href="/images"
-                    className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors"
-                    style={{
-                      color: "var(--sidebar-foreground)",
-                      opacity: 0.88,
-                    }}
-                  >
-                    <ImageIcon size={14} className="shrink-0" />
-                    <span>Images</span>
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="border-t border-border pt-3">
-                    <div className="space-y-1.5">
-                      <Link
-                        href="/settings/billing"
-                        className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
-                        style={{
-                          color: "var(--sidebar-foreground)",
-                          opacity: 0.86,
-                        }}
-                      >
-                        <ArrowUpRight size={14} className="shrink-0" />
-                        <span>See plans and pricing</span>
-                      </Link>
-
-                      <Link
-                        href="/settings"
-                        className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
-                        style={{
-                          color: "var(--sidebar-foreground)",
-                          opacity: 0.86,
-                        }}
-                      >
-                        <Settings size={14} className="shrink-0" />
-                        <span>Settings</span>
-                      </Link>
-
-                      <Link
-                        href="/help"
-                        className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
-                        style={{
-                          color: "var(--sidebar-foreground)",
-                          opacity: 0.86,
-                        }}
-                      >
-                        <CircleHelp size={14} className="shrink-0" />
-                        <span>Help</span>
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[28px] border border-border bg-card/70 p-4 shadow-[0_18px_30px_-28px_rgba(0,0,0,0.35)]">
-                    <p className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">
-                      Get responses tailored to you
-                    </p>
-                    <p className="mt-2 text-[12.5px] leading-5 text-muted-foreground">
-                      Log in to get answers based on saved chats, plus create images and upload files.
-                    </p>
-                    <Link
-                      href="/login"
-                      className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
-                    >
-                      <LogIn size={14} />
-                      Log in
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
+              <Link
+                href="/images"
+                className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors"
+                style={{
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.88,
+                }}
+              >
+                <ImageIcon size={14} className="shrink-0" />
+                <span>Images</span>
+              </Link>
+            </div>
           </div>
         )}
       </div>
 
-      {/* ── Collapsed state ── */}
-      {collapsed ? (
+      {collapsed && (
         <>
           <div className="flex flex-1 flex-col items-center gap-2 px-2 pt-3">
             <div className="group relative">
@@ -1128,28 +1047,43 @@ export function SidebarClient({
                       Plans & pricing
                     </Link>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void (async () => {
-                          await signOut();
-                          router.push("/");
-                        })();
-                      }}
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
-                      style={{ color: "var(--sidebar-foreground)" }}
-                    >
-                      <LogOut size={13} />
-                      Sign out
-                    </button>
+                    {user ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void (async () => {
+                            await signOut();
+                            router.push("/");
+                          })();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+                        style={{ color: "var(--sidebar-foreground)" }}
+                      >
+                        <LogOut size={13} />
+                        Sign out
+                      </button>
+                    ) : (
+                      <Link
+                        href="/login"
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+                        style={{ color: "var(--sidebar-foreground)" }}
+                      >
+                        <LogIn size={13} />
+                        Log in
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </div>
         </>
-      ) : user ? (
+      )}
+
+      {!collapsed && (
         <>
+          {user && (
+            <>
           {/* ── Projects section ── */}
           <div className="px-3 pb-1 pt-4">
             <div className="group mb-2 flex w-full items-center justify-between px-1">
@@ -1187,7 +1121,7 @@ export function SidebarClient({
             {projectsOpen && (
               <div className="space-y-0.5">
                 {isBooting ? (
-                  Array.from({ length: initialProjects.length || 4 }).map(
+                  Array.from({ length: projects.length || 4 }).map(
                     (_, i) => (
                       <div
                         key={`project-skeleton-${i}`}
@@ -1196,8 +1130,8 @@ export function SidebarClient({
                       />
                     ),
                   )
-                ) : initialProjects.length > 0 ? (
-                  initialProjects.map((project) => (
+                ) : projects.length > 0 ? (
+                  projects.map((project) => (
                     <ProjectItem
                       key={project.id}
                       project={project}
@@ -1227,6 +1161,8 @@ export function SidebarClient({
             className="mx-3 my-2 h-px"
             style={{ background: "var(--border)" }}
           />
+            </>
+          )}
 
           {/* ── Recents section ── */}
           <div ref={recentsScrollRef} className="flex-1 overflow-y-auto px-3">
@@ -1302,20 +1238,87 @@ export function SidebarClient({
 
           {/* Footer */}
           <div
-            className="p-2.5"
+            className="shrink-0 space-y-3 p-2.5"
             style={{ borderTop: "1px solid var(--border)" }}
           >
-            <Link
-              href="/settings"
-              className="flex items-center gap-2 rounded-2xl px-3 py-2 text-[12.5px] transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
-              style={{ color: "var(--sidebar-foreground)", opacity: 0.68 }}
-            >
-              <Settings size={13} />
-              Settings
-            </Link>
+            <div className="space-y-1.5">
+              <Link
+                href="/settings/billing"
+                className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
+                style={{
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.86,
+                }}
+              >
+                <ArrowUpRight size={14} className="shrink-0" />
+                <span>See plans and pricing</span>
+              </Link>
+
+              <Link
+                href="/settings"
+                className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
+                style={{
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.86,
+                }}
+              >
+                <Settings size={14} className="shrink-0" />
+                <span>Settings</span>
+              </Link>
+
+              <Link
+                href="/help"
+                className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
+                style={{
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.86,
+                }}
+              >
+                <CircleHelp size={14} className="shrink-0" />
+                <span>Help</span>
+              </Link>
+            </div>
+
+            {user ? (
+              <button
+                type="button"
+                onClick={() =>
+                  void (async () => {
+                    await signOut();
+                    router.push("/");
+                  })()
+                }
+                className="flex h-10 w-full items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors hover:bg-accent"
+                style={{
+                  color: "var(--sidebar-foreground)",
+                  opacity: 0.86,
+                }}
+              >
+                <UserCircle2 size={14} className="shrink-0" />
+                <span className="truncate">
+                  {user.name || user.email || "Account"}
+                </span>
+              </button>
+            ) : (
+              <div className="rounded-[28px] border border-border bg-card/70 p-4 shadow-[0_18px_30px_-28px_rgba(0,0,0,0.35)]">
+                <p className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">
+                  Get responses tailored to you
+                </p>
+                <p className="mt-2 text-[12.5px] leading-5 text-muted-foreground">
+                  Log in to get answers based on saved chats, plus create images and upload files.
+                </p>
+                <Link
+                  href="/login"
+                  className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+                >
+                  <LogIn size={14} />
+                  Log in
+                </Link>
+              </div>
+            )}
           </div>
         </>
-      ) : null}
+      )}
     </aside>
   );
 }

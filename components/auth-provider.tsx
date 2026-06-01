@@ -1,12 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { getSession, signOut as signOutClient } from "@/lib/auth-client";
+import React, { createContext, useContext, useMemo } from "react";
+import { authClient, signOut as signOutClient } from "@/lib/auth-client";
 
-type User = any;
+type AuthUser = typeof authClient.$Infer.Session.user;
 
 type AuthContextValue = {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -15,32 +15,25 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: session, isPending, refetch } = authClient.useSession();
 
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      const session = await getSession();
-      setUser((session as any)?.user ?? null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  const signOut = async () => {
-    await signOutClient();
-    setUser(null);
-  };
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: session?.user ?? null,
+      loading: isPending,
+      refresh: async () => {
+        await refetch();
+      },
+      signOut: async () => {
+        await signOutClient();
+        await refetch();
+      },
+    }),
+    [session?.user, isPending, refetch],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, refresh, signOut }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
 }
 

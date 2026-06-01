@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getChatById } from "@/lib/actions/chats";
+import { isGuestChatId } from "@/lib/guest-chat";
 import { getBranchesForParent } from "@/lib/actions/messages";
 import type { UploadedAttachment } from "@/lib/attachment-types";
 import {
@@ -19,6 +20,20 @@ export default async function ChatPage({
 }) {
   const { chatId } = await params;
   const { initialMessage, attachmentIds } = await searchParams;
+
+  if (isGuestChatId(chatId)) {
+    return (
+      <ChatClient
+        chatId={chatId}
+        projectId={null}
+        title="New Chat"
+        initialMessage={initialMessage}
+        initialMessages={[]}
+        pendingInitialAttachments={[]}
+      />
+    );
+  }
+
   const pendingAttachmentIds =
     attachmentIds
       ?.split(",")

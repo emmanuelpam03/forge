@@ -8,6 +8,7 @@ import { AttachmentChip } from "@/components/chat/AttachmentChip";
 import { AttachmentPreviewDialog } from "@/components/chat/AttachmentPreviewDialog";
 import { ModesMenu } from "@/components/ModesMenu";
 import { useFeedback } from "@/components/feedback-provider";
+import { useAuth } from "@/components/auth-provider";
 import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 import { inferAttachmentKind, type UploadedAttachment } from "@/lib/attachment-types";
 
@@ -54,6 +55,7 @@ const FEATURE_CARDS = [
 
 export default function HomePage() {
   const { showFeedback } = useFeedback();
+  const { user } = useAuth();
   const router = useRouter();
   const homeScopeId = "home-global";
   const uploadInputId = "home-upload-input";
@@ -62,13 +64,10 @@ export default function HomePage() {
   const greetingText =
     hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
 
-  const [userName] = useState(() => {
-    try {
-      return localStorage.getItem("userName") ?? "there";
-    } catch {
-      return "there";
-    }
-  });
+  const displayName =
+    user?.name?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "there";
 
   const [input, setInput] = useState("");
   const [isCreatingChat, setIsCreatingChat] = useState(false);
@@ -108,14 +107,22 @@ export default function HomePage() {
       }),
     );
 
-    const { createChat } = await import("@/lib/actions/chats");
-    const createResult = await createChat();
+    let chatId: string;
 
-    if (!createResult.success || !createResult.chat) {
-      throw new Error(createResult.error ?? "Failed to create chat");
+    if (!user) {
+      const { createGuestChatId } = await import("@/lib/guest-chat");
+      chatId = createGuestChatId();
+    } else {
+      const { createChat } = await import("@/lib/actions/chats");
+      const createResult = await createChat();
+
+      if (!createResult.success || !createResult.chat) {
+        throw new Error(createResult.error ?? "Failed to create chat");
+      }
+
+      chatId = createResult.chat.id;
     }
 
-    const chatId = createResult.chat.id;
     draftChatIdRef.current = chatId;
     setDraftChatId(chatId);
 
@@ -126,7 +133,7 @@ export default function HomePage() {
     );
 
     return chatId;
-  }, []);
+  }, [user]);
 
   const uploadAttachment = useCallback(
     async (file: File) => {
@@ -390,7 +397,7 @@ export default function HomePage() {
                 fontFamily: "var(--font-manrope), sans-serif",
               }}
             >
-              {greetingText.toUpperCase() + ", " + userName}
+              {greetingText.toUpperCase() + ", " + displayName}
             </h1>
 
             <p

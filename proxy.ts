@@ -1,30 +1,32 @@
-import { NextResponse } from "next/server";
-import { getServerSessionFromRequest } from "./lib/server-auth";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 
-const protectedMatchers = [
-  "/p",
-  "/c",
-  "/search",
-  "/metrics",
-];
+const protectedMatchers = ["/p", "/search", "/metrics", "/settings"];
 
-export async function proxy(req: Request) {
-  const url = new URL(req.url);
-  const pathname = url.pathname;
+export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
 
-  // Allow static assets and auth routes to flow
-  if (pathname.startsWith("/_next") || pathname.startsWith("/api/auth") || pathname.startsWith("/favicon.ico")) {
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/favicon.ico")
+  ) {
     return NextResponse.next();
   }
 
-  const isProtected = protectedMatchers.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const isProtected = protectedMatchers.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
   if (!isProtected) return NextResponse.next();
 
-  const session = await getServerSessionFromRequest(req as unknown as Request);
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
+
   if (!session?.user) {
-    const redirectUrl = new URL("/(auth)/login", url);
-    redirectUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(redirectUrl);
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
@@ -36,5 +38,6 @@ export const config = {
     "/c/:path*",
     "/search/:path*",
     "/metrics/:path*",
+    "/settings/:path*",
   ],
 };

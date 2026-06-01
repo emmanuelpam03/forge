@@ -15,10 +15,11 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     // Delegate to the catch-all auth route; Better Auth will handle the flow.
     try {
-      await fetch("/api/auth/forgot-password", {
+      await fetch("/api/auth/request-password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
+        credentials: "include",
       });
       setSent(true);
     } catch {

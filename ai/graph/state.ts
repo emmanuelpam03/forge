@@ -100,6 +100,8 @@ export type ChatGraphState = {
   branchId?: string | null;
   assistantMessageId?: string | null;
   skipUserCreate?: boolean;
+  /** When true, do not write messages or titles to the database (guest sessions). */
+  skipPersistence?: boolean;
   runId: string;
   previousMessages: ChatMessageSnapshot[];
   preferences: PreferenceSnapshot[];
@@ -403,6 +405,7 @@ export type ChatGraphInput = Pick<
   | "branchId"
   | "assistantMessageId"
   | "skipUserCreate"
+  | "skipPersistence"
   | "promptBehavior"
   | "selectedOptions"
   | "attachments"
@@ -419,6 +422,7 @@ export const createChatGraphSeed = (input: ChatGraphInput): ChatGraphState => ({
   branchId: input.branchId ?? null,
   assistantMessageId: input.assistantMessageId ?? null,
   skipUserCreate: input.skipUserCreate ?? false,
+  skipPersistence: input.skipPersistence ?? false,
   runId: input.runId,
   previousMessages: [],
   preferences: [],

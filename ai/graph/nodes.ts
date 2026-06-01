@@ -829,6 +829,17 @@ export function testBuildToolArgs(toolName: string, userMessage: string) {
 export async function saveMessagesNode(state: ChatGraphState) {
   const saveTimer = startTimer("saveMessagesNode", { chatId: state.chatId, runId: state.runId });
   try {
+    if (state.skipPersistence) {
+      const preAllocatedUserMessageId = state.skipUserCreate
+        ? null
+        : crypto.randomUUID();
+      return {
+        traceId: state.traceId,
+        assistantMessageId: state.assistantMessageId,
+        userMessageId: preAllocatedUserMessageId,
+        imageBlock: state.imageBlock ?? undefined,
+      };
+    }
     const imageBlock = state.imageBlock;
     const assistantMedia = state.assistantMedia;
     const messageAttachmentIds = state.messageAttachmentIds ?? [];
@@ -1622,6 +1633,10 @@ export async function classifyIntentNode(state: ChatGraphState) {
 // The background worker will assemble the final prompt including any
 // project context, chat summary, or memory summary that may be present.
 export async function generateTitleNode(state: ChatGraphState) {
+  if (state.skipPersistence) {
+    return { generatedTitle: "" };
+  }
+
   // Queue title generation as background job (don't block response stream)
   // Title will be generated and persisted asynchronously
   // For first turn, we could emit title later; for subsequent turns it's optional

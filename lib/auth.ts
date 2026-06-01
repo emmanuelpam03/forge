@@ -1,9 +1,17 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { nextCookies } from "better-auth/next-js";
 import prisma from "@/lib/prisma";
-import type { Auth } from "better-auth";
+
+export function isGoogleOAuthConfigured(): boolean {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  return Boolean(clientId && clientSecret);
+}
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL,
+  secret: process.env.BETTER_AUTH_SECRET,
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
@@ -11,6 +19,17 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  ...(isGoogleOAuthConfigured()
+    ? {
+        socialProviders: {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+          },
+        },
+      }
+    : {}),
+  plugins: [nextCookies()],
 });
 
-export const authHandler: Auth["handler"] = auth.handler;
+export type Session = typeof auth.$Infer.Session;

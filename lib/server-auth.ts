@@ -1,26 +1,38 @@
-import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { auth, type Session } from "@/lib/auth";
 
-export async function getServerSessionFromRequest(request: Request | undefined) {
-  const getter = (auth as any).getServerSession || (auth as any).getSession;
-  if (typeof getter === "function") {
+export async function getServerSession(): Promise<Session | null> {
+  try {
+    return await auth.api.getSession({
+      headers: await headers(),
+    });
+  } catch (err) {
+    console.warn("getServerSession failed", err);
+    return null;
+  }
+}
+
+export async function getServerSessionFromRequest(
+  request?: Request,
+): Promise<Session | null> {
+  if (request) {
     try {
-      if (request) return await getter(request);
-      // Some Better Auth versions accept no-arg server call
-      return await getter();
+      return await auth.api.getSession({
+        headers: request.headers,
+      });
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn("getServerSessionFromRequest failed", err);
       return null;
     }
   }
-  return null;
+  return getServerSession();
 }
 
 export async function requireServerUser(request?: Request) {
   const session = await getServerSessionFromRequest(request);
   const user = session?.user ?? null;
   if (!user) {
-    const err: any = new Error("Unauthorized");
+    const err = new Error("Unauthorized") as Error & { status: number };
     err.status = 401;
     throw err;
   }
