@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { ArrowUp, Bookmark, Globe, Layers, Mic, Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ActiveToolChip } from "@/components/chat/ActiveToolChip";
 import { AttachmentChip } from "@/components/chat/AttachmentChip";
 import { AttachmentPreviewDialog } from "@/components/chat/AttachmentPreviewDialog";
@@ -57,6 +57,7 @@ export default function HomePage() {
   const { showFeedback } = useFeedback();
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const homeScopeId = "home-global";
   const uploadInputId = "home-upload-input";
 
@@ -100,6 +101,14 @@ export default function HomePage() {
       return draftChatIdRef.current;
     }
 
+    if (!user) {
+      const { createGuestChatId } = await import("@/lib/guest-chat");
+      const chatId = createGuestChatId();
+      draftChatIdRef.current = chatId;
+      setDraftChatId(chatId);
+      return chatId;
+    }
+
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     window.dispatchEvent(
       new CustomEvent("chat:created", {
@@ -107,22 +116,14 @@ export default function HomePage() {
       }),
     );
 
-    let chatId: string;
+    const { createChat } = await import("@/lib/actions/chats");
+    const createResult = await createChat();
 
-    if (!user) {
-      const { createGuestChatId } = await import("@/lib/guest-chat");
-      chatId = createGuestChatId();
-    } else {
-      const { createChat } = await import("@/lib/actions/chats");
-      const createResult = await createChat();
-
-      if (!createResult.success || !createResult.chat) {
-        throw new Error(createResult.error ?? "Failed to create chat");
-      }
-
-      chatId = createResult.chat.id;
+    if (!createResult.success || !createResult.chat) {
+      throw new Error(createResult.error ?? "Failed to create chat");
     }
 
+    const chatId = createResult.chat.id;
     draftChatIdRef.current = chatId;
     setDraftChatId(chatId);
 
@@ -134,6 +135,20 @@ export default function HomePage() {
 
     return chatId;
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      draftChatIdRef.current = null;
+      setDraftChatId(null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user && pathname === "/") {
+      draftChatIdRef.current = null;
+      setDraftChatId(null);
+    }
+  }, [user, pathname]);
 
   const uploadAttachment = useCallback(
     async (file: File) => {

@@ -30,7 +30,7 @@ import {
   deleteProject,
 } from "@/lib/actions/projects";
 import { deleteChat, getRecentChatsPage } from "@/lib/actions/chats";
-import { isGuestChatId } from "@/lib/guest-chat";
+import { createGuestChatId, isGuestChatId } from "@/lib/guest-chat";
 
 export type ProjectItemData = {
   id: string;
@@ -592,8 +592,12 @@ export function SidebarClient({
     loadMoreRecentChats,
   ]);
 
-  // Optimistic chat creation: listen for chat:created and chat:confirmed events
+  // Optimistic chat creation for signed-in users only
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     function handleChatCreated(e: CustomEvent) {
       const { id, title } = e.detail;
       setRecentChats((prev) => [
@@ -629,7 +633,7 @@ export function SidebarClient({
       window.removeEventListener("chat:confirmed", handleChatConfirmed as EventListener);
       window.removeEventListener("chat:title-updated", handleTitleUpdated as EventListener);
     };
-  }, []);
+  }, [user]);
 
   // Title-updates EventSource removed by request — rely on window events only
 
@@ -688,7 +692,7 @@ export function SidebarClient({
       setRecentChats(initialChats);
       return;
     }
-    setRecentChats((prev) => prev.filter((chat) => isGuestChatId(chat.id)));
+    setRecentChats([]);
   }, [initialChats, user]);
 
   const handleCreateProject = async (event: MouseEvent<HTMLButtonElement>) => {
@@ -718,6 +722,10 @@ export function SidebarClient({
 
   const handleCreateChat = () => {
     window.setTimeout(() => {
+      if (!user) {
+        router.push(`/c/${createGuestChatId()}`);
+        return;
+      }
       router.push("/");
     }, 0);
   };
@@ -727,6 +735,12 @@ export function SidebarClient({
       router.push("/search");
     }, 0);
   };
+
+  const loginHref = `/login?redirect=${encodeURIComponent(
+    pathname && pathname !== "/login" && pathname !== "/signup"
+      ? pathname
+      : "/",
+  )}`;
 
   const sectionLabel = {
     fontSize: "11px",
@@ -749,7 +763,7 @@ export function SidebarClient({
       {/* ── Top bar ── */}
       <div
         className="p-2 pb-3"
-        style={{ borderBottom: "1px solid var(--border)" }}
+        style={user ? { borderBottom: "1px solid var(--border)" } : undefined}
       >
         {collapsed ? (
           <div className="flex items-center gap-2">
@@ -918,7 +932,7 @@ export function SidebarClient({
                 Images
               </span>
 
-              {recentsOpen && (
+              {user && recentsOpen && (
                 <div
                   className="absolute left-full top-0 z-20 ml-2.5 w-72 rounded-2xl p-2 shadow-2xl"
                   style={{
@@ -997,7 +1011,7 @@ export function SidebarClient({
 
           <div
             className="mt-auto p-2.5"
-            style={{ borderTop: "1px solid var(--border)" }}
+            style={user ? { borderTop: "1px solid var(--border)" } : undefined}
           >
             <div className="relative flex items-center justify-center">
               <button
@@ -1064,7 +1078,7 @@ export function SidebarClient({
                       </button>
                     ) : (
                       <Link
-                        href="/login"
+                        href={loginHref}
                         className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
                         style={{ color: "var(--sidebar-foreground)" }}
                       >
@@ -1155,91 +1169,86 @@ export function SidebarClient({
               </div>
             )}
           </div>
-
-          {/* Divider */}
-          <div
-            className="mx-3 my-2 h-px"
-            style={{ background: "var(--border)" }}
-          />
             </>
           )}
 
-          {/* ── Recents section ── */}
-          <div ref={recentsScrollRef} className="flex-1 overflow-y-auto px-3">
-            <button
-              onClick={() => setChatsOpen((v) => !v)}
-              className="mb-2 flex w-full items-center justify-between px-1"
-            >
-              <span style={sectionLabel}>Recents</span>
-              <ChevronDown
-                size={11}
-                className={`transition-transform duration-200 ${!chatsOpen ? "-rotate-90" : ""}`}
-                style={{ color: "var(--sidebar-foreground)", opacity: 0.5 }}
-              />
-            </button>
+          {user && (
+            <div ref={recentsScrollRef} className="flex-1 overflow-y-auto px-3">
+              <button
+                onClick={() => setChatsOpen((v) => !v)}
+                className="mb-2 flex w-full items-center justify-between px-1"
+              >
+                <span style={sectionLabel}>Recents</span>
+                <ChevronDown
+                  size={11}
+                  className={`transition-transform duration-200 ${!chatsOpen ? "-rotate-90" : ""}`}
+                  style={{ color: "var(--sidebar-foreground)", opacity: 0.5 }}
+                />
+              </button>
 
-            {chatsOpen && (
-              <div className="space-y-0.5">
-                {isBooting ? (
-                  Array.from({ length: recentChats.length || RECENT_CHAT_PAGE_SIZE }).map(
-                    (_, i) => (
-                      <div
-                        key={`chat-skeleton-${i}`}
-                        className="h-11 animate-pulse rounded-2xl"
-                        style={{ background: "var(--muted)", opacity: 0.12 }}
-                      />
-                    ),
-                  )
-                ) : recentChats.length > 0 ? (
-                  <>
-                    {recentChats.map((chat) => (
-                      <ChatItem
-                        key={chat.id}
-                        chat={chat}
-                        active={pathname === `/c/${chat.id}`}
-                        onDelete={(chatId) =>
-                          setRecentChats((current) =>
-                            current.filter((item) => item.id !== chatId),
-                          )
-                        }
-                      />
-                    ))}
-                    {hasMoreRecentChats && (
-                      <div ref={recentsLoadMoreRef} className="px-2.5 py-2">
-                        <div className="h-8 rounded-2xl" />
-                      </div>
-                    )}
-                    {isLoadingMoreChats && (
-                      <div
-                        className="rounded-2xl px-2.5 py-2 text-[12px]"
-                        style={{
-                          color: "var(--sidebar-foreground)",
-                          opacity: 0.48,
-                        }}
-                      >
-                        Loading more chats...
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div
-                    className="rounded-2xl px-2.5 py-2 text-[12px]"
-                    style={{
-                      color: "var(--sidebar-foreground)",
-                      opacity: 0.48,
-                    }}
-                  >
-                    No chats yet
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              {chatsOpen && (
+                <div className="space-y-0.5">
+                  {isBooting ? (
+                    Array.from({ length: recentChats.length || RECENT_CHAT_PAGE_SIZE }).map(
+                      (_, i) => (
+                        <div
+                          key={`chat-skeleton-${i}`}
+                          className="h-11 animate-pulse rounded-2xl"
+                          style={{ background: "var(--muted)", opacity: 0.12 }}
+                        />
+                      ),
+                    )
+                  ) : recentChats.length > 0 ? (
+                    <>
+                      {recentChats.map((chat) => (
+                        <ChatItem
+                          key={chat.id}
+                          chat={chat}
+                          active={pathname === `/c/${chat.id}`}
+                          onDelete={(chatId) =>
+                            setRecentChats((current) =>
+                              current.filter((item) => item.id !== chatId),
+                            )
+                          }
+                        />
+                      ))}
+                      {hasMoreRecentChats && (
+                        <div ref={recentsLoadMoreRef} className="px-2.5 py-2">
+                          <div className="h-8 rounded-2xl" />
+                        </div>
+                      )}
+                      {isLoadingMoreChats && (
+                        <div
+                          className="rounded-2xl px-2.5 py-2 text-[12px]"
+                          style={{
+                            color: "var(--sidebar-foreground)",
+                            opacity: 0.48,
+                          }}
+                        >
+                          Loading more chats...
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div
+                      className="rounded-2xl px-2.5 py-2 text-[12px]"
+                      style={{
+                        color: "var(--sidebar-foreground)",
+                        opacity: 0.48,
+                      }}
+                    >
+                      No chats yet
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Footer */}
           <div
-            className="shrink-0 space-y-3 p-2.5"
-            style={{ borderTop: "1px solid var(--border)" }}
+            className={`shrink-0 space-y-3 p-2.5${user ? "" : " mt-auto"}`}
+            style={user ? { borderTop: "1px solid var(--border)" } : undefined}
           >
             <div className="space-y-1.5">
               <Link
@@ -1308,7 +1317,7 @@ export function SidebarClient({
                   Log in to get answers based on saved chats, plus create images and upload files.
                 </p>
                 <Link
-                  href="/login"
+                  href={loginHref}
                   className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
                 >
                   <LogIn size={14} />

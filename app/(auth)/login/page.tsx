@@ -11,6 +11,24 @@ import { X } from "lucide-react";
 import { useRef } from "react";
 import { useTheme } from "next-themes";
 
+function getGoogleClientId(): string | undefined {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
+  return clientId || undefined;
+}
+
+type OneTapPluginClient = {
+  oneTap?: (options?: unknown) => Promise<void>;
+};
+
+function getPostLoginDestination(): string {
+  if (typeof window === "undefined") return "/";
+  const redirect = new URLSearchParams(window.location.search).get("redirect");
+  if (redirect?.startsWith("/") && !redirect.startsWith("//")) {
+    return redirect;
+  }
+  return "/";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { refresh } = useAuth();
@@ -47,7 +65,7 @@ export default function LoginPage() {
         return;
       }
       await refresh();
-      router.push("/");
+      router.push(getPostLoginDestination());
       router.refresh();
     } catch {
       setError("Network error");
@@ -67,11 +85,17 @@ export default function LoginPage() {
       // dynamic import to avoid SSR issues
       // Attempt to import Better Auth client oneTap helper
       // NOTE: requires `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to be set
+      const googleClientId = getGoogleClientId();
       const mod = await import("better-auth/client/plugins").catch(() => null);
-      if (mod && typeof mod.oneTapClient === "function") {
-        const client = mod.oneTapClient({ clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID });
-        // try to start a one-tap prompt or button flow
-        if (client?.oneTap) {
+      if (
+        googleClientId &&
+        mod &&
+        typeof mod.oneTapClient === "function"
+      ) {
+        const client = mod.oneTapClient({
+          clientId: googleClientId,
+        }) as OneTapPluginClient;
+        if (client.oneTap) {
           await client.oneTap();
           return;
         }
@@ -102,15 +126,26 @@ export default function LoginPage() {
 
   // Attempt to render a Better Auth GSI button into the `googleBtnRef` container
   useEffect(() => {
+    if (!googleEnabled) return;
+
     let mounted = true;
     (async () => {
       try {
+        const googleClientId = getGoogleClientId();
+        if (!googleClientId) return;
+
         const mod = await import("better-auth/client/plugins").catch(() => null);
         if (!mounted || !mod || typeof mod.oneTapClient !== "function") return;
-        const client = mod.oneTapClient({ clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID });
-        if (client?.oneTap && googleBtnRef.current) {
-          // render a GSI button inside the container
-          await client.oneTap({ button: { container: googleBtnRef.current, config: { type: "standard", text: "continue_with" } } });
+        const client = mod.oneTapClient({
+          clientId: googleClientId,
+        }) as OneTapPluginClient;
+        if (client.oneTap && googleBtnRef.current) {
+          await client.oneTap({
+            button: {
+              container: googleBtnRef.current,
+              config: { type: "standard", text: "continue_with" },
+            },
+          });
         }
       } catch {
         // ignore - fall back to our manual button
@@ -119,7 +154,7 @@ export default function LoginPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [googleEnabled]);
 
   if (!mounted) return null;
 

@@ -9,11 +9,14 @@ import { Label } from "@/components/ui/label";
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
   const emailInputId = "email";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Delegate to the catch-all auth route; Better Auth will handle the flow.
+    if (loading) return;
+
+    setLoading(true);
     try {
       await fetch("/api/auth/request-password-reset", {
         method: "POST",
@@ -24,6 +27,8 @@ export default function ForgotPasswordPage() {
       setSent(true);
     } catch {
       setSent(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,8 +54,12 @@ export default function ForgotPasswordPage() {
           </div>
 
           <div>
-            <Button type="submit" className="rounded-md bg-primary px-4 py-2 text-white">
-              Send reset link
+            <Button
+              type="submit"
+              disabled={loading}
+              className="rounded-md bg-primary px-4 py-2 text-white"
+            >
+              {loading ? "Sending…" : "Send reset link"}
             </Button>
           </div>
         </form>

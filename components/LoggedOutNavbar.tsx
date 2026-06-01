@@ -11,7 +11,7 @@ export default function LoggedOutNavbar() {
   }
 
   return (
-    <header className="shrink-0 border-b border-border bg-background/95 backdrop-blur-md">
+    <header className="shrink-0 bg-background/95 backdrop-blur-md">
       <div className="flex h-14 items-center justify-between px-4 sm:px-5 lg:px-6">
         <div className="flex items-center gap-3 min-w-0">
           <span className="min-w-0 text-[15px] font-semibold tracking-[-0.02em] text-foreground">
