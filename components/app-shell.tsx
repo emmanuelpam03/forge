@@ -7,7 +7,6 @@ import LoggedOutNavbar from "@/components/LoggedOutNavbar";
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      <LoggedOutNavbar />
       <div className="flex min-h-0 flex-1 overflow-hidden">
       <Suspense
         fallback={
@@ -19,6 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar />
       </Suspense>
       <main className="flex-1 overflow-hidden">
+        <LoggedOutNavbar />
         <ErrorBoundary>
           {children}
         </ErrorBoundary>

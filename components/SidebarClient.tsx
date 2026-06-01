@@ -11,20 +11,19 @@ import {
   LogIn,
   Search,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeft,
   Folder,
   MessageSquare,
   MoreHorizontal,
   Settings,
+  LogOut,
   Trash2,
   Pencil,
+  UserCircle2,
 } from "lucide-react";
 import ForgeLogo from "./ForgeLogo";
 import { useFeedback } from "./feedback-provider";
 import { useAuth } from "./auth-provider";
-import { UserCircle2 } from "lucide-react";
-import { ModeToggle } from "./mode-toggle";
 import {
   createProject,
   updateProject,
@@ -462,7 +461,8 @@ export function SidebarClient({
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
-  const [recentsOpen, setRecentsOpen] = useState(false);
+  const [recentsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [isBooting, setIsBooting] = useState(true);
   const [recentChats, setRecentChats] = useState(initialChats);
   const [hasMoreRecentChats, setHasMoreRecentChats] = useState(
@@ -627,6 +627,47 @@ export function SidebarClient({
     return () => window.clearTimeout(timer);
   }, []);
 
+  // Listen for global sidebar toggle events from the shell/navbar
+  useEffect(() => {
+    function handleToggle() {
+      setCollapsed((v) => !v);
+    }
+    window.addEventListener("sidebar:toggle", handleToggle);
+    return () => window.removeEventListener("sidebar:toggle", handleToggle);
+  }, []);
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      const menu = document.getElementById("sidebar-profile-menu");
+      const trigger = document.getElementById("sidebar-profile-trigger");
+      if (menu?.contains(target) || trigger?.contains(target)) {
+        return;
+      }
+      setProfileMenuOpen(false);
+    }
+
+    document.addEventListener("click", handleDocumentClick as unknown as EventListener);
+    return () => document.removeEventListener("click", handleDocumentClick as unknown as EventListener);
+  }, []);
+
+  // Broadcast collapsed state so other UI (navbar) can adapt
+  useEffect(() => {
+    try {
+      // store on window for initial read
+      // @ts-expect-error -- we intentionally add a window-scoped debug var
+      window.__FORGE_SIDEBAR_COLLAPSED = collapsed;
+      window.dispatchEvent(
+        new CustomEvent("sidebar:change", { detail: { collapsed } })
+      );
+    } catch {
+      // ignore
+    }
+  }, [collapsed]);
+
   const handleCreateProject = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -679,13 +720,28 @@ export function SidebarClient({
         style={{ borderBottom: "1px solid var(--border)" }}
       >
         {collapsed ? (
-          <button
-            type="button"
-            onClick={() => setCollapsed(false)}
-            className="flex h-9 w-full items-center justify-center rounded-2xl"
-          >
-            <ChevronRight size={13} />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="group relative">
+              <button
+                type="button"
+                onClick={() => setCollapsed(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-2xl"
+                aria-label="Expand sidebar"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full">
+                  <ForgeLogo className="h-5 w-5 text-sidebar-foreground" />
+                </span>
+              </button>
+
+              <button
+                onClick={() => setCollapsed(false)}
+                className="absolute -inset-1 flex items-center justify-center rounded-2xl bg-card/95 border border-border text-sidebar-foreground opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100"
+                aria-hidden
+              >
+                <PanelLeft size={12} />
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
@@ -693,19 +749,14 @@ export function SidebarClient({
                 <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-sidebar-accent border border-sidebar-border">
                   <ForgeLogo className="h-5 w-5 text-sidebar-foreground" />
                 </span>
-                <span
-                  className="text-sm font-semibold tracking-[-0.02em]"
-                  style={{ color: "var(--sidebar-foreground)" }}
-                >
-                  Forge
-                </span>
               </Link>
               <button
                 type="button"
                 onClick={() => setCollapsed((v) => !v)}
                 className="rounded-2xl p-2"
+                aria-label="Toggle sidebar"
               >
-                <ChevronLeft size={13} />
+                <PanelLeft size={13} />
               </button>
             </div>
 
@@ -881,7 +932,7 @@ export function SidebarClient({
                 }}
                 title="New Chat"
               >
-                <Plus size={13} />
+                <Plus size={14} />
               </button>
               <span
                 className="pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-medium opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
@@ -908,7 +959,7 @@ export function SidebarClient({
                 }}
                 title="Search"
               >
-                <Search size={13} />
+                <Search size={14} />
               </button>
               <span
                 className="pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-medium opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
@@ -925,7 +976,7 @@ export function SidebarClient({
             <div className="group relative">
               <button
                 type="button"
-                onClick={() => setRecentsOpen((v) => !v)}
+                onClick={() => router.push('/images')}
                 className="flex h-9 w-9 items-center justify-center rounded-2xl transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
                 style={{
                   background: "var(--accent)",
@@ -933,9 +984,9 @@ export function SidebarClient({
                   color: "var(--sidebar-foreground)",
                   opacity: 0.52,
                 }}
-                title="Recents"
+                title="Images"
               >
-                <MessageSquare size={13} />
+                <ImageIcon size={14} />
               </button>
               <span
                 className="pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-medium opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
@@ -945,7 +996,7 @@ export function SidebarClient({
                   color: "var(--foreground)",
                 }}
               >
-                Recents
+                Images
               </span>
 
               {recentsOpen && (
@@ -1029,15 +1080,71 @@ export function SidebarClient({
             className="mt-auto p-2.5"
             style={{ borderTop: "1px solid var(--border)" }}
           >
-            <div className="flex flex-col gap-2">
-              <ModeToggle />
-              <Link
-                href="/settings"
-                className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors"
-                style={{ color: "var(--sidebar-foreground)", opacity: 0.5 }}
+            <div className="relative flex items-center justify-center">
+              <button
+                id="sidebar-profile-trigger"
+                type="button"
+                onClick={() => setProfileMenuOpen((value) => !value)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-accent"
+                aria-label="Open profile menu"
               >
-                <Settings size={13} />
-              </Link>
+                <UserCircle2 size={18} />
+              </button>
+
+              {profileMenuOpen && (
+                <div
+                  id="sidebar-profile-menu"
+                  className="absolute bottom-0 left-full z-50 ml-2 w-52 rounded-2xl border border-border bg-card p-2 shadow-2xl"
+                >
+                  <div className="space-y-1">
+                    <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                      Profile
+                    </div>
+
+                    <Link
+                      href="/settings"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+                      style={{ color: "var(--sidebar-foreground)" }}
+                    >
+                      <Settings size={13} />
+                      Settings
+                    </Link>
+
+                    <Link
+                      href="/help"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+                      style={{ color: "var(--sidebar-foreground)" }}
+                    >
+                      <CircleHelp size={13} />
+                      Help
+                    </Link>
+
+                    <Link
+                      href="/settings/billing"
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+                      style={{ color: "var(--sidebar-foreground)" }}
+                    >
+                      <ArrowUpRight size={13} />
+                      Plans & pricing
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void (async () => {
+                          await signOut();
+                          router.push("/");
+                        })();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+                      style={{ color: "var(--sidebar-foreground)" }}
+                    >
+                      <LogOut size={13} />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -1198,17 +1305,14 @@ export function SidebarClient({
             className="p-2.5"
             style={{ borderTop: "1px solid var(--border)" }}
           >
-            <div className="flex items-center gap-2">
-              <ModeToggle />
-              <Link
-                href="/settings"
-                className="flex flex-1 items-center gap-2 rounded-2xl px-3 py-2 text-[12.5px] transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
-                style={{ color: "var(--sidebar-foreground)", opacity: 0.68 }}
-              >
-                <Settings size={13} />
-                Settings
-              </Link>
-            </div>
+            <Link
+              href="/settings"
+              className="flex items-center gap-2 rounded-2xl px-3 py-2 text-[12.5px] transition-[background-color,color,opacity,transform] duration-200 ease-out cursor-pointer"
+              style={{ color: "var(--sidebar-foreground)", opacity: 0.68 }}
+            >
+              <Settings size={13} />
+              Settings
+            </Link>
           </div>
         </>
       ) : null}

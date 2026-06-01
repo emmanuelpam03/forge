@@ -4,7 +4,6 @@ import { getServerSessionFromRequest } from "./lib/server-auth";
 const protectedMatchers = [
   "/p",
   "/c",
-  "/settings",
   "/search",
   "/metrics",
 ];
@@ -35,7 +34,6 @@ export const config = {
   matcher: [
     "/p/:path*",
     "/c/:path*",
-    "/settings/:path*",
     "/search/:path*",
     "/metrics/:path*",
   ],
