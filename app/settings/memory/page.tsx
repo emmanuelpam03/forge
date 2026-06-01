@@ -8,7 +8,6 @@ import {
   Eye,
   SearchCheck,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import SettingsShell from "../../../components/SettingsShell";
 
@@ -39,8 +38,8 @@ const MEMORY_OPTIONS = [
 export default function MemorySettingsPage() {
   return (
     <SettingsShell>
-      <div className="flex w-full flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex w-full flex-col gap-8">
+        <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Settings
@@ -62,10 +61,10 @@ export default function MemorySettingsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="space-y-4">
+        <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="space-y-6">
             <div className="overflow-hidden rounded-[22px] border border-border bg-card/90">
-              <div className="flex items-center justify-between gap-6 px-5 py-4">
+              <div className="flex items-center justify-between gap-6 px-6 py-5">
                 <div className="max-w-104">
                   <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
                     What Forge remembers
@@ -83,7 +82,7 @@ export default function MemorySettingsPage() {
               {MEMORY_ITEMS.map((item, index) => (
                 <div
                   key={item}
-                  className={`px-5 py-4 ${index > 0 ? "border-t border-border" : "border-t border-border"}`}
+                  className={`px-6 py-5 ${index > 0 ? "border-t border-border" : "border-t border-border"}`}
                 >
                   <p className="text-[14px] font-medium text-foreground">
                     {item}
@@ -94,24 +93,19 @@ export default function MemorySettingsPage() {
                 </div>
               ))}
 
-              <div className="border-t border-border px-5 py-4">
-                <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-muted px-4 py-3">
-                  <div>
-                    <p className="text-[14px] font-medium text-foreground">
-                      Show memory details
-                    </p>
-                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                      Review exactly what is stored before it is used.
-                    </p>
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-primary">
-                    <Eye size={16} />
-                  </div>
+              <div className="border-t border-border px-6 py-5">
+                <div className="rounded-2xl border border-border bg-muted p-4">
+                  <p className="text-[14px] font-medium text-foreground">
+                    Review flow
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                    Memory stays readable and curated instead of exposing a noisy control surface.
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-border bg-card/90 p-5">
+            <div className="rounded-[22px] border border-border bg-card/90 p-6">
               <div className="flex items-center gap-3">
                 <SearchCheck size={18} className="text-primary" />
                 <div>
@@ -126,7 +120,7 @@ export default function MemorySettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-[22px] border border-border bg-card/90 p-5">
+          <div className="rounded-[22px] border border-border bg-card/90 p-6">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
                 <Database size={18} />
@@ -141,7 +135,7 @@ export default function MemorySettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-5 space-y-3">
               {MEMORY_OPTIONS.map((item) => (
                 <div
                   key={item.title}
@@ -164,7 +158,7 @@ export default function MemorySettingsPage() {
               ))}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-border bg-muted p-4">
+            <div className="mt-5 rounded-2xl border border-border bg-muted p-4">
               <div className="flex items-center gap-3">
                 <Sparkles size={18} className="text-primary" />
                 <div>
@@ -173,20 +167,6 @@ export default function MemorySettingsPage() {
                   </p>
                   <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
                     Clear rules around what gets saved and how it is used.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-border bg-muted p-4">
-              <div className="flex items-center gap-3">
-                <Trash2 size={18} className="text-primary" />
-                <div>
-                  <p className="text-[14px] font-medium text-foreground">
-                    Manage memory
-                  </p>
-                  <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Delete anything that no longer helps your workflow.
                   </p>
                 </div>
               </div>

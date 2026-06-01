@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CreditCard,
-  Gauge,
   ReceiptText,
   Sparkles,
 } from "lucide-react";
@@ -19,8 +18,8 @@ const USAGE_ITEMS = [
 export default function BillingSettingsPage() {
   return (
     <SettingsShell>
-      <div className="flex w-full flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex w-full flex-col gap-8">
+        <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Settings
@@ -42,16 +41,16 @@ export default function BillingSettingsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-4 lg:grid-cols-[1fr_0.92fr]">
-          <div className="space-y-4">
+        <section className="grid gap-6 lg:grid-cols-[1fr_0.92fr]">
+          <div className="space-y-6">
             <div className="overflow-hidden rounded-[22px] border border-border bg-card/90">
-              <div className="flex items-center justify-between gap-6 px-5 py-4">
+              <div className="flex items-center justify-between gap-6 px-6 py-5">
                 <div className="max-w-104">
                   <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
                     Current plan
                   </p>
                   <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Simple billing for the current frontend stage.
+                    Billing is informational here until the payment flow is connected.
                   </p>
                 </div>
 
@@ -60,46 +59,45 @@ export default function BillingSettingsPage() {
                 </span>
               </div>
 
-              <div className="border-t border-border px-5 py-4">
+              <div className="border-t border-border px-6 py-5">
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-primary bg-primary/10 px-4 py-3">
                   <div>
                     <p className="text-[14px] font-semibold text-foreground">
                       Free
                     </p>
                     <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                      Great for trying Forge while the product is still evolving.
+                      The current workspace is using the free plan.
                     </p>
                   </div>
                   <Sparkles size={18} className="text-primary" />
                 </div>
               </div>
 
-              <div className="border-t border-border px-5 py-4">
+              <div className="border-t border-border px-6 py-5">
                 <p className="text-[13px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Upgrade path
+                  Billing status
                 </p>
                 <p className="mt-2 text-[14px] leading-6 text-foreground">
-                  Pro will later unlock more models, deeper memory, and advanced tools.
+                  No subscription management is wired yet, so this page stays simple.
                 </p>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-border bg-card/90 p-5">
+            <div className="rounded-[22px] border border-border bg-card/90 p-6">
               <div className="flex items-center gap-3">
-                <Gauge size={18} className="text-primary" />
                 <div>
                   <p className="text-[14px] font-medium text-foreground">
-                    Growth ready
+                    Design principle
                   </p>
                   <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                    Billing can scale later without changing the current design.
+                    Keep billing readable instead of packing in controls that do not do anything yet.
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[22px] border border-border bg-card/90 p-5">
+          <div className="rounded-[22px] border border-border bg-card/90 p-6">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
                 <ReceiptText size={18} />
@@ -114,7 +112,7 @@ export default function BillingSettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-5 space-y-3">
               {USAGE_ITEMS.map((item) => (
                 <div
                   key={item.label}

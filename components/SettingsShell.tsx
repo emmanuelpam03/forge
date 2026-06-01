@@ -28,9 +28,27 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
+  const dismissSettings = () => {
+    router.push("/");
+  };
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        dismissSettings();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [dismissSettings]);
 
   if (!mounted) {
     return null;
@@ -41,7 +59,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
   return (
     <div
       className="fixed inset-0 z-50"
-      onClick={() => router.push("/")}
+      onClick={dismissSettings}
       style={{
         background: isDarkMode
           ? "rgba(0, 0, 0, 0.78)"
@@ -62,6 +80,10 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
         <Link
           href="/"
           aria-label="Close settings"
+          onClick={(event) => {
+            event.preventDefault();
+            dismissSettings();
+          }}
           className="absolute right-6 top-6 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card/90 text-foreground/70 shadow-sm backdrop-blur-sm transition hover:bg-card hover:text-foreground"
         >
           <X size={15} />

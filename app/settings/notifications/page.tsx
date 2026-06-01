@@ -6,7 +6,6 @@ import {
   Bell,
   Mail,
   MessageSquareText,
-  Smartphone,
 } from "lucide-react";
 import SettingsShell from "../../../components/SettingsShell";
 
@@ -29,19 +28,13 @@ const NOTIFICATION_CHANNELS = [
     icon: MessageSquareText,
     enabled: true,
   },
-  {
-    label: "Mobile push",
-    description: "Reserved for future mobile clients.",
-    icon: Smartphone,
-    enabled: false,
-  },
 ];
 
 export default function NotificationsSettingsPage() {
   return (
     <SettingsShell>
-      <div className="flex w-full flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex w-full flex-col gap-8">
+        <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               Settings
@@ -64,12 +57,12 @@ export default function NotificationsSettingsPage() {
         </div>
 
         <section className="overflow-hidden rounded-[22px] border border-border bg-card/90">
-          <div className="px-5 py-4">
+          <div className="px-6 py-5">
             <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
               Notification channels
             </h2>
             <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-              Choose where Forge can send updates.
+              Keep notifications focused on the channels Forge already uses.
             </p>
           </div>
 
@@ -79,7 +72,7 @@ export default function NotificationsSettingsPage() {
             return (
               <div
                 key={item.label}
-                className={`flex items-center justify-between gap-4 px-5 py-4 ${index > 0 ? "border-t border-border" : "border-t border-border"}`}
+                className={`flex items-center justify-between gap-4 px-6 py-5 ${index > 0 ? "border-t border-border" : "border-t border-border"}`}
               >
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-primary/15 text-primary">
@@ -107,6 +100,12 @@ export default function NotificationsSettingsPage() {
               </div>
             );
           })}
+
+          <div className="border-t border-border px-6 py-5">
+            <p className="text-[13px] leading-6 text-muted-foreground">
+              These are summary states only. Real notification settings can be wired in later without changing the layout.
+            </p>
+          </div>
         </section>
       </div>
     </SettingsShell>
