@@ -730,6 +730,67 @@ export function SidebarClient({
       : "/",
   )}`;
 
+  const profileMenuItems = (
+    <div className="space-y-1">
+      <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+        Account
+      </div>
+
+      <Link
+        href="/settings/billing"
+        className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+        style={{ color: "var(--sidebar-foreground)" }}
+      >
+        <ArrowUpRight size={13} />
+        See plans and pricing
+      </Link>
+
+      <Link
+        href="/settings"
+        className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+        style={{ color: "var(--sidebar-foreground)" }}
+      >
+        <Settings size={13} />
+        Settings
+      </Link>
+
+      <Link
+        href="/help"
+        className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+        style={{ color: "var(--sidebar-foreground)" }}
+      >
+        <CircleHelp size={13} />
+        Help
+      </Link>
+
+      {user ? (
+        <button
+          type="button"
+          onClick={() => {
+            void (async () => {
+              await signOut();
+              router.push("/");
+            })();
+          }}
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+          style={{ color: "var(--sidebar-foreground)" }}
+        >
+          <LogOut size={13} />
+          Sign out
+        </button>
+      ) : (
+        <Link
+          href={loginHref}
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
+          style={{ color: "var(--sidebar-foreground)" }}
+        >
+          <LogIn size={13} />
+          Log in
+        </Link>
+      )}
+    </div>
+  );
+
   const sectionLabel = {
     fontSize: "11px",
     fontWeight: 700,
@@ -1008,6 +1069,7 @@ export function SidebarClient({
                 onClick={() => setProfileMenuOpen((value) => !value)}
                 className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-accent"
                 aria-label="Open profile menu"
+                aria-expanded={profileMenuOpen}
               >
                 <UserCircle2 size={18} />
               </button>
@@ -1015,66 +1077,9 @@ export function SidebarClient({
               {profileMenuOpen && (
                 <div
                   id="sidebar-profile-menu"
-                  className="absolute bottom-0 left-full z-50 ml-2 w-52 rounded-2xl border border-border bg-card p-2 shadow-2xl"
+                  className="absolute bottom-0 left-full z-50 ml-2 w-56 rounded-2xl border border-border bg-card p-2 shadow-2xl"
                 >
-                  <div className="space-y-1">
-                    <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Profile
-                    </div>
-
-                    <Link
-                      href="/settings"
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
-                      style={{ color: "var(--sidebar-foreground)" }}
-                    >
-                      <Settings size={13} />
-                      Settings
-                    </Link>
-
-                    <Link
-                      href="/help"
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
-                      style={{ color: "var(--sidebar-foreground)" }}
-                    >
-                      <CircleHelp size={13} />
-                      Help
-                    </Link>
-
-                    <Link
-                      href="/settings/billing"
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
-                      style={{ color: "var(--sidebar-foreground)" }}
-                    >
-                      <ArrowUpRight size={13} />
-                      Plans & pricing
-                    </Link>
-
-                    {user ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void (async () => {
-                            await signOut();
-                            router.push("/");
-                          })();
-                        }}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
-                        style={{ color: "var(--sidebar-foreground)" }}
-                      >
-                        <LogOut size={13} />
-                        Sign out
-                      </button>
-                    ) : (
-                      <Link
-                        href={loginHref}
-                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[12.5px] transition-colors hover:bg-accent"
-                        style={{ color: "var(--sidebar-foreground)" }}
-                      >
-                        <LogIn size={13} />
-                        Log in
-                      </Link>
-                    )}
-                  </div>
+                  {profileMenuItems}
                 </div>
               )}
             </div>
@@ -1238,64 +1243,34 @@ export function SidebarClient({
             className={`shrink-0 space-y-3 p-2.5${user ? "" : " mt-auto"}`}
             style={user ? { borderTop: "1px solid var(--border)" } : undefined}
           >
-            <div className="space-y-1.5">
-              <Link
-                href="/settings/billing"
-                className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
-                style={{
-                  color: "var(--sidebar-foreground)",
-                  opacity: 0.86,
-                }}
-              >
-                <ArrowUpRight size={14} className="shrink-0" />
-                <span>See plans and pricing</span>
-              </Link>
-
-              <Link
-                href="/settings"
-                className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
-                style={{
-                  color: "var(--sidebar-foreground)",
-                  opacity: 0.86,
-                }}
-              >
-                <Settings size={14} className="shrink-0" />
-                <span>Settings</span>
-              </Link>
-
-              <Link
-                href="/help"
-                className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
-                style={{
-                  color: "var(--sidebar-foreground)",
-                  opacity: 0.86,
-                }}
-              >
-                <CircleHelp size={14} className="shrink-0" />
-                <span>Help</span>
-              </Link>
-            </div>
-
             {user ? (
-              <button
-                type="button"
-                onClick={() =>
-                  void (async () => {
-                    await signOut();
-                    router.push("/");
-                  })()
-                }
-                className="flex h-10 w-full items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors hover:bg-accent"
-                style={{
-                  color: "var(--sidebar-foreground)",
-                  opacity: 0.86,
-                }}
-              >
-                <UserCircle2 size={14} className="shrink-0" />
-                <span className="truncate">
-                  {user.name || user.email || "Account"}
-                </span>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((value) => !value)}
+                  id="sidebar-profile-trigger"
+                  className="flex h-10 w-full items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors hover:bg-accent"
+                  style={{
+                    color: "var(--sidebar-foreground)",
+                    opacity: 0.86,
+                  }}
+                  aria-expanded={profileMenuOpen}
+                >
+                  <UserCircle2 size={14} className="shrink-0" />
+                  <span className="truncate">
+                    {user.name || user.email || "Account"}
+                  </span>
+                </button>
+
+                {profileMenuOpen ? (
+                  <div
+                    id="sidebar-profile-menu"
+                    className="absolute bottom-full right-0 z-50 mb-2 w-56 rounded-2xl border border-border bg-card p-2 shadow-2xl"
+                  >
+                    {profileMenuItems}
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="rounded-[28px] border border-border bg-card/70 p-4 shadow-[0_18px_30px_-28px_rgba(0,0,0,0.35)]">
                 <p className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">
