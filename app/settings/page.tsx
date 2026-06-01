@@ -1,159 +1,158 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { ChevronDown, Database, MoonStar, X } from "lucide-react";
-import { useTheme } from "next-themes";
-import * as React from "react";
+import Link from "next/link";
+import {
+  Bell,
+  CreditCard,
+  MoonStar,
+  Sparkles,
+  UserCircle2,
+  Settings2,
+  Shield,
+} from "lucide-react";
+import SettingsShell from "@/components/SettingsShell";
 
-const NAV_ITEMS = [
-  { label: "General", active: true, icon: MoonStar },
-  { label: "Data controls", active: false, icon: Database },
-];
+const SETTINGS_SECTIONS = [
+  {
+    title: "Account",
+    description: "Profile, email, and workspace basics.",
+    href: "/settings/account",
+    icon: UserCircle2,
+  },
+  {
+    title: "Appearance",
+    description: "Theme, contrast, and typography preferences.",
+    href: "/settings/appearance",
+    icon: MoonStar,
+  },
+  {
+    title: "Memory",
+    description: "What Forge remembers across sessions.",
+    href: "/settings/memory",
+    icon: Sparkles,
+  },
+  {
+    title: "Billing",
+    description: "Plan status and usage details.",
+    href: "/settings/billing",
+    icon: CreditCard,
+  },
+  {
+    title: "Notifications",
+    description: "Desktop, email, and in-app updates.",
+    href: "/settings/notifications",
+    icon: Bell,
+  },
+  {
+    title: "Security",
+    description: "Login and access-related settings.",
+    href: "/settings/account",
+    icon: Shield,
+  },
+] as const;
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const { theme, resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
-
-  const isLightMode = resolvedTheme === "light";
-  const shellClasses = isLightMode
-    ? "border-black/10 bg-[#f4f1ea] text-[#111111] shadow-[0_28px_100px_rgba(0,0,0,0.22)]"
-    : "border-white/10 bg-[#2a2a2a] text-white shadow-[0_28px_100px_rgba(0,0,0,0.55)]";
-  const surfaceClasses = isLightMode ? "bg-white/70" : "bg-white/8";
-  const surfaceHoverClasses = isLightMode ? "hover:bg-white/90" : "hover:bg-white/12";
-  const mutedTextClasses = isLightMode ? "text-black/60" : "text-white/60";
-  const activePillClasses = isLightMode ? "bg-black text-white" : "bg-white text-black";
-  const inactivePillClasses = isLightMode
-    ? "bg-black/6 text-black/75 hover:bg-black/10"
-    : "bg-white/8 text-white/90 hover:bg-white/12";
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
-      <div className={`w-full max-w-[742px] overflow-hidden rounded-[20px] ${shellClasses}`}>
-        <div className="flex items-center gap-3 px-3 py-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${surfaceClasses} ${surfaceHoverClasses}`}
-            aria-label="Close settings"
+    <SettingsShell>
+      <div className="flex w-full flex-col gap-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Settings
+            </p>
+            <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.03em] text-foreground">
+              Preferences
+            </h1>
+            <p className="mt-2 max-w-2xl text-[14px] leading-6 text-muted-foreground">
+              Keep the app aligned with your workflow. The left rail mirrors the
+              same structure used across the rest of Forge.
+            </p>
+          </div>
+
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-[13px] font-medium text-card-foreground transition hover:border-border/80 hover:text-foreground"
           >
-            <X size={18} />
-          </button>
-
-          <h1 className="text-[18px] font-medium tracking-[-0.02em]">
-            General
-          </h1>
+            <Settings2 size={14} />
+            Back to chat
+          </Link>
         </div>
 
-        <div className="grid min-h-[420px] grid-cols-[208px_1fr] border-t border-black/10">
-          <aside className="border-r border-black/10 px-2 py-3">
-            <div className="space-y-1">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {SETTINGS_SECTIONS.map((section) => {
+            const Icon = section.icon;
 
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[14px] transition-colors ${
-                      item.active
-                        ? isLightMode
-                          ? "bg-black/8 text-black"
-                          : "bg-white/10 text-white"
-                        : isLightMode
-                          ? "text-black/70 hover:bg-black/5"
-                          : "text-white/85 hover:bg-white/6"
-                    }`}
-                  >
-                    <Icon size={16} className="shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+            return (
+              <Link
+                key={section.title}
+                href={section.href}
+                className="group rounded-3xl border border-border bg-card/90 p-5 transition-colors hover:border-border/80 hover:bg-card"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-primary/15 text-primary transition-colors group-hover:bg-primary/20">
+                    <Icon size={18} />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
+                      {section.title}
+                    </h2>
+                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                      {section.description}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-3xl border border-border bg-card/90 p-5">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Quick access
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/settings/appearance"
+                className="rounded-2xl border border-border bg-muted p-4 transition-colors hover:bg-accent"
+              >
+                <p className="text-[14px] font-medium text-foreground">
+                  Theme and contrast
+                </p>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Tune the visual style of the workspace.
+                </p>
+              </Link>
+
+              <Link
+                href="/settings/billing"
+                className="rounded-2xl border border-border bg-muted p-4 transition-colors hover:bg-accent"
+              >
+                <p className="text-[14px] font-medium text-foreground">
+                  Billing and usage
+                </p>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Review plan status and current usage.
+                </p>
+              </Link>
             </div>
-          </aside>
+          </div>
 
-          <section className="px-6 py-5">
-            <div className="space-y-0 divide-y divide-black/10">
-              <div className="flex items-center justify-between gap-6 py-4">
-                <div>
-                  <p className="text-[16px] font-medium tracking-[-0.02em]">
-                    Appearance
-                  </p>
-                  <p className={`mt-1 text-[13px] ${mutedTextClasses}`}>
-                    Choose how Forge looks.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTheme("system")}
-                    className={`rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${
-                      theme === "system" ? activePillClasses : inactivePillClasses
-                    }`}
-                  >
-                    System
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTheme("light")}
-                    className={`rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${
-                      theme === "light" ? activePillClasses : inactivePillClasses
-                    }`}
-                  >
-                    Light
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTheme("dark")}
-                    className={`rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${
-                      theme === "dark" ? activePillClasses : inactivePillClasses
-                    }`}
-                  >
-                    Dark
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-6 py-4">
-                <div>
-                  <p className="text-[16px] font-medium tracking-[-0.02em]">
-                    Language
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${surfaceClasses} ${surfaceHoverClasses}`}
-                >
-                  Auto-detect
-                  <ChevronDown size={14} />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-6 py-4">
-                <div>
-                  <p className="text-[16px] font-medium tracking-[-0.02em]">
-                    Accessibility
-                  </p>
-                </div>
-
-                <div className={`text-[13px] ${mutedTextClasses}`}>More controls coming soon</div>
-              </div>
-            </div>
-          </section>
-        </div>
+          <div className="rounded-3xl border border-border bg-card/90 p-5">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              App consistency
+            </p>
+            <p className="mt-4 text-[14px] leading-6 text-foreground">
+              Forge settings now follow the same modular layout as the rest of
+              the app: shared shell, focused sections, and lightweight cards.
+            </p>
+            <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
+              That keeps the UI readable without copying the ChatGPT settings
+              screen wholesale.
+            </p>
+          </div>
+        </section>
       </div>
-    </div>
+    </SettingsShell>
   );
 }
