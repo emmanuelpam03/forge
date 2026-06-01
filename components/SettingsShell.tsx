@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { label: "Overview", href: "/settings", icon: Settings2, exact: true },
+  { label: "General", href: "/settings", icon: Settings2, exact: true },
   { label: "Account", href: "/settings/account", icon: UserCircle2 },
   { label: "Appearance", href: "/settings/appearance", icon: MoonStar },
   { label: "Memory", href: "/settings/memory", icon: Sparkles },

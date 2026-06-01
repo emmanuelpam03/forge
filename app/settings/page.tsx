@@ -1,51 +1,117 @@
 "use client";
 
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import {
   ArrowRight,
-  Bell,
-  CreditCard,
+  ChevronDown,
   MoonStar,
-  Sparkles,
-  UserCircle2,
   Settings2,
+  Sparkles,
 } from "lucide-react";
+import * as React from "react";
 import SettingsShell from "@/components/SettingsShell";
 
-const SETTINGS_SECTIONS = [
-  {
-    title: "Account",
-    description: "Profile, email, and workspace basics.",
-    href: "/settings/account",
-    icon: UserCircle2,
-  },
-  {
-    title: "Appearance",
-    description: "Theme, contrast, and typography preferences.",
-    href: "/settings/appearance",
-    icon: MoonStar,
-  },
-  {
-    title: "Memory",
-    description: "What Forge remembers across sessions.",
-    href: "/settings/memory",
-    icon: Sparkles,
-  },
-  {
-    title: "Billing",
-    description: "Plan status and usage details.",
-    href: "/settings/billing",
-    icon: CreditCard,
-  },
-  {
-    title: "Notifications",
-    description: "Desktop, email, and in-app updates.",
-    href: "/settings/notifications",
-    icon: Bell,
-  },
-] as const;
+function RowButton({
+  label,
+  value,
+  helper,
+  icon,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  icon?: React.ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-6 px-5 py-4">
+      <div className="max-w-104">
+        <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
+          {label}
+        </p>
+        {helper ? (
+          <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+            {helper}
+          </p>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        className={`inline-flex min-w-30 items-center justify-between gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition-colors ${
+          accent
+            ? "border-border bg-muted text-foreground hover:bg-accent"
+            : "border-border bg-muted text-foreground hover:bg-accent"
+        }`}
+      >
+        {icon}
+        <span>{value}</span>
+        <ChevronDown size={14} className="text-muted-foreground" />
+      </button>
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  helper,
+  checked,
+  onToggle,
+}: {
+  label: string;
+  helper: string;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-6 px-5 py-4">
+      <div className="max-w-104">
+        <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
+          {label}
+        </p>
+        <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+          {helper}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onToggle}
+        className={`relative inline-flex h-7 w-12 items-center rounded-full border transition-colors ${
+          checked ? "border-primary/40 bg-primary" : "border-border bg-muted"
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  const [dictationEnabled, setDictationEnabled] = React.useState(true);
+  const [separateVoice, setSeparateVoice] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  const themeLabel =
+    theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System";
+
   return (
     <SettingsShell>
       <div className="flex w-full flex-col gap-6">
@@ -55,11 +121,10 @@ export default function SettingsPage() {
               Settings
             </p>
             <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.03em] text-foreground">
-              Preferences
+              General
             </h1>
             <p className="mt-2 max-w-2xl text-[14px] leading-6 text-muted-foreground">
-              Keep the app aligned with your workflow. The left rail mirrors the
-              same structure used across the rest of Forge.
+              Match the screenshot’s structure, but keep Forge’s own surfaces and controls.
             </p>
           </div>
 
@@ -72,87 +137,177 @@ export default function SettingsPage() {
           </Link>
         </div>
 
-        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="overflow-hidden rounded-[22px] border border-border bg-card/90">
-            {SETTINGS_SECTIONS.map((section, index) => {
-              const Icon = section.icon;
+        <section className="overflow-hidden rounded-[22px] border border-border bg-card/90">
+          <div className="flex items-center justify-between gap-6 px-5 py-4">
+            <div className="max-w-104">
+              <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
+                Appearance
+              </p>
+              <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                Choose how Forge looks.
+              </p>
+            </div>
 
-              return (
-                <Link
-                  key={section.title}
-                  href={section.href}
-                  className={`flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-accent ${
-                    index > 0 ? "border-t border-border" : ""
-                  }`}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-primary/15 text-primary">
-                      <Icon size={18} />
-                    </span>
-                    <div className="min-w-0">
-                      <h2 className="text-[15px] font-medium tracking-[-0.02em] text-foreground">
-                        {section.title}
-                      </h2>
-                      <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                        {section.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  <ArrowRight size={16} className="shrink-0 text-muted-foreground" />
-                </Link>
-              );
-            })}
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              <MoonStar size={14} className="text-primary" />
+              {themeLabel}
+            </button>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-[22px] border border-border bg-card/90 p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Quick access
-              </p>
-              <div className="mt-4 space-y-3">
-                <Link
-                  href="/settings/appearance"
-                  className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted px-4 py-3 transition-colors hover:bg-accent"
-                >
-                  <div>
-                    <p className="text-[14px] font-medium text-foreground">
-                      Theme and contrast
-                    </p>
-                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                      Tune the visual style of the workspace.
-                    </p>
-                  </div>
-                  <ArrowRight size={16} className="shrink-0 text-muted-foreground" />
-                </Link>
+          <div className="border-t border-border">
+            <RowButton
+              label="Contrast"
+              helper="Keep the interface calm and readable in both modes."
+              value="System"
+            />
+          </div>
 
-                <Link
-                  href="/settings/billing"
-                  className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-muted px-4 py-3 transition-colors hover:bg-accent"
+          <div className="border-t border-border">
+            <RowButton
+              label="Accent color"
+              helper="Forge stays green by default to match the brand tone."
+              value="Default"
+              icon={<span className="h-2.5 w-2.5 rounded-full bg-primary" />}
+              accent
+            />
+          </div>
+
+          <div className="border-t border-border">
+            <RowButton
+              label="Language"
+              helper="Keep prompts and settings in the language you speak most."
+              value="Auto-detect"
+            />
+          </div>
+
+          <div className="border-t border-border">
+            <ToggleRow
+              label="Enable Dictation"
+              helper="Use dictation in the chat composer."
+              checked={dictationEnabled}
+              onToggle={() => setDictationEnabled((value) => !value)}
+            />
+          </div>
+
+          <div className="border-t border-border">
+            <RowButton
+              label="Spoken language"
+              helper="For best results, select the language you mainly speak."
+              value="Auto-detect"
+            />
+          </div>
+
+          <div className="border-t border-border">
+            <div className="flex items-center justify-between gap-6 px-5 py-4">
+              <div className="max-w-104">
+                <p className="text-[16px] font-medium tracking-[-0.02em] text-foreground">
+                  Voice
+                </p>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Pick the voice used for read-aloud responses.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-black px-4 py-2 text-[13px] font-medium text-white transition-colors hover:opacity-90 dark:bg-black"
                 >
-                  <div>
-                    <p className="text-[14px] font-medium text-foreground">
-                      Billing and usage
-                    </p>
-                    <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
-                      Review plan status and current usage.
-                    </p>
-                  </div>
-                  <ArrowRight size={16} className="shrink-0 text-muted-foreground" />
-                </Link>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-black">
+                    ▶
+                  </span>
+                  Play
+                </button>
+
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-between gap-2 rounded-full border border-border bg-muted px-4 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  Juniper
+                  <ChevronDown size={14} className="text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border">
+            <ToggleRow
+              label="Separate Voice"
+              helper="Keep Forge Voice in a separate full screen, without real time transcripts and visuals."
+              checked={separateVoice}
+              onToggle={() => setSeparateVoice((value) => !value)}
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[22px] border border-border bg-card/90 p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
+                  Typography
+                </h2>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Current pairing uses Manrope and Space Grotesk.
+                </p>
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-border bg-card/90 p-5">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                App consistency
-              </p>
-              <p className="mt-4 text-[14px] leading-6 text-foreground">
-                Forge settings now follow the same shell, spacing, and card language as the rest of the app.
-              </p>
-              <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
-                The pages stay readable and aligned without cloning the reference UI wholesale.
-              </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-primary bg-primary/10 p-4">
+                <p className="text-[14px] font-medium text-foreground">Manrope</p>
+                <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
+                  Clear, readable, and used across the interface.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted p-4">
+                <p className="text-[14px] font-medium text-foreground">Space Grotesk</p>
+                <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
+                  Reserved for headings and stronger hierarchy.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[22px] border border-border bg-card/90 p-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                <ArrowRight size={18} />
+              </span>
+              <div>
+                <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">
+                  App feel
+                </h2>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Forge keeps the same shell and spacing across settings pages.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="rounded-2xl border border-border bg-muted p-4">
+                <p className="text-[14px] font-medium text-foreground">
+                  Light mode
+                </p>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Soft surfaces with warm neutral framing.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted p-4">
+                <p className="text-[14px] font-medium text-foreground">
+                  Dark mode
+                </p>
+                <p className="mt-1 text-[13px] leading-6 text-muted-foreground">
+                  Higher contrast surfaces with the same structure.
+                </p>
+              </div>
             </div>
           </div>
         </section>
