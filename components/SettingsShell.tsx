@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CreditCard,
   Sparkles,
+  Shield,
   UserCircle2,
   Settings2,
   X,
@@ -17,6 +18,7 @@ import {
 const NAV_ITEMS = [
   { label: "General", href: "/settings", icon: Settings2, exact: true },
   { label: "Account", href: "/settings/account", icon: UserCircle2 },
+  { label: "Security", href: "/settings/security", icon: Shield },
   { label: "Memory", href: "/settings/memory", icon: Sparkles },
   { label: "Billing", href: "/settings/billing", icon: CreditCard },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
