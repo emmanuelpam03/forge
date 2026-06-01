@@ -727,6 +727,19 @@ export function SidebarClient({
               >
                 <Search size={14} />
               </button>
+
+              {/* Sign-in shortcut (will become session-aware later) */}
+              <a
+                href="/(auth)/login"
+                className="h-10 ml-2 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  color: "var(--sidebar-foreground)",
+                }}
+              >
+                Sign in
+              </a>
             </div>
           </div>
         )}
