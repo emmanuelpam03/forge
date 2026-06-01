@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowUpRight,
+  CircleHelp,
+  Image as ImageIcon,
   Plus,
+  LogIn,
   Search,
   ChevronDown,
   ChevronLeft,
@@ -705,40 +709,41 @@ export function SidebarClient({
               </button>
             </div>
 
-            <div className="flex w-full gap-2">
-              <button
-                onClick={handleCreateChat}
-                className="flex-1 rounded-2xl px-3 py-2 flex items-center justify-center"
-                style={{
-                  background: "var(--primary)",
-                  color: "var(--primary-foreground)",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                }}
-              >
-                <Plus size={14} className="mr-1.5" />
-                New chat
-              </button>
-              <button
-                onClick={handleOpenSearch}
-                className="h-10 w-10 rounded-2xl flex items-center justify-center"
-                style={{
-                  background: "var(--accent)",
-                  border: "1px solid var(--border)",
-                  color: "var(--sidebar-foreground)",
-                }}
-              >
-                <Search size={14} />
-              </button>
+            {user ? (
+              <div className="flex w-full gap-2">
+                <button
+                  onClick={handleCreateChat}
+                  className="flex-1 rounded-2xl px-3 py-2 flex items-center justify-center"
+                  style={{
+                    background: "var(--primary)",
+                    color: "var(--primary-foreground)",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                  }}
+                >
+                  <Plus size={14} className="mr-1.5" />
+                  New chat
+                </button>
+                <button
+                  onClick={handleOpenSearch}
+                  className="h-10 w-10 rounded-2xl flex items-center justify-center"
+                  style={{
+                    background: "var(--accent)",
+                    border: "1px solid var(--border)",
+                    color: "var(--sidebar-foreground)",
+                  }}
+                >
+                  <Search size={14} />
+                </button>
 
-              {/* Session-aware account/menu */}
-              {user ? (
                 <div className="h-10 ml-2 relative">
                   <button
-                    onClick={() => void (async () => {
-                      await signOut();
-                      router.push('/');
-                    })()}
+                    onClick={() =>
+                      void (async () => {
+                        await signOut();
+                        router.push("/");
+                      })()
+                    }
                     className="h-10 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
                     style={{
                       background: "transparent",
@@ -753,20 +758,110 @@ export function SidebarClient({
                     </span>
                   </button>
                 </div>
-              ) : (
-                <Link
-                  href="/login"
-                  className="h-10 ml-2 rounded-2xl flex items-center justify-center px-3 py-2 text-sm font-medium"
-                  style={{
-                    background: "transparent",
-                    border: "1px solid var(--border)",
-                    color: "var(--sidebar-foreground)",
-                  }}
-                >
-                  Sign in
-                </Link>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="ml-2 flex min-h-[calc(100vh-7.5rem)] w-full flex-col justify-between px-1 pt-1 pb-2">
+                <div className="space-y-1.5">
+                  <button
+                    onClick={handleCreateChat}
+                    className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium"
+                    style={{
+                      background: "var(--accent)",
+                      border: "1px solid var(--border)",
+                      color: "var(--sidebar-foreground)",
+                      opacity: 0.96,
+                    }}
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md border border-border bg-background/80">
+                      <Plus size={13} />
+                    </span>
+                    <span>New chat</span>
+                  </button>
+
+                  <Link
+                    href="/search"
+                    className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors"
+                    style={{
+                      color: "var(--sidebar-foreground)",
+                      opacity: 0.88,
+                    }}
+                  >
+                    <Search size={14} className="shrink-0" />
+                    <span>Search chats</span>
+                  </Link>
+
+                  <Link
+                    href="/images"
+                    className="flex h-11 w-full items-center gap-3 rounded-2xl px-3 text-sm font-medium transition-colors"
+                    style={{
+                      color: "var(--sidebar-foreground)",
+                      opacity: 0.88,
+                    }}
+                  >
+                    <ImageIcon size={14} className="shrink-0" />
+                    <span>Images</span>
+                  </Link>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="border-t border-border pt-3">
+                    <div className="space-y-1.5">
+                      <Link
+                        href="/settings/billing"
+                        className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
+                        style={{
+                          color: "var(--sidebar-foreground)",
+                          opacity: 0.86,
+                        }}
+                      >
+                        <ArrowUpRight size={14} className="shrink-0" />
+                        <span>See plans and pricing</span>
+                      </Link>
+
+                      <Link
+                        href="/settings"
+                        className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
+                        style={{
+                          color: "var(--sidebar-foreground)",
+                          opacity: 0.86,
+                        }}
+                      >
+                        <Settings size={14} className="shrink-0" />
+                        <span>Settings</span>
+                      </Link>
+
+                      <Link
+                        href="/help"
+                        className="flex h-10 items-center gap-3 rounded-2xl px-3 text-[13px] font-medium transition-colors"
+                        style={{
+                          color: "var(--sidebar-foreground)",
+                          opacity: 0.86,
+                        }}
+                      >
+                        <CircleHelp size={14} className="shrink-0" />
+                        <span>Help</span>
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] border border-border bg-card/70 p-4 shadow-[0_18px_30px_-28px_rgba(0,0,0,0.35)]">
+                    <p className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">
+                      Get responses tailored to you
+                    </p>
+                    <p className="mt-2 text-[12.5px] leading-5 text-muted-foreground">
+                      Log in to get answers based on saved chats, plus create images and upload files.
+                    </p>
+                    <Link
+                      href="/login"
+                      className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+                    >
+                      <LogIn size={14} />
+                      Log in
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -946,7 +1041,7 @@ export function SidebarClient({
             </div>
           </div>
         </>
-      ) : (
+      ) : user ? (
         <>
           {/* ── Projects section ── */}
           <div className="px-3 pb-1 pt-4">
@@ -1116,7 +1211,7 @@ export function SidebarClient({
             </div>
           </div>
         </>
-      )}
+      ) : null}
     </aside>
   );
 }
