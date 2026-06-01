@@ -23,7 +23,9 @@ export async function proxy(req: Request) {
 
   const session = await getServerSessionFromRequest(req as unknown as Request);
   if (!session?.user) {
-    const redirectUrl = new URL("/(auth)/login", url);
+    // Redirect to the public login path. Internal grouping folders like "(auth)"
+    // are not valid public URLs and will produce 404s (use "/login").
+    const redirectUrl = new URL("/login", url);
     redirectUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(redirectUrl);
   }
