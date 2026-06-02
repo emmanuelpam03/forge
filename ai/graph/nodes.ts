@@ -36,7 +36,6 @@ import type { ChatGraphState } from "@/ai/graph/state";
 import type { StreamEvent } from "@/ai/graph/stream";
 import type { RetrievedImage } from "@/ai/tools/image-types";
 import { groundImageSearchQuery } from "@/ai/services/image-ranking";
-import type { UploadedAttachment } from "@/lib/attachment-types";
 
 type ChatImageBlock = {
   images: RetrievedImage[];
@@ -44,24 +43,13 @@ type ChatImageBlock = {
   retrievalTimeMs?: number;
 };
 
-function isUploadedAttachment(value: unknown): value is UploadedAttachment {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    typeof (value as UploadedAttachment).id === "string" &&
-    typeof (value as UploadedAttachment).chatId === "string" &&
-    typeof (value as UploadedAttachment).name === "string" &&
-    typeof (value as UploadedAttachment).mimeType === "string"
-  );
-}
-
 function emitImageSearchEvent(
   toolName: string,
   rawResult: unknown,
   state: ChatGraphState,
   onEvent?: (event: StreamEvent) => void,
 ) {
-  if (toolName !== "imageSearch" && toolName !== "imageGeneration") return;
+  if (toolName !== "imageSearch") return;
 
   try {
     const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
@@ -115,7 +103,7 @@ type ModelInvoker = {
     messages: BaseMessage[],
     opts?: unknown,
   ) => AsyncIterable<unknown> | PromiseLike<AsyncIterable<unknown>>;
-  nativeStream?: (
+      if (toolName !== "imageSearch") return;
     messages: BaseMessage[],
     opts?: unknown,
   ) => AsyncIterable<unknown> | PromiseLike<AsyncIterable<unknown>>;
@@ -144,7 +132,6 @@ function getToolStatusMessage(toolName: string): string {
   if (toolName === "currentDateTime") return "Checking time...";
   if (toolName === "summarizeText") return "Summarizing...";
   if (toolName === "projectContextLookup") return "Loading context...";
-  if (toolName === "imageGeneration") return "Generating image...";
   return "Working...";
 }
 
@@ -289,24 +276,12 @@ function resolveToolPlanForQueryIntent(
     // chat-history-only policy. Keep tools conservative.
   }
 
-  const imageGenerationPattern = /\b(generate|create|make|draw|paint|design|show|give|produce)\b.*\b(image|images|picture|pictures|illustration|illustrations|poster|posters|graphic|graphics|logo|logos|scene|scenes|art|artwork|wallpaper|wallpapers)\b/i;
-  const explicitImageRequestPattern = /\bimages?\s+of\b/i;
-  const imageGenerationRequested = imageGenerationPattern.test(message) || explicitImageRequestPattern.test(message);
-  if (!hasAnyAttachment && imageGenerationRequested) {
-    selectedTools.push("imageGeneration");
-  }
-
-  const documentGenerationPattern = /\b(export|save|download|generate|create|produce)\b.*\b(pdf|docx|doc|powerpoint|pptx|ppt|excel|xlsx|spreadsheet|word)\b/i;
-  if (documentGenerationPattern.test(message)) {
-    selectedTools.push("documentGeneration");
-  }
-
   // Heuristic: If the message looks like it would benefit from visual context, add imageSearch.
   const visualContextPattern = /\b(explain|diagram|how does|how do|visualize|show|illustrate|architecture|structure|design|flow|process|system|bridge|map|picture|image|images|photo|photos|visual|draw|sketch|render|display|suspension bridge|circuit|layout|ui|interface|pattern|component|example|inspire|reference)\b/i;
   // Only add an imageSearch tool when we don't already have an uploaded image
   // to use as the primary visual context. Uploaded images should be used
   // directly rather than triggering a provider image search.
-  if (!hasAnyAttachment && !hasImageAttachment && !imageGenerationRequested && visualContextPattern.test(message)) {
+  if (!hasAnyAttachment && !hasImageAttachment && visualContextPattern.test(message)) {
     selectedTools.push("imageSearch");
   }
 
@@ -351,10 +326,6 @@ function mapStructuredToolUsage(toolUsage: string[]): string[] {
       case "code_execution":
       case "calculator":
         return "calculator";
-      case "image_generation":
-        return "imageGeneration";
-      case "document_generation":
-        return "documentGeneration";
       case "memory_lookup":
         return null;
       default:
@@ -394,44 +365,6 @@ function buildToolArgs(
   state: ChatGraphState,
 ): Record<string, unknown> {
   const message = state.userMessage;
-
-  function extractRequestedImageCount(input: string): number {
-    const normalized = input.toLowerCase();
-
-    const explicitCountMatch = normalized.match(
-      /\b(?:generate|create|make|draw|paint|design|show|give|return|produce)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+images?\b/,
-    );
-    if (explicitCountMatch?.[1]) {
-      const token = explicitCountMatch[1];
-      if (/^\d+$/.test(token)) {
-        return Math.max(1, Math.min(20, Number.parseInt(token, 10)));
-      }
-
-      const wordToNumber: Record<string, number> = {
-        one: 1,
-        two: 2,
-        three: 3,
-        four: 4,
-        five: 5,
-        six: 6,
-        seven: 7,
-        eight: 8,
-        nine: 9,
-        ten: 10,
-      };
-      return wordToNumber[token] ?? 3;
-    }
-
-    if (/\ban image\b|\bone image\b|\b1 image\b/i.test(input)) {
-      return 1;
-    }
-
-    if (/\bimages\b/i.test(input)) {
-      return 3;
-    }
-
-    return 1;
-  }
 
   if (toolName === "calculator") {
     return { expression: extractCalculatorExpression(message) };
@@ -491,42 +424,6 @@ function buildToolArgs(
       placementHint: "gallery",
       freshness: "recent",
       avoidDuplicates: true,
-    };
-  }
-
-  if (toolName === "documentGeneration") {
-    // Infer format and basic args from the user message.
-    const fmtMatch = message.match(/\b(pdf|docx|doc|pptx|ppt|powerpoint|xlsx|excel|spreadsheet|word)\b/i);
-    const format = fmtMatch ? fmtMatch[1].toLowerCase().replace(/^ppt$/, "pptx").replace(/^doc$/, "docx").replace(/^excel$/, "xlsx").replace(/^word$/, "docx") : "pdf";
-    if (format === "xlsx") {
-      // Split lines into rows and commas into cells
-      const rows = message.split(/\r?\n/).map((r) => r.split(/,|\t/).map((c) => c.trim())).filter((r) => r.length > 0);
-      return { format: "xlsx", sheetName: "Sheet1", rows };
-    }
-
-    if (format === "pptx") {
-      const bullets = message.split(/[\.\n]/).map((s) => s.trim()).filter(Boolean);
-      return { format: "pptx", title: undefined, bullets };
-    }
-
-    // Default to document/text formats
-    return { format: format as "pdf" | "docx", title: undefined, body: message };
-  }
-  if (toolName === "imageGeneration") {
-    const prompt = message
-      .replace(/^(generate|create|make|draw|paint|design)\s+(an?\s+)?(image|picture|illustration|poster|graphic|logo|scene|artwork|art)\s+(of|for|about)\s+/i, "")
-      .replace(/^(generate|create|make|draw|paint|design)\s+/i, "")
-      .trim();
-
-    return {
-      prompt: prompt || message,
-      count: extractRequestedImageCount(message),
-      aspectRatio: /\b(portrait|vertical)\b/i.test(message)
-        ? "portrait"
-        : /\b(square|squared)\b/i.test(message)
-          ? "square"
-          : "landscape",
-      style: undefined,
     };
   }
 
@@ -678,59 +575,8 @@ export async function generateResponseNode(state: ChatGraphState) {
           assistantMessage += visibleChunk;
           graphStreamEventEmitter?.({ type: "token", content: visibleChunk });
         },
-        async (jsonText) => {
-          // Attempt to parse fenced JSON and route to document generator
-          try {
-            const parsed = JSON.parse(jsonText) as Record<string, unknown>;
-
-            // If parsed payload looks like a document generation request,
-            // invoke the documentGeneration tool and emit attachments.
-            const maybeFormat = parsed?.format ?? parsed?.type ?? null;
-            if (maybeFormat && typeof maybeFormat === "string") {
-              try {
-                graphStreamEventEmitter?.({ type: "status", message: "Generating document..." });
-                const tools = createForgeTools({ chatId: state.chatId });
-                const docTool = tools.find((t) => t.name === "documentGeneration");
-                if (docTool) {
-                  // invoke the tool with the parsed payload (zod will validate)
-                  const rawResult = await docTool.invoke(parsed);
-                  const resultText = typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult);
-                  try {
-                    const parsedResult = JSON.parse(resultText);
-                    const att = parsedResult?.attachment;
-                    if (isUploadedAttachment(att)) {
-                      // attach to assistant media for persistence
-                      state.assistantMedia = { attachments: [att] };
-                      // emit attachments event so the client can render immediately
-                      graphStreamEventEmitter?.({ type: "attachments", attachments: [att] });
-                    }
-                  } catch {
-                    // ignore parse errors from tool output
-                  }
-                }
-              } catch {
-                // fail silently; do not surface tool execution errors to user stream
-              }
-            }
-          } catch {
-            // ignore JSON parse errors and continue streaming
-          }
-        },
+        async (jsonText) => jsonText,
       );
-
-      const endedAt = Date.now();
-      info("stream_closed_generate", {
-        chatId: state.chatId,
-        runId: state.runId,
-        durationMs: endedAt - startedAt,
-        ttftMs: firstTokenAt ? firstTokenAt - startedAt : null,
-      });
-    } catch (err) {
-      logError("streaming_failed_generate", {
-        message: `[CRITICAL] Streaming failed in generateResponseNode. Chat: ${state.chatId}, RunId: ${state.runId}`,
-        error: err,
-      });
-    }
 
   // Never expose raw tool outputs directly to the user. If the model failed
   // to produce content, return a safe, assistant-composed fallback message
@@ -1070,58 +916,46 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
-          if (forcedName === "imageSearch" || forcedName === "imageGeneration" || forcedName === "documentGeneration") {
+          if (forcedName === "imageSearch") {
             try {
               const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
-              if (forcedName === "imageSearch" || forcedName === "imageGeneration") {
-                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
-                intermediateImageBlock = {
-                  images: images.map((im) => ({
-                    id: im.id,
-                    url: im.url,
-                    thumbnailUrl: im.thumbnailUrl,
-                    title: im.title,
-                    sourcePage: im.sourcePage,
-                    source: im.sourcePage || im.provider,
-                    width: im.width,
-                    height: im.height,
-                    provider: im.provider,
-                    relevanceScore: im.relevanceScore,
-                    safetyScore: im.safetyScore,
-                    metadata: im.metadata || {},
-                  })),
-                  totalFound: (parsed?.totalFound as number) ?? images.length,
-                  retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
-                };
-              } else if (forcedName === "documentGeneration") {
-                // Document generation returns an `attachment` in the tool result.
-                const att = parsed?.attachment;
-                if (att) {
-                  intermediateAssistantMedia = { attachments: [att] };
-                }
-              }
+              const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+              intermediateImageBlock = {
+                images: images.map((im) => ({
+                  id: im.id,
+                  url: im.url,
+                  thumbnailUrl: im.thumbnailUrl,
+                  title: im.title,
+                  sourcePage: im.sourcePage,
+                  source: im.sourcePage || im.provider,
+                  width: im.width,
+                  height: im.height,
+                  provider: im.provider,
+                  relevanceScore: im.relevanceScore,
+                  safetyScore: im.safetyScore,
+                  metadata: im.metadata || {},
+                })),
+                totalFound: (parsed?.totalFound as number) ?? images.length,
+                retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+              };
+              emitImageSearchEvent(forcedName, rawResult, state, onEvent);
+              toolsUsed.add(forcedName);
+              evidenceBundles.push({
+                tool: forcedName,
+                content: "",
+                timestamp: new Date().toISOString(),
+              });
+
+              return {
+                toolsUsed: Array.from(toolsUsed),
+                evidenceBundles,
+                toolContext: intermediateContext,
+                imageBlock: intermediateImageBlock,
+                assistantMedia: intermediateAssistantMedia,
+              };
             } catch {
               // ignore parse errors; still emit images event
             }
-
-            if (forcedName === "imageSearch" || forcedName === "imageGeneration") {
-              emitImageSearchEvent(forcedName, rawResult, state, onEvent);
-            }
-
-            toolsUsed.add(forcedName);
-            evidenceBundles.push({
-              tool: forcedName,
-              content: "",
-              timestamp: new Date().toISOString(),
-            });
-
-            return {
-              toolsUsed: Array.from(toolsUsed),
-              evidenceBundles,
-              toolContext: intermediateContext,
-              imageBlock: intermediateImageBlock,
-              assistantMedia: intermediateAssistantMedia,
-            };
           }
 
           toolsUsed.add(forcedName);
@@ -1163,49 +997,36 @@ export async function toolRouterNodeImpl(
                 ? rawResult
                 : JSON.stringify(rawResult, null, 2);
 
-            // For imageSearch, imageGeneration, and documentGeneration, emit structured
+            // For imageSearch, emit structured
             // events / set assistant media and avoid including raw JSON/text in evidenceBundles
             // so internal orchestration isn't exposed to the assistant prompts.
-            if (
-              toolName === "imageSearch" ||
-              toolName === "imageGeneration" ||
-              toolName === "documentGeneration"
-            ) {
+            if (toolName === "imageSearch") {
               try {
                 const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
-                if (toolName === "imageSearch" || toolName === "imageGeneration") {
-                  const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
-                  intermediateImageBlock = {
-                    images: images.map((im) => ({
-                      id: im.id,
-                      url: im.url,
-                      thumbnailUrl: im.thumbnailUrl,
-                      title: im.title,
-                      sourcePage: im.sourcePage,
-                      source: im.sourcePage || im.provider,
-                      width: im.width,
-                      height: im.height,
-                      provider: im.provider,
-                      relevanceScore: im.relevanceScore,
-                      safetyScore: im.safetyScore,
-                      metadata: im.metadata || {},
-                    })),
-                    totalFound: (parsed?.totalFound as number) ?? images.length,
-                    retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
-                  };
-                }
-
-                if (toolName === "documentGeneration") {
-                  const att = parsed?.attachment;
-                  if (att) intermediateAssistantMedia = { attachments: [att] };
-                }
+                const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
+                intermediateImageBlock = {
+                  images: images.map((im) => ({
+                    id: im.id,
+                    url: im.url,
+                    thumbnailUrl: im.thumbnailUrl,
+                    title: im.title,
+                    sourcePage: im.sourcePage,
+                    source: im.sourcePage || im.provider,
+                    width: im.width,
+                    height: im.height,
+                    provider: im.provider,
+                    relevanceScore: im.relevanceScore,
+                    safetyScore: im.safetyScore,
+                    metadata: im.metadata || {},
+                  })),
+                  totalFound: (parsed?.totalFound as number) ?? images.length,
+                  retrievalTimeMs: (parsed?.retrievalTimeMs as number) ?? 0,
+                };
               } catch {
                 // ignore parse errors
               }
 
-              if (toolName === "imageSearch" || toolName === "imageGeneration") {
-                emitImageSearchEvent(toolName, rawResult, state, onEvent);
-              }
+              emitImageSearchEvent(toolName, rawResult, state, onEvent);
 
               return {
                 tool: toolName,
@@ -1260,11 +1081,11 @@ export async function toolRouterNodeImpl(
               ? rawResult
               : JSON.stringify(rawResult, null, 2);
 
-          // If this is an imageSearch or imageGeneration tool, emit a structured images event
+          // If this is an imageSearch tool, emit a structured images event
           // for the UI and avoid storing its raw textual output in the
           // evidenceBundles or as toolContext. This keeps orchestration
           // internal and prevents tool JSON from leaking into prompts.
-          if (toolName === "imageSearch" || toolName === "imageGeneration") {
+          if (toolName === "imageSearch") {
             try {
               const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
               const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
@@ -1361,10 +1182,10 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
     emitStatus(undefined, "Analyzing results...");
 
     // Format evidence bundles into a clear, sentence-oriented context
-    // (exclude imageSearch and imageGeneration output). Use explicit sentences so the
+    // (exclude imageSearch output). Use explicit sentences so the
     // output sanitizer recognizes these as visible answer content.
     const contextLines = state.evidenceBundles
-      .filter((bundle) => bundle.tool !== "imageSearch" && bundle.tool !== "imageGeneration")
+      .filter((bundle) => bundle.tool !== "imageSearch")
       .map((bundle) => {
         const toolLabel =
           bundle.tool === "webSearch"

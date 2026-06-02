@@ -69,7 +69,6 @@ const KNOWN_TOOL_USAGE = new Set([
   "memory_lookup",
   "project_context",
   "code_execution",
-  "image_generation",
 ]);
 
 const KNOWN_RESPONSE_MODES = new Set([

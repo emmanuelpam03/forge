@@ -8,7 +8,7 @@ Rules:
 - difficulty: one of "easy", "medium", "hard".
 - verbosity: one of "concise", "balanced", "detailed".
 - audience_level: one of "beginner", "intermediate", "expert".
- - tool_usage: include only tools that are clearly useful, such as web_search, weather, calculator, datetime, memory_lookup, project_context, code_execution, image_generation.
+ - tool_usage: include only tools that are clearly useful, such as web_search, weather, calculator, datetime, memory_lookup, project_context, code_execution.
   - Special rule: For location-specific current-condition requests (e.g. "What's the weather in [Place]?", "Is it raining in [City]?"), the router MUST include "tool_usage":["weather"] so the planner invokes the weather tool. Include only "weather" (and not "web_search") when the user's intent is explicitly to get current weather for a named place.
 - response_mode: one of "code", "teach", "plan", "analyze", "summarize", "compare", "support", "chat".
 - confidence: one of "high", "medium", "low".
@@ -24,8 +24,6 @@ const INTENT_ROUTER_EXAMPLES = `Examples:
 - "Help me debug this hook and explain why it breaks" => {"intent":"debugging","difficulty":"medium","verbosity":"balanced","audience_level":"intermediate","tool_usage":["code_execution"],"response_mode":"teach","confidence":"high","memory_relevance":false,"reasoning_depth":"deep","multi_intent":["teaching"]}
 - "Plan a rollout for the new auth flow" => {"intent":"planning","difficulty":"medium","verbosity":"balanced","audience_level":"intermediate","tool_usage":[],"response_mode":"plan","confidence":"high","memory_relevance":true,"reasoning_depth":"standard","multi_intent":[]}
 - "Compare Next.js and Remix for a dashboard" => {"intent":"comparison","difficulty":"medium","verbosity":"detailed","audience_level":"intermediate","tool_usage":["web_search"],"response_mode":"compare","confidence":"high","memory_relevance":false,"reasoning_depth":"deep","multi_intent":["analysis"]}
-- "Generate a cinematic poster of a red fox in the rain" => {"intent":"creative","difficulty":"medium","verbosity":"detailed","audience_level":"intermediate","tool_usage":["image_generation"],"response_mode":"chat","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}
-- "Write an essay about flowers and give it to me in a PDF" => {"intent":"creative","difficulty":"medium","verbosity":"detailed","audience_level":"general","tool_usage":["document_generation"],"response_mode":"chat","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":["writing"]}
 - "I feel overwhelmed and need some encouragement" => {"intent":"emotional_support","difficulty":"easy","verbosity":"balanced","audience_level":"general","tool_usage":[],"response_mode":"support","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}
 - "What's the weather like in Flic en Flac, Mauritius?" => {"intent":"research","difficulty":"easy","verbosity":"balanced","audience_level":"intermediate","tool_usage":["weather"],"response_mode":"analyze","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}
 - "Is it raining in London right now?" => {"intent":"research","difficulty":"easy","verbosity":"concise","audience_level":"general","tool_usage":["weather"],"response_mode":"chat","confidence":"high","memory_relevance":false,"reasoning_depth":"light","multi_intent":[]}`;

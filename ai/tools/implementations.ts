@@ -3,7 +3,6 @@ import "server-only";
 import prisma from "@/lib/prisma";
 import fetchWithTimeout from "@/lib/fetchWithTimeout";
 import type { ImageSearchInput, ImageSearchResult, ProviderImage } from "./image-types";
-import { pollinationsGenerateImage } from "./providers/pollinations";
 import { serpapiImageSearch } from "./providers/serpapi";
 import { pexelsSearch } from "./providers/pexels";
 import {
@@ -38,13 +37,6 @@ type RankedChunk = {
 type ReadAnyFileInput = {
   chatId: string;
   attachmentId: string;
-};
-
-type ImageGenerationInput = {
-  prompt: string;
-  count?: number;
-  aspectRatio?: "square" | "landscape" | "portrait";
-  style?: string;
 };
 
 function tokenize(value: string): string[] {
@@ -1229,177 +1221,6 @@ export async function readAnyFileToolAsync(
     result: "",
     error: "Attachment reading is no longer supported.",
   };
-}
-
-export async function pollinationsImageGenerationToolAsync(
-  input: ImageGenerationInput,
-  chatId: string,
-): Promise<ToolResult> {
-  try {
-    const startedAt = Date.now();
-    const count = Math.max(1, Math.min(input.count ?? 1, 20));
-    const images = [] as Awaited<ReturnType<typeof pollinationsGenerateImage>>["images"];
-
-    for (let index = 0; index < count; index += 1) {
-      const variant = count > 1 ? `${input.prompt.trim()} (variation ${index + 1})` : input.prompt;
-      const generated = await pollinationsGenerateImage({ prompt: variant, aspectRatio: input.aspectRatio, style: input.style }, chatId);
-      images.push(...generated.images);
-    }
-
-    const retrievalTimeMs = Date.now() - startedAt;
-    return {
-      success: true,
-      result: JSON.stringify(
-        {
-          success: true,
-          provider: "pollinations",
-          promptUsed: input.prompt,
-          images,
-          totalFound: images.length,
-          retrievalTimeMs,
-        },
-        null,
-        2,
-      ),
-      metadata: {
-        provider: "pollinations",
-        promptUsed: input.prompt,
-        imageCount: images.length,
-        retrievalTimeMs,
-        chatId,
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      result: "",
-      error: error instanceof Error ? error.message : "Image generation failed.",
-    };
-  }
-}
-
-// Document generators: PDF, DOCX, XLSX, PPTX
-import { PDFDocument, StandardFonts } from "pdf-lib";
-import { Document, Packer, Paragraph, TextRun } from "docx";
-import ExcelJS from "exceljs";
-import PptxGenJS from "pptxgenjs";
-import { buildUploadedAttachment } from "@/lib/attachment-processing";
-import { randomUUID } from "node:crypto";
-
-export async function generatePdfToolAsync(input: { chatId: string; title?: string; body: string }): Promise<ToolResult> {
-  try {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const { height } = page.getSize();
-    const fontSize = 12;
-    page.drawText(input.title ? `${input.title}\n\n${input.body}` : input.body, {
-      x: 50,
-      y: height - 50 - fontSize,
-      size: fontSize,
-      font,
-    });
-
-    const buffer = await pdfDoc.save();
-    const attachmentId = randomUUID();
-    const uploaded = await buildUploadedAttachment({
-      chatId: input.chatId,
-      fileName: `${attachmentId}.pdf`,
-      mimeType: "application/pdf",
-      sizeBytes: buffer.length,
-      buffer: Buffer.from(buffer),
-      attachmentId,
-    });
-
-    return {
-      success: true,
-      result: JSON.stringify({
-        success: true,
-        attachment: uploaded,
-      }),
-    };
-  } catch (err) {
-    return { success: false, result: "", error: err instanceof Error ? err.message : "PDF generation failed" };
-  }
-}
-
-export async function generateDocxToolAsync(input: { chatId: string; title?: string; body: string }): Promise<ToolResult> {
-  try {
-    const titleRun = input.title ? new TextRun({ text: input.title, bold: true }) : undefined;
-    const bodyRun = new TextRun(input.body || "");
-    const paragraphChildren = titleRun ? [titleRun, new TextRun("\n"), bodyRun] : [bodyRun];
-    const paragraph = new Paragraph({ children: paragraphChildren });
-    const doc = new Document({ sections: [{ properties: {}, children: [paragraph] }] });
-    const buffer = await Packer.toBuffer(doc);
-    const attachmentId = randomUUID();
-    const uploaded = await buildUploadedAttachment({
-      chatId: input.chatId,
-      fileName: `${attachmentId}.docx`,
-      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      sizeBytes: buffer.length,
-      buffer: Buffer.from(buffer),
-      attachmentId,
-    });
-
-    return { success: true, result: JSON.stringify({ success: true, attachment: uploaded }) };
-  } catch (err) {
-    return { success: false, result: "", error: err instanceof Error ? err.message : "DOCX generation failed" };
-  }
-}
-
-export async function generateXlsxToolAsync(input: { chatId: string; sheetName?: string; rows: Array<string[]> }): Promise<ToolResult> {
-  try {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet(input.sheetName || 'Sheet1');
-    for (const row of input.rows) {
-      ws.addRow(row);
-    }
-    const buffer = await wb.xlsx.writeBuffer();
-    const attachmentId = randomUUID();
-    const uploaded = await buildUploadedAttachment({
-      chatId: input.chatId,
-      fileName: `${attachmentId}.xlsx`,
-      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      sizeBytes: buffer.byteLength,
-      buffer: Buffer.from(buffer),
-      attachmentId,
-    });
-
-    return { success: true, result: JSON.stringify({ success: true, attachment: uploaded }) };
-  } catch (err) {
-    return { success: false, result: "", error: err instanceof Error ? err.message : "XLSX generation failed" };
-  }
-}
-
-export async function generatePptxToolAsync(input: { chatId: string; title?: string; bullets: string[] }): Promise<ToolResult> {
-  try {
-    const pptx = new PptxGenJS();
-    const slide = pptx.addSlide();
-    slide.addText(input.title || '', { x: 0.5, y: 0.3, fontSize: 24, bold: true });
-    slide.addText(input.bullets.join('\n'), { x: 0.5, y: 1.0, fontSize: 14 });
-    // pptxgenjs types don't always expose a typed `writeBuffer()`; call dynamically
-    // and normalize the result to a Node Buffer.
-    type PptxWriter = {
-      writeBuffer?: () => Promise<ArrayBuffer | Uint8Array | Buffer>;
-      write?: (format: string) => Promise<ArrayBuffer | Uint8Array | Buffer>;
-    };
-    const writer = pptx as unknown as PptxWriter;
-    const rawResult = await (writer.writeBuffer?.() ?? writer.write?.("arraybuffer"));
-    const buffer = Buffer.isBuffer(rawResult) ? rawResult : Buffer.from(rawResult as ArrayBuffer);
-    const attachmentId = randomUUID();
-    const uploaded = await buildUploadedAttachment({
-      chatId: input.chatId,
-      fileName: `${attachmentId}.pptx`,
-      mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      sizeBytes: buffer.byteLength,
-      buffer: Buffer.from(buffer),
-      attachmentId,
-    });
-
-    return { success: true, result: JSON.stringify({ success: true, attachment: uploaded }) };
-  } catch (err) {
-    return { success: false, result: "", error: err instanceof Error ? err.message : "PPTX generation failed" };
-  }
 }
 
 /**
