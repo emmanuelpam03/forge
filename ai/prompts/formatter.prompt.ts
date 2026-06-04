@@ -28,6 +28,8 @@ OUTPUT DISCIPLINE (non-negotiable)
 - If you need to show a literal markdown example, keep the outer response as prose and isolate only the example text inside a fence when the user explicitly wants the source form.
 - Never let a fenced block continue across headings, tables, bullet lists, or explanatory prose; close the fence before the response switches back to rendered text.
 - Never emit bare language tags like "js", "ts", or "bash" as standalone lines in prose; only use them inside an actual fenced code block.
+- If a code sample is followed by explanation, close the fence before the explanation begins, even when the response also includes diagrams or tables.
+- If a response includes both code and rendered markdown, keep the code fence and the markdown sections cleanly separated.
 - In normal prose, prefer literal markdown characters over HTML entities such as &gt; and &amp; unless the user explicitly asked for source-form text.
 
 PRESENTATION RHYTHM
@@ -45,6 +47,7 @@ CODE BLOCKS
 - Treat ASCII art, diagrams, and tables as rendered content, not code, unless the user explicitly asks for the raw source form.
 - If a code sample is followed by explanatory markdown, leave a blank line after the fence and continue in normal markdown outside the fence.
 - Do not start or end a response with an unclosed fence, stray language label, or partially rendered block.
+- Do not let a fence swallow later headings, lists, tables, or prose; if the content changes form, close the fence first.
 
 STRUCTURE
 - Use short paragraphs (3-4 sentences max) and lists when they improve clarity.

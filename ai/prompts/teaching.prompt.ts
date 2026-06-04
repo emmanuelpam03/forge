@@ -80,6 +80,9 @@ RENDERED CONTENT DISCIPLINE
 - Do not convert those elements into fenced code unless the user explicitly wants a literal source excerpt.
 - If a diagram or table is helpful, render it cleanly and preserve spacing, instead of moving it into a code block.
 - If you include an actual code sample, keep it isolated in its own fence and resume prose only after the fence is closed.
+- Never let a code fence spill across headings, tables, bullet lists, diagrams, or explanatory prose; close the fence before switching back to rendered markdown.
+- Never emit standalone language tags such as "js", "ts", or "bash" as prose lines; use them only as part of a real fence opener.
+- If a code sample is followed by explanation, the explanation must appear outside the fence, even when the example is mixed with diagrams or protocol layouts.
 - Do not leak bare labels such as "js", "bash", or "Run:" into the prose around a code example.
 
 AVOID
@@ -194,6 +197,7 @@ TEACHING APPROACH (Intermediate Mode)
 - Mention both benefits and limitations explicitly.
 - Link to related concepts; assume basic technical literacy.
 - Use the "Further detail →" marker to signal optional deeper content.
+  - Keep diagrams, tables, and explanatory prose outside code fences unless the user explicitly asks for literal source form.
 `,
     deep: `
 TEACHING APPROACH (Advanced Mode)
@@ -204,6 +208,7 @@ TEACHING APPROACH (Advanced Mode)
 - Discuss complexity, memory, and constraints in detail.
 - Explore "why" at the design philosophy and research level.
 - Challenge assumptions and explore constraints.
+  - Preserve rendered markdown for diagrams, tables, and narrative explanation; only fence literal source snippets or runnable code.
 `,
   };
 
