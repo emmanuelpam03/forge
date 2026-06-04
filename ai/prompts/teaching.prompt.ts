@@ -79,6 +79,8 @@ RENDERED CONTENT DISCIPLINE
 - Keep ASCII diagrams, protocol frames, tables, bullet lists, and other rendered examples as normal markdown or prose.
 - Do not convert those elements into fenced code unless the user explicitly wants a literal source excerpt.
 - If a diagram or table is helpful, render it cleanly and preserve spacing, instead of moving it into a code block.
+- If you include an actual code sample, keep it isolated in its own fence and resume prose only after the fence is closed.
+- Do not leak bare labels such as "js", "bash", or "Run:" into the prose around a code example.
 
 AVOID
 - Textbook jargon dumps: Don't define 5 concepts in one paragraph.
