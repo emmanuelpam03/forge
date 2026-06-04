@@ -80,8 +80,27 @@ export function buildFormatterPrompt(controls: PromptBehaviorControls): string {
     `Persona mode: ${controls.persona}\n` +
     `Teaching depth: ${controls.teachingDepth}\n\n`;
 
+  const codeResponseDiscipline =
+    controls.responseMode === "code"
+      ? `CODE RESPONSE DISCIPLINE
+- Prioritize fenced code blocks over prose.
+- Put runnable code first unless the user explicitly asks for explanation first.
+- Keep any explanation outside the code fences.
+- Never mix normal explanation text into a code fence.
+- Separate multiple files or commands into clearly labeled blocks.
+- Make code snippets copy-paste safe and complete when possible.
+
+`
+      : "";
+
   // Keep the rich legacy formatter guidance after the small header to avoid
   // invalidating downstream expectations while making the formatter
   // responsive to classifier outputs.
-  return ATTACHMENT_HANDLING_GUIDANCE + "\n\n" + header + FORMATTER_PROMPT;
+  return (
+    ATTACHMENT_HANDLING_GUIDANCE +
+    "\n\n" +
+    header +
+    codeResponseDiscipline +
+    FORMATTER_PROMPT
+  );
 }

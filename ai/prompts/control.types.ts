@@ -17,7 +17,7 @@ export type FormattingProfile =
   | "table-first"
   | "stepwise";
 
-export type PersonaMode = "auto" | "none" | "senior-engineer";
+export type PersonaMode = "auto" | "none";
 
 export type PromptBehaviorControls = {
   responseMode: ResponseMode;

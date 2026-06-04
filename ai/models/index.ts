@@ -7,7 +7,7 @@ import { info, warn } from "@/lib/logger";
 import type { UploadedAttachment } from "@/lib/attachment-types";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
+export const DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
 export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 2048;
 export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 2048;
 
@@ -40,7 +40,7 @@ export function chatHasImageAttachments(
 }
 
 /**
- * Default text chat model (DeepSeek via OpenRouter).
+ * Default text chat model (NVIDIA Nemotron via OpenRouter).
  */
 export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
   return {
@@ -71,7 +71,7 @@ export function resolveChatModelConfig(
 function assertModelEnv() {
   if (!process.env.OPENROUTER_API_KEY?.trim()) {
     warn("missing_openrouter_key", {
-      message: "OPENROUTER_API_KEY not set. DeepSeek model will not function.",
+      message: "OPENROUTER_API_KEY not set. NVIDIA Nemotron model will not function.",
     });
   }
 }
@@ -139,7 +139,7 @@ export function createModel(
 }
 
 /**
- * Create model with tools bound. DeepSeek via OpenRouter.
+ * Create model with tools bound. NVIDIA Nemotron via OpenRouter.
  */
 export function createModelWithTools(
   tools: DynamicStructuredTool[],

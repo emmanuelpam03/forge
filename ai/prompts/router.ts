@@ -9,7 +9,6 @@ import {
 } from "@/ai/prompts/composer";
 import {
   getFormatterPrompt,
-  getHumanizationPrompt,
   getMasterPrompt,
   getModePrompt,
   getSafetyPrompt,
@@ -17,7 +16,6 @@ import {
   getToolsPrompt,
   getVisualContextToolPrompt,
 } from "@/ai/prompts/promptRegistry";
-// humanization routing removed from live prompt assembly
 import {
   DEFAULT_PROMPT_BEHAVIOR_CONTROLS,
   type AudienceLevel,
@@ -390,13 +388,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   const includeVisualContextToolGuidance =
     includeToolGuidance && looksLikeVisualRequest(state.userMessage);
 
-  const seniorEngineerEnabled =
-    controls.persona === "senior-engineer" ||
-    (controls.persona === "auto" &&
-      (state.taskCategory === "coding" || controls.responseMode === "code"));
-
   const shouldPrioritizeCodingTaskPrompt =
-    seniorEngineerEnabled ||
     state.taskCategory === "coding" ||
     controls.responseMode === "code" ||
     looksLikeCodeRequest(state.userMessage);
@@ -407,7 +399,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
 
   const taskPrompt = getTaskPrompt(effectiveTaskCategory);
 
-  const resolvedPersonaRole = seniorEngineerEnabled ? "senior-engineer" : "none";
+  const resolvedPersonaRole = "none";
 
   const baseSegments: PromptSegment[] = [
     {
@@ -475,16 +467,6 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       enabled: taskPrompt.trim().length > 0,
     },
     {
-      id: "humanization-explicit",
-      layer: "humanization",
-      priority: 78,
-      content: getHumanizationPrompt(),
-      directives: {
-        "response.humanization": false ? "explicit-request" : "disabled",
-      },
-      enabled: false,
-    },
-    {
       id: "formatter-default",
       layer: "formatting",
       priority: 75,
@@ -494,7 +476,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
         "response.verbosity": controls.verbosity,
         "response.audience": controls.audience,
       },
-      enabled: effectiveTaskCategory !== "coding",
+      enabled: true,
     },
   ];
 
@@ -523,7 +505,6 @@ export async function buildChatMessages(state: ChatGraphState): Promise<BaseMess
   const behaviorControls =
     state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS;
   const effectiveTaskCategory =
-    behaviorControls.persona === "senior-engineer" ||
     state.taskCategory === "coding" ||
     behaviorControls.responseMode === "code" ||
     looksLikeCodeRequest(state.userMessage)

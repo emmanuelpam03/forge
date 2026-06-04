@@ -426,8 +426,18 @@ function buildToolArgs(
       avoidDuplicates: true,
     };
   }
-
   return {};
+}
+
+function looksLikeTrivialGreetingOrAcknowledgement(message: string): boolean {
+  const normalized = message.trim();
+  if (!normalized || normalized.length > 40) {
+    return false;
+  }
+
+  return /^(hi|hey|hello|yo|sup|thanks|thank you|thx|ok|okay|got it|cool|nice|great|sounds good|perfect|appreciate it)[!.?\s]*$/i.test(
+    normalized,
+  );
 }
 
 function estimateTokens(text: string): number {
@@ -575,9 +585,7 @@ export async function generateResponseNode(state: ChatGraphState) {
           assistantMessage += visibleChunk;
           graphStreamEventEmitter?.({ type: "token", content: visibleChunk });
         },
-        async (_jsonText) => {
-          return;
-        },
+        async () => {},
       );
 
     } catch (err) {
@@ -790,23 +798,15 @@ export async function planTaskNode(state: ChatGraphState) {
       state.queryIntent ??
       deriveQueryIntentFromClassification(state.classifiedIntent);
     const selected = state.selectedOptions ?? [];
-    const forceSeniorEngineeringFromCoding = selected.includes("coding");
-    const forcedPromptBehavior = forceSeniorEngineeringFromCoding
-      ? {
-          ...(state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
-          persona: "senior-engineer" as const,
-        }
-      : state.promptBehavior;
-    const forcedTaskCategory = forceSeniorEngineeringFromCoding
-      ? "coding"
-      : state.taskCategory;
+    const forceCodingPrompt = selected.includes("coding");
+    const forcedPromptBehavior = state.promptBehavior;
+    const forcedTaskCategory = forceCodingPrompt ? "coding" : state.taskCategory;
 
-    if (forceSeniorEngineeringFromCoding) {
-      info("prompt_routing.force_persona", {
+    if (forceCodingPrompt) {
+      info("prompt_routing.force_coding", {
         chatId: state.chatId,
         runId: state.runId,
         reason: "selectedOption:coding",
-        forcedPersona: "senior-engineer",
       });
     }
     const forcedTool = state.forceTool ?? null;
@@ -907,7 +907,7 @@ export async function toolRouterNodeImpl(
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
     let intermediateImageBlock: ChatImageBlock | undefined = undefined;
-    let intermediateAssistantMedia: unknown | undefined = undefined;
+    const intermediateAssistantMedia: unknown | undefined = undefined;
 
     if (state.forceTool) {
       const forcedName = state.forceTool;
@@ -925,7 +925,10 @@ export async function toolRouterNodeImpl(
 
           if (forcedName === "imageSearch") {
             try {
-              const parsed: Record<string, unknown> = typeof rawResult === "string" ? JSON.parse(rawResult) : (rawResult as Record<string, unknown>);
+              const parsed: Record<string, unknown> =
+                typeof rawResult === "string"
+                  ? JSON.parse(rawResult)
+                  : (rawResult as Record<string, unknown>);
               const images = ((parsed?.images as Array<Record<string, unknown>>) ?? []) as RetrievedImage[];
               intermediateImageBlock = {
                 images: images.map((im) => ({
@@ -952,6 +955,8 @@ export async function toolRouterNodeImpl(
                 content: "",
                 timestamp: new Date().toISOString(),
               });
+
+              intermediateContext = toolResultText;
 
               return {
                 toolsUsed: Array.from(toolsUsed),
@@ -1254,11 +1259,32 @@ export async function synthesizeEvidenceNode(state: ChatGraphState) {
  */
 export async function classifyIntentNode(state: ChatGraphState) {
   try {
-    const model = createGeminiModel();
-    const classificationPrompt = buildIntentClassificationMessage(
-      state.userMessage,
-    );
     const preserveLongFormDraft = shouldPreserveLongFormDraft(state.userMessage);
+
+    if (looksLikeTrivialGreetingOrAcknowledgement(state.userMessage)) {
+      const promptBehavior =
+        state.promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS;
+
+      return {
+        intent: "knowledge",
+        queryIntent: {
+          needsTools: false,
+          type: "knowledge",
+        },
+        classifiedIntent: null,
+        structuredIntent: null,
+        taskCategory: "general",
+        responseMode: "chat",
+        verbosityLevel: "auto",
+        audienceLevel: "auto",
+        teachingDepth: "auto",
+        formattingProfile: "auto",
+        promptBehavior,
+      };
+    }
+
+    const model = createGeminiModel();
+    const classificationPrompt = buildIntentClassificationMessage(state.userMessage);
 
     let classifiedIntent = null;
     let structuredIntent = null;
@@ -1287,34 +1313,40 @@ export async function classifyIntentNode(state: ChatGraphState) {
           },
       );
 
-      // Run a separate freshness classifier to catch queries that explicitly
-      // require up-to-date facts (e.g. "Who is the president of the US?"). If
-      // the freshness classifier indicates the query needs fresh data, force
-      // `web_search` into the structured intent so the planner invokes the
-      // web search tool.
-      try {
-        const freshnessPrompt = buildFreshnessClassificationMessage(state.userMessage);
-        const freshnessResp = await model.invoke(
-          [new HumanMessage(freshnessPrompt)],
-          buildLangSmithRunConfig(state, "freshness-classification"),
+      const shouldRunFreshnessClassification =
+        (structuredIntent?.intent ?? classifiedIntent?.intent) === "factual" &&
+        !looksLikeCodeRequest(state.userMessage) &&
+        !/^(hi|hey|hello|thanks|thank you|yo|sup|good morning|good afternoon|good evening)[!.\s]*$/i.test(
+          state.userMessage.trim(),
         );
-        const freshnessParsed = parseClassificationText(toTextContent(freshnessResp.content));
 
-        if (shouldForceWebSearchFromClassification(freshnessParsed)) {
-          classifiedIntent = {
-            ...(classifiedIntent ?? { intent: "factual", requiresFreshData: true, confidence: "low" }),
-            requiresFreshData: true,
-          } as ClassifiedIntent;
-          if (!structuredIntent) {
-            structuredIntent = deriveStructuredFromLegacy(classifiedIntent as ClassifiedIntent);
+      if (shouldRunFreshnessClassification) {
+        // Only spend the extra model call when the first pass suggests the
+        // turn is actually factual and could benefit from freshness checks.
+        try {
+          const freshnessPrompt = buildFreshnessClassificationMessage(state.userMessage);
+          const freshnessResp = await model.invoke(
+            [new HumanMessage(freshnessPrompt)],
+            buildLangSmithRunConfig(state, "freshness-classification"),
+          );
+          const freshnessParsed = parseClassificationText(toTextContent(freshnessResp.content));
+
+          if (shouldForceWebSearchFromClassification(freshnessParsed)) {
+            classifiedIntent = {
+              ...(classifiedIntent ?? { intent: "factual", requiresFreshData: true, confidence: "low" }),
+              requiresFreshData: true,
+            } as ClassifiedIntent;
+            if (!structuredIntent) {
+              structuredIntent = deriveStructuredFromLegacy(classifiedIntent as ClassifiedIntent);
+            }
+            if (!structuredIntent.toolUsage.includes("web_search")) {
+              structuredIntent.toolUsage = [...structuredIntent.toolUsage, "web_search"];
+            }
           }
-          if (!structuredIntent.toolUsage.includes("web_search")) {
-            structuredIntent.toolUsage = [...structuredIntent.toolUsage, "web_search"];
-          }
+        } catch (freshnessErr) {
+          // Non-fatal: if freshness classification fails, continue with existing intent
+          warn("freshness_classification_failed", { error: freshnessErr });
         }
-      } catch (freshnessErr) {
-        // Non-fatal: if freshness classification fails, continue with existing intent
-        warn("freshness_classification_failed", { error: freshnessErr });
       }
 
       // Attachment extraction heuristic: if uploads suggest the user expects
@@ -1373,15 +1405,9 @@ export async function classifyIntentNode(state: ChatGraphState) {
       };
     }
 
-    const forceSeniorEngineeringFromCoding = (
-      state.selectedOptions ?? []
-    ).includes("coding");
-    if (forceSeniorEngineeringFromCoding) {
+    const forceCodingPrompt = (state.selectedOptions ?? []).includes("coding");
+    if (forceCodingPrompt) {
       taskCategory = "coding";
-      promptBehavior = {
-        ...(promptBehavior ?? DEFAULT_PROMPT_BEHAVIOR_CONTROLS),
-        persona: "senior-engineer",
-      };
     }
 
     // Log intent classification results at debug level to reduce hot-path verbosity

@@ -25,7 +25,6 @@ import { ModesMenu } from "@/components/ModesMenu";
 import { useSelectedOptions } from "@/hooks/useSelectedOptions";
 import { type StreamEvent } from "@/ai/graph/stream";
 import { type RetrievedImage } from "@/ai/tools/image-types";
-import { useSeniorEngineeringMode } from "@/hooks/useSeniorEngineeringMode";
 import {
   inferAttachmentKind,
   type UploadedAttachment,
@@ -107,10 +106,15 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
+  {
+    id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    label: "NVIDIA Nemotron 3 Ultra (free)",
+    provider: "openrouter",
+  },
   { id: "deepseek/deepseek-v4-flash", label: "DeepSeek v4 Flash", provider: "openrouter" },
 ];
 
-const DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
+const DEFAULT_MODEL_ID = "nvidia/nemotron-3-ultra-550b-a55b:free";
 const DEFAULT_MODEL_OPTION = MODEL_OPTIONS[0];
 
 function MessageBubble({
@@ -412,8 +416,6 @@ export function ChatClient({
     removeOption,
   } = useSelectedOptions(chatId);
   const selectedOptions = getSelectedOptionObjects();
-  const { isEnabled: isForceSeniorEngineeringMode } =
-    useSeniorEngineeringMode(chatId);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -424,7 +426,9 @@ export function ChatClient({
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoSentRef = useRef(false);
 
-  const selectedModel = DEFAULT_MODEL_OPTION;
+  const selectedModel =
+    MODEL_OPTIONS.find((option) => option.id === selectedModelId) ??
+    DEFAULT_MODEL_OPTION;
   const requestModel = selectedModel;
 
   const hasMessages = messages.length > 0;
@@ -1419,9 +1423,6 @@ export function ChatClient({
             forceTool: options?.forceTool,
             // send only stable attachment IDs; server will resolve them
             attachments: attachmentsSnapshot.map((a) => a.id),
-            promptBehavior: isForceSeniorEngineeringMode
-              ? { persona: "senior-engineer" }
-              : undefined,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -1660,7 +1661,6 @@ export function ChatClient({
       requestModel.id,
       requestModel.provider,
       selectedOptionIds,
-      isForceSeniorEngineeringMode,
       showFeedback,
       finalizeStreamState,
       hasMessages,
