@@ -8,7 +8,7 @@ import {
 } from "@/ai/models";
 import { buildChatMessages, looksLikeCodeRequest } from "@/ai/prompts/router.ts";
 import { loadContextFastPath } from "@/ai/context/engine";
-import { persistSaveMessagesJobData } from "@/lib/background-worker";
+import { generateAndPersistTitle, persistSaveMessagesJobData } from "@/lib/background-worker";
 import { queueJob, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
 import { createForgeTools } from "@/ai/tools";
 import { hashIdentifierForLogging } from "@/lib/logging";
@@ -1505,7 +1505,20 @@ export async function generateTitleNode(state: ChatGraphState) {
     runId: state.runId,
   };
 
-  void queueJob("generateTitle", titleJobData);
+  const queuedJobId = await queueJob("generateTitle", titleJobData);
+
+  if (queuedJobId === "no-redis") {
+    try {
+      const generatedTitle = await generateAndPersistTitle(titleJobData);
+      return { generatedTitle };
+    } catch (error) {
+      logError("generate_title_sync_fallback_failed", {
+        chatId: state.chatId,
+        runId: state.runId,
+        error,
+      });
+    }
+  }
 
   // Return empty title immediately; actual generation happens asynchronously
   // This prevents blocking the response stream

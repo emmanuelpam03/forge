@@ -169,89 +169,113 @@ export async function persistSaveMessagesJobData(
   };
 }
 
+export async function generateAndPersistTitle(
+  data: GenerateTitleJobData,
+): Promise<string> {
+  const titleGenerationMaxTokens = 128;
+
+  const existingChat = await prisma.chat.findUnique({
+    where: { id: data.chatId },
+    select: { title: true },
+  });
+
+  const existingTitle = (existingChat?.title ?? "").trim();
+  if (existingTitle && !isGenericChatTitle(existingTitle)) {
+    return existingTitle;
+  }
+
+  const model = createGeminiModel(undefined, {
+    maxCompletionTokens: titleGenerationMaxTokens,
+  });
+
+  const recentMessages = await prisma.message.findMany({
+    where: { chatId: data.chatId },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    select: { role: true, content: true },
+  });
+
+  const recentMessageContext = recentMessages
+    .reverse()
+    .map((message) => {
+      const content = message.content.trim();
+      if (!content) return "";
+      return `${message.role === "assistant" ? "Assistant" : "User"}: ${content}`;
+    })
+    .filter((line) => line.length > 0)
+    .join("\n");
+
+  const parts: string[] = [];
+  if (recentMessageContext) {
+    parts.push(recentMessageContext);
+  }
+  if (typeof data.recentConversation === "string" && data.recentConversation.trim().length > 0) {
+    parts.push(data.recentConversation.trim());
+  }
+  if (typeof data.userMessage === "string" && data.userMessage.trim().length > 0) {
+    parts.push(`User: ${data.userMessage.trim()}`);
+  }
+  if (typeof data.assistantMessage === "string" && data.assistantMessage.trim().length > 0) {
+    parts.push(`Assistant: ${data.assistantMessage.trim()}`);
+  }
+
+  const conversationContext = parts.join("\n");
+
+  let prompt = TITLE_GENERATION_PROMPT.replace("{CONVERSATION_CONTEXT}", conversationContext);
+
+  const contextParts: string[] = [];
+  if (data.projectContext) {
+    contextParts.push(`Project context: ${toTextContent(data.projectContext)}`);
+  }
+  if (data.chatSummary) {
+    contextParts.push(`Chat summary: ${toTextContent(data.chatSummary)}`);
+  }
+  if (data.memorySummary) {
+    contextParts.push(`Relevant memory: ${toTextContent(data.memorySummary)}`);
+  }
+
+  if (contextParts.length > 0) {
+    prompt += `\n\nContext:\n${contextParts.join("\n\n")}\n\nUse this context when creating a concise, descriptive title.`;
+  }
+
+  const response = await model.invoke([new HumanMessage(prompt)], {
+    runName: "forge.title-generation-bg",
+    tags: ["phase:title-generation", "background:true"],
+    metadata: { chatId: data.chatId, runId: data.runId },
+  });
+
+  const generatedTitle = toTextContent(response.content)
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/[—–-].*$/, "")
+    .replace(/\b(straight to the point|quick take|in brief|explained simply)\b.*$/i, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[^\p{L}\p{N}\s'-]/gu, "")
+    .trim();
+
+  if (!generatedTitle) {
+    return "";
+  }
+
+  await prisma.chat.update({
+    where: { id: data.chatId },
+    data: { title: generatedTitle },
+  });
+
+  await publishChatTitleUpdate({
+    chatId: data.chatId,
+    title: generatedTitle,
+  });
+
+  return generatedTitle;
+}
+
 async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<void> {
   const { data } = job;
   const timer = startTimer("process_generate_title", { chatId: data.chatId });
-  const titleGenerationMaxTokens = 128;
 
   try {
-    const existingChat = await prisma.chat.findUnique({
-      where: { id: data.chatId },
-      select: { title: true },
-    });
-
-    if (existingChat && !isGenericChatTitle(existingChat.title)) {
-      info("job_generateTitle_skipped_existing_title", {
-        jobId: job.id,
-        chatId: data.chatId,
-        runId: data.runId,
-        title: existingChat.title,
-      });
-      await completeJob(job.id, "generateTitle");
-      return;
-    }
-
-    const model = createGeminiModel(undefined, {
-      maxCompletionTokens: titleGenerationMaxTokens,
-    });
-    const parts: string[] = [];
-    if (typeof data.recentConversation === "string" && data.recentConversation.trim().length > 0) {
-      parts.push(data.recentConversation.trim());
-    }
-    if (typeof data.userMessage === "string" && data.userMessage.trim().length > 0) {
-      parts.push(`User: ${data.userMessage.trim()}`);
-    }
-    if (typeof data.assistantMessage === "string" && data.assistantMessage.trim().length > 0) {
-      parts.push(`Assistant: ${data.assistantMessage.trim()}`);
-    }
-
-    const conversationContext = parts.join("\n");
-
-    let prompt = TITLE_GENERATION_PROMPT.replace("{CONVERSATION_CONTEXT}", conversationContext);
-
-    const contextParts: string[] = [];
-    if (data.projectContext) {
-      contextParts.push(`Project context: ${toTextContent(data.projectContext)}`);
-    }
-    if (data.chatSummary) {
-      contextParts.push(`Chat summary: ${toTextContent(data.chatSummary)}`);
-    }
-    if (data.memorySummary) {
-      contextParts.push(`Relevant memory: ${toTextContent(data.memorySummary)}`);
-    }
-
-    if (contextParts.length > 0) {
-      prompt += `\n\nContext:\n${contextParts.join("\n\n")}\n\nUse this context when creating a concise, descriptive title.`;
-    }
-
-    // Mock buildLangSmithRunConfig - adjust if needed
-    const runConfig = {
-      runName: `forge.title-generation-bg`,
-      tags: [`phase:title-generation`, `background:true`],
-      metadata: { chatId: data.chatId, runId: data.runId },
-    };
-
-    const response = await model.invoke([new HumanMessage(prompt)], runConfig);
-    const generatedTitle = toTextContent(response.content)
-      .trim()
-      .replace(/^["']|["']$/g, "")
-      .replace(/[—–-].*$/, "")
-      .replace(/\b(straight to the point|quick take|in brief|explained simply)\b.*$/i, "")
-      .replace(/\s{2,}/g, " ")
-      .replace(/[^\p{L}\p{N}\s'-]/gu, "")
-      .trim();
-
-    if (generatedTitle) {
-      await prisma.chat.update({
-        where: { id: data.chatId },
-        data: { title: generatedTitle },
-      });
-
-      await publishChatTitleUpdate({
-        chatId: data.chatId,
-        title: generatedTitle,
-      });
-    }
+    const generatedTitle = await generateAndPersistTitle(data);
 
     info("job_generateTitle_completed", {
       jobId: job.id,
