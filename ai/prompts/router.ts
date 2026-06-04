@@ -371,7 +371,7 @@ function buildRuntimeContext(state: ChatGraphState): string {
 
 // Memory injection disabled.
 
-function looksLikeCodeRequest(message: string): boolean {
+export function looksLikeCodeRequest(message: string): boolean {
   return /```|\b(code|coding|function|class|interface|type|typescript|javascript|python|java|c\+\+|c#|sql|api|endpoint|bug|debug|fix|refactor|implement|algorithm|query|schema)\b/i.test(
     message,
   );

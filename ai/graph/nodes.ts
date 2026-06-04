@@ -6,7 +6,7 @@ import {
   resolveChatModelConfig,
   type ModelOverride,
 } from "@/ai/models";
-import { buildChatMessages } from "@/ai/prompts/router.ts";
+import { buildChatMessages, looksLikeCodeRequest } from "@/ai/prompts/router.ts";
 import { loadContextFastPath } from "@/ai/context/engine";
 import { persistSaveMessagesJobData } from "@/lib/background-worker";
 import { queueJob, type SaveMessagesJobData, type GenerateTitleJobData } from "@/lib/job-queue";
@@ -907,7 +907,6 @@ export async function toolRouterNodeImpl(
     const toolsUsed = new Set<string>();
     let intermediateContext = state.toolContext;
     let intermediateImageBlock: ChatImageBlock | undefined = undefined;
-    const intermediateAssistantMedia: unknown | undefined = undefined;
 
     if (state.forceTool) {
       const forcedName = state.forceTool;
@@ -963,7 +962,6 @@ export async function toolRouterNodeImpl(
                 evidenceBundles,
                 toolContext: intermediateContext,
                 imageBlock: intermediateImageBlock,
-                assistantMedia: intermediateAssistantMedia,
               };
             } catch {
               // ignore parse errors; still emit images event
@@ -1153,7 +1151,6 @@ export async function toolRouterNodeImpl(
         evidenceBundles,
         toolContext: intermediateContext,
         imageBlock: intermediateImageBlock,
-        assistantMedia: intermediateAssistantMedia,
       };
     }
 
@@ -1315,10 +1312,7 @@ export async function classifyIntentNode(state: ChatGraphState) {
 
       const shouldRunFreshnessClassification =
         (structuredIntent?.intent ?? classifiedIntent?.intent) === "factual" &&
-        !looksLikeCodeRequest(state.userMessage) &&
-        !/^(hi|hey|hello|thanks|thank you|yo|sup|good morning|good afternoon|good evening)[!.\s]*$/i.test(
-          state.userMessage.trim(),
-        );
+        !looksLikeCodeRequest(state.userMessage);
 
       if (shouldRunFreshnessClassification) {
         // Only spend the extra model call when the first pass suggests the
