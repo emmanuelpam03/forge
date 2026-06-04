@@ -103,7 +103,7 @@ type ModelInvoker = {
     messages: BaseMessage[],
     opts?: unknown,
   ) => AsyncIterable<unknown> | PromiseLike<AsyncIterable<unknown>>;
-      if (toolName !== "imageSearch") return;
+  nativeStream?: (
     messages: BaseMessage[],
     opts?: unknown,
   ) => AsyncIterable<unknown> | PromiseLike<AsyncIterable<unknown>>;
@@ -575,8 +575,15 @@ export async function generateResponseNode(state: ChatGraphState) {
           assistantMessage += visibleChunk;
           graphStreamEventEmitter?.({ type: "token", content: visibleChunk });
         },
-        async (jsonText) => jsonText,
+        async (_jsonText) => {
+          return;
+        },
       );
+
+    } catch (err) {
+      logError("stream_generation_failed", { error: err });
+      // Fall through to fallback handling below.
+    }
 
   // Never expose raw tool outputs directly to the user. If the model failed
   // to produce content, return a safe, assistant-composed fallback message
