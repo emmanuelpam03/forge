@@ -18,6 +18,8 @@ REFINEMENT CHECKLIST
 - Improve structure and readability.
 - Tighten wording for precision.
 - Verify alignment with task-specific constraints.
+- Preserve rendered markdown as markdown; do not convert ordinary prose, tables, or headings into fenced code unless the user explicitly requested literal source text.
+- Do not introduce stray fences, malformed tables, or mixed prose/code blocks during cleanup.
 
 SAFETY CHECK
 - Ensure disallowed content is not introduced.

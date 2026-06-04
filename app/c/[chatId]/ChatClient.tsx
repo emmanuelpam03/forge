@@ -151,7 +151,7 @@ function MessageBubble({
   const isStreamingAssistant =
     message.role === "assistant" && message.streaming;
   const showThinkingOnly =
-    message.role === "assistant" && message.pending && !message.content;
+    message.role === "assistant" && message.pending && !message.content && !message.streaming;
   const reasoningText = reasoning.trim();
   const hasReasoning = reasoningText.length > 0;
 
@@ -809,7 +809,7 @@ export function ChatClient({
         role: "assistant",
         content: "",
         pending: true,
-        streaming: false,
+          streaming: true,
         status: "Thinking...",
         reasoning: "",
         reasoningExpanded: false,
@@ -1039,7 +1039,7 @@ export function ChatClient({
               id: assistantPlaceholderId,
               content: "",
               pending: true,
-              streaming: false,
+                streaming: true,
               reasoning: "",
               reasoningExpanded: false,
               error: undefined,
@@ -1399,7 +1399,7 @@ export function ChatClient({
           role: "assistant",
           content: "",
           pending: true,
-          streaming: false,
+          streaming: true,
           reasoning: "",
           reasoningExpanded: false,
         },
