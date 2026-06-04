@@ -150,8 +150,10 @@ function MessageBubble({
 }) {
   const isStreamingAssistant =
     message.role === "assistant" && message.streaming;
-  const showThinkingOnly =
-    message.role === "assistant" && message.pending && !message.content && !message.streaming;
+  const activityStatus = message.status?.trim() ?? "";
+  const showAssistantActivity =
+    message.role === "assistant" &&
+    (Boolean(activityStatus) || message.pending || message.streaming);
   const reasoningText = reasoning.trim();
   const hasReasoning = reasoningText.length > 0;
 
@@ -246,15 +248,17 @@ function MessageBubble({
               <p className="text-[14px] leading-7 text-red-400">
                 {message.error}
               </p>
-            ) : showThinkingOnly ? (
-              <div className="flex items-center gap-2 text-[14px] text-muted-foreground">
-                <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-                <span className="text-sm">
-                  {message.status ?? "Thinking..."}
-                </span>
-              </div>
             ) : (
               <div className="text-[14px]">
+                {showAssistantActivity ? (
+                  <div className="mb-2 flex items-center gap-2 text-[12.5px] text-muted-foreground">
+                    <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                    <span className="text-sm">
+                      {activityStatus || "Thinking..."}
+                    </span>
+                  </div>
+                ) : null}
+
                 {message.role === "user" && message.attachmentBlock?.attachments?.length ? (
                   <div className="mb-3 flex flex-wrap gap-2">
                     {message.attachmentBlock.attachments.map((attachment) => (
