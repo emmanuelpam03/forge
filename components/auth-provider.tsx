@@ -5,6 +5,11 @@ import { authClient, signOut as signOutClient } from "@/lib/auth-client";
 
 type AuthUser = typeof authClient.$Infer.Session.user;
 
+type AuthProviderProps = {
+  children: React.ReactNode;
+  initialUser?: AuthUser | null;
+};
+
 type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
@@ -14,13 +19,15 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children, initialUser = null }: AuthProviderProps) {
   const { data: session, isPending, refetch } = authClient.useSession();
+  const user = session?.user ?? (session === undefined ? initialUser : null);
+  const loading = isPending && !user;
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: session?.user ?? null,
-      loading: isPending,
+      user,
+      loading,
       refresh: async () => {
         await refetch();
       },
@@ -29,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await refetch();
       },
     }),
-    [session?.user, isPending, refetch],
+    [user, loading, refetch],
   );
 
   return (

@@ -6,6 +6,7 @@ import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { FeedbackProvider } from "@/components/feedback-provider";
 import { AppShell } from "@/components/app-shell";
 import AuthProvider from "@/components/auth-provider";
+import { getServerSession } from "@/lib/server-auth";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -67,11 +68,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession();
+
   return (
     <html
       lang="en"
@@ -87,7 +90,7 @@ export default function RootLayout({
         >
           <FeedbackProvider>
             <KeyboardShortcuts />
-            <AuthProvider>
+            <AuthProvider initialUser={session?.user ?? null}>
               <AppShell>{children}</AppShell>
             </AuthProvider>
           </FeedbackProvider>
