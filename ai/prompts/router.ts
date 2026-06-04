@@ -325,6 +325,12 @@ function formatToolPlan(state: ChatGraphState): string {
   return `Tools used were ${state.toolPlan.toolsNeeded.join(", ")} in ${state.executionMode} mode.`;
 }
 
+function looksLikeVisualRequest(message: string): boolean {
+  return /\b(image|images|photo|photos|picture|pictures|diagram|diagrams|chart|charts|screenshot|mockup|wireframe|ui|ux|design|layout|architecture|reference|inspiration|show me|visual)\b/i.test(
+    message,
+  );
+}
+
 function buildRuntimeContext(state: ChatGraphState): string {
   const evidencePriorityContext = formatEvidencePriorityContext(state);
   function formatAttachmentHandlingGuidance(state: ChatGraphState): string {
@@ -380,6 +386,9 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
   logTeachingDepthTelemetry(state, controls.teachingDepth);
 
   const runtimeContext = buildRuntimeContext(state);
+  const includeToolGuidance = Boolean(state.queryIntent?.needsTools);
+  const includeVisualContextToolGuidance =
+    includeToolGuidance && looksLikeVisualRequest(state.userMessage);
 
   const seniorEngineerEnabled =
     controls.persona === "senior-engineer" ||
@@ -443,6 +452,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       directives: {
         "tools.visual-context": "image-search-autonomy",
       },
+      enabled: includeVisualContextToolGuidance,
     },
     {
       id: "tools-policy",
@@ -452,6 +462,7 @@ function buildPromptSegments(state: ChatGraphState): PromptSegment[] {
       directives: {
         "tools.policy": "evidence-first",
       },
+      enabled: includeToolGuidance,
     },
     {
       id: `task-${effectiveTaskCategory}`,

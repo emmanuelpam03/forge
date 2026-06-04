@@ -172,6 +172,7 @@ export async function persistSaveMessagesJobData(
 async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<void> {
   const { data } = job;
   const timer = startTimer("process_generate_title", { chatId: data.chatId });
+  const titleGenerationMaxTokens = 128;
 
   try {
     const existingChat = await prisma.chat.findUnique({
@@ -190,7 +191,9 @@ async function processGenerateTitleJob(job: Job<GenerateTitleJobData>): Promise<
       return;
     }
 
-    const model = createGeminiModel();
+    const model = createGeminiModel(undefined, {
+      maxCompletionTokens: titleGenerationMaxTokens,
+    });
     const parts: string[] = [];
     if (typeof data.recentConversation === "string" && data.recentConversation.trim().length > 0) {
       parts.push(data.recentConversation.trim());

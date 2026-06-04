@@ -8,8 +8,8 @@ import type { UploadedAttachment } from "@/lib/attachment-types";
 
 export const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 export const DEFAULT_MODEL = "deepseek/deepseek-v4-flash";
-export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 4096;
-export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 4096;
+export const DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS = 2048;
+export const MAX_OPENROUTER_MAX_COMPLETION_TOKENS = 2048;
 
 export type ChatModelProvider = "openrouter";
 
@@ -53,6 +53,7 @@ export function getChatModelConfig(override?: ModelOverride): ChatModelConfig {
 
 export type ResolveChatModelOptions = {
   hasImageAttachments?: boolean;
+  maxCompletionTokens?: number;
 };
 
 /**
@@ -98,14 +99,23 @@ export function createModel(
       ? Number.parseInt(maxTokensEnv, 10)
       : DEFAULT_OPENROUTER_MAX_COMPLETION_TOKENS;
 
+  const requestedMaxTokens = options?.maxCompletionTokens;
+  const parsedRequestedMaxTokens =
+    typeof requestedMaxTokens === "number" && Number.isFinite(requestedMaxTokens)
+      ? Math.trunc(requestedMaxTokens)
+      : null;
+
   const maxTokens = Math.max(
     1,
-    Math.min(parsedMaxTokens, MAX_OPENROUTER_MAX_COMPLETION_TOKENS),
+    Math.min(
+      parsedRequestedMaxTokens ?? parsedMaxTokens,
+      MAX_OPENROUTER_MAX_COMPLETION_TOKENS,
+    ),
   );
 
-  if (parsedMaxTokens !== maxTokens) {
+  if ((parsedRequestedMaxTokens ?? parsedMaxTokens) !== maxTokens) {
     warn("openrouter_max_tokens_clamped", {
-      configuredMaxTokens: parsedMaxTokens,
+      configuredMaxTokens: parsedRequestedMaxTokens ?? parsedMaxTokens,
       clampedMaxTokens: maxTokens,
       maximumAllowed: MAX_OPENROUTER_MAX_COMPLETION_TOKENS,
     });
