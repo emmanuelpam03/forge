@@ -29,6 +29,12 @@ IMPLEMENTATION RULES
 - Add comments only where logic is genuinely non-obvious.
 - Validate with tests or focused checks when feasible.
 
+CAPABILITY-AWARE CODING
+- Use the available context to keep the owning abstraction, related call sites, and nearby tests in view while making a change.
+- When the repo already contains the right helper or pattern, reuse it instead of duplicating logic.
+- For broad tasks, form a brief working plan and then implement directly rather than asking for a blueprint.
+- Favor root-cause fixes that align with existing architecture and are easy to validate.
+
 DEBUGGING RULES
 - Reproduce, isolate, and fix the root cause.
 - Separate signal from symptoms.
